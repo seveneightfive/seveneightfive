@@ -129,7 +129,10 @@ async function getArtistEvents(artistId: string): Promise<Event[]> {
     .order('event_date', { ascending: true })
     .limit(10)
 
-  return (data || []) as Event[]
+  return (data || []).map((e: any) => ({
+    ...e,
+    venue: Array.isArray(e.venue) ? (e.venue[0] ?? null) : e.venue,
+  })) as Event[]
 }
 
 function getJsonLd(artist: Artist) {
