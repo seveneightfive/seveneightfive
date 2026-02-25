@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabaseBrowser'
 import { useRouter } from 'next/navigation'
+import ImageUpload from './ImageUpload'
 
 const MUSICAL_GENRES = ['Rock','Pop','Jazz','Classical','Electronic','Hip-Hop','Country','Reggae','Blues','Folk','Singer-Songwriter','Spoken Word','Motown','Funk','Americana','Punk','Grunge','Jam Band','Tejano','Latin','DJ','Bluegrass','Rap']
 const VISUAL_MEDIUMS = ['Photography','Digital / Print','Conceptual','Fiber Arts','Sculpture / Clay','Airbrush / Street / Mural','Painting','Jewelry','Illustration']
@@ -355,19 +356,21 @@ export default function EditPage() {
         )}
 
         {/* ── IMAGES ── */}
-        {activeSection === 'images' && (
+        {activeSection === 'images' && artist && (
           <>
             <div className="field">
-              <label className="field-label">Hero Image URL</label>
+              <label className="field-label">Hero Image</label>
               {imageUrl && <img src={imageUrl} alt="Hero" className="img-preview" />}
               <input type="url" value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://…" />
+              <ImageUpload artistId={artist.id} field="hero" currentUrl={imageUrl} onUploaded={setImageUrl} />
               <div className="field-hint">Full-width image at the top of your profile page (recommended: landscape, at least 1200px wide)</div>
             </div>
             <div className="section-divider" />
             <div className="field">
-              <label className="field-label">Avatar / Headshot URL</label>
+              <label className="field-label">Avatar / Headshot</label>
               {avatarUrl && <img src={avatarUrl} alt="Avatar" className="img-preview-avatar" />}
               <input type="url" value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} placeholder="https://…" />
+              <ImageUpload artistId={artist.id} field="avatar" currentUrl={avatarUrl} onUploaded={setAvatarUrl} />
               <div className="field-hint">Square headshot used in listings and previews</div>
             </div>
           </>
@@ -461,7 +464,7 @@ export default function EditPage() {
         )}
 
         {/* ── VISUAL ── */}
-        {activeSection === 'visual' && (
+        {activeSection === 'visual' && artist && (
           <>
             <div className="field">
               <label className="field-label">Mediums</label>
@@ -479,10 +482,11 @@ export default function EditPage() {
               </div>
             </div>
             <div className="field">
-              <label className="field-label">Portfolio / Works Image URL</label>
+              <label className="field-label">Portfolio / Works Image</label>
               {works && works.startsWith('http') && <img src={works} alt="Works" className="img-preview" />}
               <input type="url" value={works} onChange={e => setWorks(e.target.value)} placeholder="https://… (image URL)" />
-              <div className="field-hint">A portfolio image or link shown on your profile</div>
+              <ImageUpload artistId={artist.id} field="portfolio" currentUrl={works} onUploaded={setWorks} />
+              <div className="field-hint">A portfolio image shown on your profile</div>
             </div>
           </>
         )}
