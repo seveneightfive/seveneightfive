@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import InstallButton from "./components/InstallButton"
 import PushNotificationButton from "./components/PushNotificationButton"
+import { SpeedInsights } from '@vercel/speed-insights/next'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -43,6 +44,7 @@ export default function RootLayout({
         {children}
         <InstallButton />
         <PushNotificationButton />
+        <SpeedInsights />
       </body>
     </html>
   )
