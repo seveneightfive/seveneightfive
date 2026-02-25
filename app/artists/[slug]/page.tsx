@@ -58,6 +58,13 @@ type Event = {
   venue: { name: string; neighborhood: string | null } | null
 }
 
+type PortfolioImage = {
+  id: string
+  image_url: string
+  caption: string | null
+  display_order: number
+}
+
 // ─── SEO ─────────────────────────────────────────────────────────────────────
 
 export async function generateMetadata(
@@ -135,6 +142,15 @@ async function getArtistEvents(artistId: string): Promise<Event[]> {
   })) as Event[]
 }
 
+async function getPortfolioImages(artistId: string): Promise<PortfolioImage[]> {
+  const { data } = await supabase
+    .from('artist_portfolio_images')
+    .select('id, image_url, caption, display_order')
+    .eq('artist_id', artistId)
+    .order('display_order', { ascending: true })
+  return (data || []) as PortfolioImage[]
+}
+
 function getJsonLd(artist: Artist) {
   const genres = [...(artist.musician_profile?.musical_genres || []), ...(artist.visual_profile?.visual_mediums || [])]
   return {
@@ -181,7 +197,10 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
   const artist = await getArtist(slug)
   if (!artist) notFound()
 
-  const events = await getArtistEvents(artist.id)
+  const [events, portfolioImages] = await Promise.all([
+    getArtistEvents(artist.id),
+    getPortfolioImages(artist.id),
+  ])
 
   const mp = artist.musician_profile
   const vp = artist.visual_profile
@@ -191,7 +210,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
   const videoId = mp?.video_url ? getYouTubeId(mp.video_url) : null
   const jsonLd = getJsonLd(artist)
   const hasMusic = !!(mp?.audio_file_url || mp?.video_url)
-  const hasWork = !!(vp?.works)
+  const hasWork = !!(vp?.works) || portfolioImages.length > 0
 
   const TYPE_LABEL: Record<string, string> = {
     Musician: 'Musician', Visual: 'Visual Artist', Performance: 'Performer', Literary: 'Literary Artist',
@@ -601,6 +620,24 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
           color: var(--ink-soft);
         }
 
+        /* ── PORTFOLIO GRID ── */
+        .portfolio-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 10px;
+          margin-top: 8px;
+        }
+        @media (min-width: 520px) { .portfolio-grid { grid-template-columns: repeat(3, 1fr); } }
+        .portfolio-item { display: flex; flex-direction: column; gap: 6px; }
+        .portfolio-img {
+          width: 100%; aspect-ratio: 4/3; object-fit: cover;
+          border-radius: 8px; display: block; background: var(--off);
+        }
+        .portfolio-caption {
+          font-size: 0.75rem; color: var(--ink-faint);
+          font-style: italic; line-height: 1.4;
+        }
+
         /* ── EVENTS ── */
         .events-empty {
           display: flex;
@@ -873,10 +910,21 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
         {hasWork && (
           <section id="work" className="section">
             <div className="eyebrow">Works</div>
-            {vp?.works && vp.works.startsWith('http')
-              ? <img src={vp.works} alt={`${artist.name} — Works`} className="works-image" />
-              : <p className="works-text">{vp?.works}</p>
-            }
+            {vp?.works && (
+              vp.works.startsWith('http')
+                ? <img src={vp.works} alt={`${artist.name} — Works`} className="works-image" style={{ marginBottom: portfolioImages.length > 0 ? 20 : 0 }} />
+                : <p className="works-text" style={{ marginBottom: portfolioImages.length > 0 ? 20 : 0 }}>{vp.works}</p>
+            )}
+            {portfolioImages.length > 0 && (
+              <div className="portfolio-grid">
+                {portfolioImages.map(img => (
+                  <div key={img.id} className="portfolio-item">
+                    <img src={img.image_url} alt={img.caption || artist.name} className="portfolio-img" />
+                    {img.caption && <p className="portfolio-caption">{img.caption}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         )}
 

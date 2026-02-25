@@ -8,6 +8,14 @@ import ImageUpload from './ImageUpload'
 const MUSICAL_GENRES = ['Rock','Pop','Jazz','Classical','Electronic','Hip-Hop','Country','Reggae','Blues','Folk','Singer-Songwriter','Spoken Word','Motown','Funk','Americana','Punk','Grunge','Jam Band','Tejano','Latin','DJ','Bluegrass','Rap']
 const VISUAL_MEDIUMS = ['Photography','Digital / Print','Conceptual','Fiber Arts','Sculpture / Clay','Airbrush / Street / Mural','Painting','Jewelry','Illustration']
 
+type PortfolioImg = {
+  id?: string
+  image_url: string
+  caption: string
+  display_order: number
+  _deleted?: boolean
+}
+
 type ArtistData = {
   id: string
   name: string
@@ -81,6 +89,7 @@ export default function EditPage() {
   const [musicalGenres, setMusicalGenres] = useState<string[]>([])
   const [visualMediums, setVisualMediums] = useState<string[]>([])
   const [works, setWorks] = useState('')
+  const [portfolioImages, setPortfolioImages] = useState<PortfolioImg[]>([])
 
   const loadArtist = useCallback(async () => {
     const supabase = createClient()
@@ -147,6 +156,14 @@ export default function EditPage() {
     setVisualMediums(vp?.visual_mediums || [])
     setWorks(vp?.works || '')
 
+    // Load portfolio images
+    const { data: pImgs } = await supabase
+      .from('artist_portfolio_images')
+      .select('id, image_url, caption, display_order')
+      .eq('artist_id', a.id)
+      .order('display_order', { ascending: true })
+    setPortfolioImages((pImgs || []).map((img: { id: string; image_url: string; caption: string | null; display_order: number }) => ({ ...img, caption: img.caption || '' })))
+
     setLoading(false)
   }, [router])
 
@@ -200,6 +217,8 @@ export default function EditPage() {
       return
     }
 
+    await savePortfolio(artist.id)
+
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
@@ -210,6 +229,40 @@ export default function EditPage() {
 
   const toggleMedium = (m: string) =>
     setVisualMediums(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m])
+
+  const savePortfolio = async (artistId: string) => {
+    const supabase = createClient()
+    const toDelete = portfolioImages.filter(img => img._deleted && img.id)
+    const toUpsert = portfolioImages.filter(img => !img._deleted)
+      .map((img, i) => ({ ...img, artist_id: artistId, display_order: i }))
+
+    if (toDelete.length > 0) {
+      await supabase.from('artist_portfolio_images').delete().in('id', toDelete.map(img => img.id!))
+    }
+    if (toUpsert.length > 0) {
+      const inserts = toUpsert.filter(img => !img.id).map(({ id: _id, _deleted, ...rest }) => rest)
+      const updates = toUpsert.filter(img => !!img.id).map(({ _deleted, ...rest }) => rest)
+      if (inserts.length > 0) await supabase.from('artist_portfolio_images').insert(inserts)
+      for (const u of updates) {
+        await supabase.from('artist_portfolio_images').update({ image_url: u.image_url, caption: u.caption, display_order: u.display_order }).eq('id', u.id!)
+      }
+    }
+  }
+
+  const addPortfolioImage = (url: string) => {
+    setPortfolioImages(prev => [...prev, {
+      image_url: url, caption: '', display_order: prev.filter(p => !p._deleted).length
+    }])
+  }
+
+  const movePortfolioImage = (index: number, dir: -1 | 1) => {
+    const active = portfolioImages.filter(p => !p._deleted)
+    const newIndex = index + dir
+    if (newIndex < 0 || newIndex >= active.length) return
+    const reordered = [...active]
+    ;[reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]]
+    setPortfolioImages(reordered)
+  }
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#1a1814', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -225,6 +278,7 @@ export default function EditPage() {
     { id: 'links', label: 'Links' },
     { id: 'media', label: 'Music/Media' },
     ...(artist?.artist_type === 'Visual' ? [{ id: 'visual', label: 'Visual' }] : []),
+    { id: 'portfolio', label: 'Portfolio' },
   ]
 
   return (
@@ -490,6 +544,68 @@ export default function EditPage() {
             </div>
           </>
         )}
+
+        {/* ── PORTFOLIO ── */}
+        {activeSection === 'portfolio' && artist && (() => {
+          const active = portfolioImages.filter(p => !p._deleted)
+          return (
+            <>
+              <div className="field-hint" style={{ marginBottom: 20, color: 'rgba(255,255,255,0.35)', fontSize: '0.82rem', lineHeight: 1.6 }}>
+                Add images to your portfolio gallery. They appear on your public profile in the Works section. Drag to reorder using the arrows.
+              </div>
+
+              {active.length === 0 && (
+                <div style={{ padding: '32px 0', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '0.85rem' }}>
+                  No images yet — upload one below to get started.
+                </div>
+              )}
+
+              {active.map((img, i) => (
+                <div key={img.id || i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '14px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, marginBottom: 10 }}>
+                  <img src={img.image_url} alt="" style={{ width: 80, height: 60, objectFit: 'cover', borderRadius: 6, flexShrink: 0, background: 'rgba(255,255,255,0.06)' }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <input
+                      type="text"
+                      value={img.caption}
+                      onChange={e => setPortfolioImages(prev => prev.map((p, pi) => pi === portfolioImages.indexOf(img) ? { ...p, caption: e.target.value } : p))}
+                      placeholder="Caption (optional)"
+                      style={{ marginBottom: 0 }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+                    <button type="button" onClick={() => movePortfolioImage(i, -1)} disabled={i === 0} style={{ background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 4, color: 'rgba(255,255,255,0.4)', cursor: i === 0 ? 'not-allowed' : 'pointer', padding: '4px 8px', fontSize: '0.8rem' }}>↑</button>
+                    <button type="button" onClick={() => movePortfolioImage(i, 1)} disabled={i === active.length - 1} style={{ background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 4, color: 'rgba(255,255,255,0.4)', cursor: i === active.length - 1 ? 'not-allowed' : 'pointer', padding: '4px 8px', fontSize: '0.8rem' }}>↓</button>
+                    <button type="button" onClick={() => setPortfolioImages(prev => prev.map(p => p === img ? { ...p, _deleted: true } : p))} style={{ background: 'rgba(200,6,80,0.12)', border: 'none', borderRadius: 4, color: '#ff9ab0', cursor: 'pointer', padding: '4px 8px', fontSize: '0.8rem' }}>✕</button>
+                  </div>
+                </div>
+              ))}
+
+              <div style={{ marginTop: 16, padding: '16px', background: 'rgba(255,255,255,0.03)', border: '1.5px dashed rgba(255,255,255,0.1)', borderRadius: 10 }}>
+                <div className="field-label" style={{ marginBottom: 10 }}>Add Image</div>
+                <ImageUpload artistId={artist.id} field={`portfolio-${active.length}` as any} currentUrl="" onUploaded={addPortfolioImage} />
+                <div className="field-hint" style={{ marginTop: 8 }}>Or paste a URL:</div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <input
+                    type="url"
+                    placeholder="https://…"
+                    id="portfolio-url-input"
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const input = document.getElementById('portfolio-url-input') as HTMLInputElement
+                      if (input?.value.trim()) { addPortfolioImage(input.value.trim()); input.value = '' }
+                    }}
+                    style={{ padding: '10px 16px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            </>
+          )
+        })()}
 
         <div style={{ marginTop: 32 }}>
           <button
