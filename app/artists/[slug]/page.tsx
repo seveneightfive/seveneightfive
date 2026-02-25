@@ -163,7 +163,7 @@ function getSocialLinks(artist: Artist) {
   if (mp?.artist_spotify) links.push({ label: 'Spotify', url: mp.artist_spotify, icon: '♫', color: '#1DB954' })
   if (mp?.artist_youtube) links.push({ label: 'YouTube', url: mp.artist_youtube, icon: '▶', color: '#FF0000' })
   if (artist.social_facebook) links.push({ label: 'Facebook', url: artist.social_facebook, icon: 'f', color: '#1877F2' })
-  if (mp?.purchase_link) links.push({ label: 'Buy / Book', url: mp.purchase_link, icon: '🎟', color: '#c8502a' })
+  if (mp?.purchase_link) links.push({ label: 'Buy / Book', url: mp.purchase_link, icon: '🎟', color: '#C80650' })
   if (artist.artist_email) links.push({ label: 'Email', url: `mailto:${artist.artist_email}`, icon: '✉', color: '#6b6560' })
   artist.same_as?.forEach(url => {
     if (url.includes('soundcloud')) links.push({ label: 'SoundCloud', url, icon: '☁', color: '#FF5500' })
@@ -203,7 +203,6 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
     { id: 'work', label: 'Work', icon: '◈', show: hasWork },
     { id: 'events', label: 'Events', icon: '◷', show: true },
     { id: 'links', label: 'Links', icon: '↗', show: socialLinks.length > 0 },
-    { id: 'contact', label: 'Contact', icon: '✉', show: true },
   ].filter(n => n.show)
 
   return (
@@ -221,8 +220,8 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
           --ink-faint: #c0bab3;
           --white: #ffffff;
           --off: #f7f6f4;
-          --accent: #c8502a;
-          --accent-light: #fdf1ec;
+          --accent: #C80650;
+          --accent-light: #fdeef3;
           --border: #ece8e2;
           --serif: 'Oswald', sans-serif;
           --sans: 'DM Sans', system-ui, sans-serif;
@@ -309,8 +308,8 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
           letter-spacing: 0.1em;
           text-transform: uppercase;
           color: var(--accent);
-          background: rgba(200,80,42,0.18);
-          border: 1px solid rgba(200,80,42,0.35);
+          background: rgba(200,6,80,0.18);
+          border: 1px solid rgba(200,6,80,0.35);
           padding: 3px 8px;
           border-radius: 100px;
         }
@@ -446,7 +445,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
           justify-content: center;
           gap: 3px;
           text-decoration: none;
-          color: var(--ink-faint);
+          color: #7a7570;
           transition: color 0.15s;
           padding: 8px 2px;
           min-width: 0;
@@ -474,7 +473,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
           justify-content: center;
           gap: 3px;
           text-decoration: none;
-          color: var(--ink-faint);
+          color: #7a7570;
           transition: color 0.15s;
           padding: 8px 2px;
           border-right: 1px solid var(--border);
@@ -956,52 +955,6 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
             </div>
           </section>
         )}
-
-        <section id="contact" className="section">
-          <div className="eyebrow">Contact & Info</div>
-          <div className="contact-grid">
-            {artist.artist_email && (
-              <div className="contact-cell">
-                <div className="contact-cell-label">Email</div>
-                <div className="contact-cell-value"><a href={`mailto:${artist.artist_email}`}>{artist.artist_email}</a></div>
-              </div>
-            )}
-            {(artist.location_city || artist.location_state) && (
-              <div className="contact-cell">
-                <div className="contact-cell-label">Based In</div>
-                <div className="contact-cell-value">{[artist.location_city, artist.location_state].filter(Boolean).join(', ')}</div>
-              </div>
-            )}
-            {artist.birth_place && (
-              <div className="contact-cell">
-                <div className="contact-cell-label">From</div>
-                <div className="contact-cell-value">{artist.birth_place}</div>
-              </div>
-            )}
-            {artist.artist_website && (
-              <div className="contact-cell">
-                <div className="contact-cell-label">Website</div>
-                <div className="contact-cell-value">
-                  <a href={artist.artist_website} target="_blank" rel="noopener noreferrer">
-                    {artist.artist_website.replace(/^https?:\/\//, '')}
-                  </a>
-                </div>
-              </div>
-            )}
-            {artist.artist_type && (
-              <div className="contact-cell">
-                <div className="contact-cell-label">Type</div>
-                <div className="contact-cell-value">{TYPE_LABEL[artist.artist_type] || artist.artist_type}</div>
-              </div>
-            )}
-            {genres.length > 0 && (
-              <div className="contact-cell">
-                <div className="contact-cell-label">{artist.artist_type === 'Visual' ? 'Mediums' : 'Genres'}</div>
-                <div className="contact-cell-value">{genres.join(', ')}</div>
-              </div>
-            )}
-          </div>
-        </section>
 
       </main>
 
