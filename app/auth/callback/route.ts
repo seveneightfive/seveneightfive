@@ -43,10 +43,15 @@ export async function GET(request: Request) {
       .single()
 
     if (artist && !artist.auth_user_id) {
-      await supabase
+      const { error: linkError } = await supabase
         .from('artists')
         .update({ auth_user_id: session.user.id })
         .eq('id', artist.id)
+      if (linkError) {
+        console.error('[auth/callback] Failed to link auth_user_id:', linkError.message)
+      }
+    } else if (!artist) {
+      console.error('[auth/callback] No artist found for email:', userEmail)
     }
   }
 
