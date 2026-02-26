@@ -8,11 +8,18 @@ export default async function DashboardPage() {
 
   if (!user) redirect('/login')
 
-  const { data: artist } = await supabase
-    .from('artists')
-    .select('id, name, slug, tagline, image_url, avatar_url, artist_type, verified')
-    .eq('auth_user_id', user.id)
-    .single()
+  const [{ data: artist }, { data: venue }] = await Promise.all([
+    supabase
+      .from('artists')
+      .select('id, name, slug, tagline, image_url, avatar_url, artist_type, verified')
+      .eq('auth_user_id', user.id)
+      .single(),
+    supabase
+      .from('venues')
+      .select('id, name, slug')
+      .eq('auth_user_id', user.id)
+      .single(),
+  ])
 
   if (!artist) {
     return (
@@ -86,7 +93,7 @@ export default async function DashboardPage() {
       `}</style>
 
       <div className="topbar">
-        <a href="/" className="wordmark">The <em>785</em></a>
+        <a href="/" className="wordmark">Your <em>seveneightfive</em> Dashboard</a>
         <LogoutButton />
       </div>
 
@@ -153,6 +160,48 @@ export default async function DashboardPage() {
               <div>
                 <div className="dashboard-card-label">Visual Work</div>
                 <div className="dashboard-card-sub">Mediums and portfolio image</div>
+              </div>
+            </div>
+            <span className="dashboard-card-arrow">→</span>
+          </a>
+        )}
+
+        {venue && (
+          <>
+            <div className="section-label">Your Venue</div>
+            <a href="/dashboard/venue" className="dashboard-card">
+              <div className="dashboard-card-left">
+                <div className="dashboard-card-icon">◎</div>
+                <div>
+                  <div className="dashboard-card-label">{venue.name}</div>
+                  <div className="dashboard-card-sub">Edit venue details, address, image</div>
+                </div>
+              </div>
+              <span className="dashboard-card-arrow">→</span>
+            </a>
+          </>
+        )}
+
+        <div className="section-label">Events</div>
+
+        <a href="/dashboard/events" className="dashboard-card">
+          <div className="dashboard-card-left">
+            <div className="dashboard-card-icon">◷</div>
+            <div>
+              <div className="dashboard-card-label">My Events</div>
+              <div className="dashboard-card-sub">Add and edit events you've created</div>
+            </div>
+          </div>
+          <span className="dashboard-card-arrow">→</span>
+        </a>
+
+        {artist && (
+          <a href="/dashboard/appearances" className="dashboard-card">
+            <div className="dashboard-card-left">
+              <div className="dashboard-card-icon">★</div>
+              <div>
+                <div className="dashboard-card-label">Appearances</div>
+                <div className="dashboard-card-sub">Events you're featured in, add yourself to others</div>
               </div>
             </div>
             <span className="dashboard-card-arrow">→</span>

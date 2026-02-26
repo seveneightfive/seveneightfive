@@ -118,7 +118,7 @@ setLoading(false)
 
   useEffect(() => { applyFilters() }, [applyFilters])
 
-  const getImage = (a: Artist) => a.image_url || a.avatar_url
+  const getImage = (a: Artist) => a.avatar_url || a.image_url
   const getGenres = (a: Artist) => [
     ...(a.musician_profile?.musical_genres || []),
     ...(a.visual_profile?.visual_mediums || []),

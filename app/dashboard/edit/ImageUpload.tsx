@@ -5,12 +5,13 @@ import { createClient } from '@/lib/supabaseBrowser'
 
 type Props = {
   artistId: string
-  field: 'hero' | 'avatar' | 'portfolio'
+  field: string
   currentUrl: string
   onUploaded: (url: string) => void
+  bucket?: string
 }
 
-export default function ImageUpload({ artistId, field, currentUrl, onUploaded }: Props) {
+export default function ImageUpload({ artistId, field, currentUrl, onUploaded, bucket = 'artist-images' }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
@@ -33,7 +34,7 @@ export default function ImageUpload({ artistId, field, currentUrl, onUploaded }:
 
     const supabase = createClient()
     const { error: uploadError } = await supabase.storage
-      .from('artist-images')
+      .from(bucket)
       .upload(path, file, { upsert: true })
 
     if (uploadError) {
@@ -43,7 +44,7 @@ export default function ImageUpload({ artistId, field, currentUrl, onUploaded }:
     }
 
     const { data } = supabase.storage
-      .from('artist-images')
+      .from(bucket)
       .getPublicUrl(path)
 
     onUploaded(data.publicUrl)
