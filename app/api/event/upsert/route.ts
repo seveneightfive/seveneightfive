@@ -59,16 +59,34 @@ export async function PATCH(request: Request) {
   const body = await request.json()
   const { eventId, ...updates } = body
 
-  // Verify the event belongs to this auth user
+  // Verify access: creator, venue owner, or featured artist
   const { data: existing } = await supabase
     .from('events')
-    .select('id')
+    .select('id, auth_user_id, venue_id')
     .eq('id', eventId)
-    .eq('auth_user_id', user.id)
     .single()
 
   if (!existing) {
-    return NextResponse.json({ error: 'Event not found or access denied' }, { status: 403 })
+    return NextResponse.json({ error: 'Event not found' }, { status: 404 })
+  }
+
+  let hasAccess = existing.auth_user_id === user.id
+  if (!hasAccess && existing.venue_id) {
+    const { data: ownedVenue } = await supabase
+      .from('venues').select('id').eq('id', existing.venue_id).eq('auth_user_id', user.id).single()
+    hasAccess = !!ownedVenue
+  }
+  if (!hasAccess) {
+    const { data: myArtists } = await supabase.from('artists').select('id').eq('auth_user_id', user.id)
+    const myArtistIds = (myArtists || []).map((a: any) => a.id)
+    if (myArtistIds.length) {
+      const { data: link } = await supabase
+        .from('event_artists').select('artist_id').eq('event_id', eventId).in('artist_id', myArtistIds).limit(1).maybeSingle()
+      hasAccess = !!link
+    }
+  }
+  if (!hasAccess) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 })
   }
 
   const safeData: Record<string, unknown> = {}

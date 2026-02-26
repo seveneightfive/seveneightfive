@@ -8,20 +8,18 @@ export default async function DashboardPage() {
 
   if (!user) redirect('/login')
 
-  const [{ data: artist }, { data: venue }] = await Promise.all([
+  const [{ data: artists }, { data: venues }] = await Promise.all([
     supabase
       .from('artists')
       .select('id, name, slug, tagline, image_url, avatar_url, artist_type, verified')
-      .eq('auth_user_id', user.id)
-      .single(),
+      .eq('auth_user_id', user.id),
     supabase
       .from('venues')
       .select('id, name, slug, venue_type')
-      .eq('auth_user_id', user.id)
-      .single(),
+      .eq('auth_user_id', user.id),
   ])
 
-  if (!artist) {
+  if (!artists || artists.length === 0) {
     return (
       <>
         <style>{`
@@ -103,46 +101,51 @@ export default async function DashboardPage() {
 
       <div className="content">
 
-        {/* ── ARTIST ── */}
-        <div className="entity-header">
-          <div className="entity-header-left">
-            <div className="entity-type">{TYPE_LABEL[artist.artist_type || ''] || 'Artist'}</div>
-            <div className="entity-name">{artist.name}</div>
-          </div>
-        </div>
-
-        <a href="/dashboard/edit" className="dashboard-card">
-          <div className="dashboard-card-left">
-            <div className="dashboard-card-icon">◉</div>
-            <div>
-              <div className="dashboard-card-label">Edit Your Artist Profile</div>
-              <div className="dashboard-card-sub">Bio, images, links, media, portfolio</div>
+        {/* ── ARTISTS ── */}
+        {artists.map((artist, i) => (
+          <div key={artist.id}>
+            {i > 0 && <div className="section-divider" />}
+            <div className="entity-header">
+              <div className="entity-header-left">
+                <div className="entity-type">{TYPE_LABEL[artist.artist_type || ''] || 'Artist'}</div>
+                <div className="entity-name">{artist.name}</div>
+              </div>
             </div>
+
+            <a href={`/dashboard/edit?id=${artist.id}`} className="dashboard-card">
+              <div className="dashboard-card-left">
+                <div className="dashboard-card-icon">◉</div>
+                <div>
+                  <div className="dashboard-card-label">Edit Your Artist Profile</div>
+                  <div className="dashboard-card-sub">Bio, images, links, media, portfolio</div>
+                </div>
+              </div>
+              <span className="dashboard-card-arrow">→</span>
+            </a>
+
+            <a href="/dashboard/appearances" className="sub-card">
+              <div>
+                <div className="sub-card-label">★ Appearances</div>
+                <div className="sub-card-sub">Events you're featured in — add yourself to others</div>
+              </div>
+              <span className="sub-card-arrow">→</span>
+            </a>
+
+            {artist.slug && (
+              <a href={`/artists/${artist.slug}`} className="sub-card" target="_blank" rel="noopener noreferrer">
+                <div>
+                  <div className="sub-card-label">↗ View Public Artist Page</div>
+                  <div className="sub-card-sub">785mag.com/artists/{artist.slug}</div>
+                </div>
+                <span className="sub-card-arrow">↗</span>
+              </a>
+            )}
           </div>
-          <span className="dashboard-card-arrow">→</span>
-        </a>
+        ))}
 
-        <a href="/dashboard/appearances" className="sub-card">
-          <div>
-            <div className="sub-card-label">★ Appearances</div>
-            <div className="sub-card-sub">Events you're featured in — add yourself to others</div>
-          </div>
-          <span className="sub-card-arrow">→</span>
-        </a>
-
-        {artist.slug && (
-          <a href={`/artists/${artist.slug}`} className="sub-card" target="_blank" rel="noopener noreferrer">
-            <div>
-              <div className="sub-card-label">↗ View Public Artist Page</div>
-              <div className="sub-card-sub">785mag.com/artists/{artist.slug}</div>
-            </div>
-            <span className="sub-card-arrow">↗</span>
-          </a>
-        )}
-
-        {/* ── VENUE ── */}
-        {venue && (
-          <>
+        {/* ── VENUES ── */}
+        {(venues || []).map(venue => (
+          <div key={venue.id}>
             <div className="section-divider" />
 
             <div className="entity-header">
@@ -152,7 +155,7 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            <a href="/dashboard/venue" className="dashboard-card">
+            <a href={`/dashboard/venue?id=${venue.id}`} className="dashboard-card">
               <div className="dashboard-card-left">
                 <div className="dashboard-card-icon">◎</div>
                 <div>
@@ -180,8 +183,8 @@ export default async function DashboardPage() {
                 <span className="sub-card-arrow">↗</span>
               </a>
             )}
-          </>
-        )}
+          </div>
+        ))}
 
         {/* ── EVENTS ── */}
         <div className="section-divider" />

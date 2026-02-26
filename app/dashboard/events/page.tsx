@@ -28,20 +28,46 @@ export default function MyEventsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      const { data, error } = await supabase
-        .from('events')
-        .select('id, title, event_date, slug, venue_id, venues(name)')
-        .eq('auth_user_id', user.id)
-        .order('event_date', { ascending: true })
+      // Get user's artist IDs and venue IDs
+      const [{ data: myArtists }, { data: myVenues }] = await Promise.all([
+        supabase.from('artists').select('id').eq('auth_user_id', user.id),
+        supabase.from('venues').select('id').eq('auth_user_id', user.id),
+      ])
+      const artistIds = (myArtists || []).map((a: any) => a.id)
+      const venueIds = (myVenues || []).map((v: any) => v.id)
 
-      if (error) { console.error(error); setLoading(false); return }
+      const EVENT_SELECT = 'id, title, event_date, slug, venue_id, venues(name)'
 
-      const mapped = (data || []).map((e: any) => ({
-        ...e,
-        venue_name: Array.isArray(e.venues) ? e.venues[0]?.name : e.venues?.name,
-      }))
+      // Fetch from all 3 sources in parallel
+      const [
+        { data: createdEvents },
+        venueEventsResult,
+        artistLinksResult,
+      ] = await Promise.all([
+        supabase.from('events').select(EVENT_SELECT).eq('auth_user_id', user.id),
+        venueIds.length
+          ? supabase.from('events').select(EVENT_SELECT).in('venue_id', venueIds)
+          : Promise.resolve({ data: [] as any[] }),
+        artistIds.length
+          ? supabase.from('event_artists').select(`event_id, events(${EVENT_SELECT})`).in('artist_id', artistIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ])
 
-      setEvents(mapped)
+      // Flatten artist-linked events
+      const linkedEvents = ((artistLinksResult.data) || []).map((l: any) => {
+        const e = Array.isArray(l.events) ? l.events[0] : l.events
+        return e
+      }).filter(Boolean)
+
+      // Merge and deduplicate
+      const allEvents = [...(createdEvents || []), ...((venueEventsResult.data) || []), ...linkedEvents]
+      const seen = new Set<string>()
+      const merged: EventRow[] = allEvents
+        .filter((e: any) => { if (seen.has(e.id)) return false; seen.add(e.id); return true })
+        .map((e: any) => ({ ...e, venue_name: Array.isArray(e.venues) ? e.venues[0]?.name : e.venues?.name }))
+        .sort((a, b) => a.event_date.localeCompare(b.event_date))
+
+      setEvents(merged)
       setLoading(false)
     }
     load()

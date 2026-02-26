@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import { createClient } from '@/lib/supabaseBrowser'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import ImageUpload from './ImageUpload'
 
 const MUSICAL_GENRES = ['Rock','Pop','Jazz','Classical','Electronic','Hip-Hop','Country','Reggae','Blues','Folk','Singer-Songwriter','Spoken Word','Motown','Funk','Americana','Punk','Grunge','Jam Band','Tejano','Latin','DJ','Bluegrass','Rap']
@@ -53,7 +53,17 @@ type ArtistData = {
 }
 
 export default function EditPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', background: '#1a1814' }} />}>
+      <EditPageInner />
+    </Suspense>
+  )
+}
+
+function EditPageInner() {
   const router = useRouter()
+  const params = useSearchParams()
+  const artistId = params.get('id')
   const [artist, setArtist] = useState<ArtistData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -96,7 +106,7 @@ export default function EditPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    const { data } = await supabase
+    const query = supabase
       .from('artists')
       .select(`
         id, name, slug, tagline, bio, location_city, location_state,
@@ -109,7 +119,10 @@ export default function EditPage() {
         artist_visual_profiles (artist_id, visual_mediums, works)
       `)
       .eq('auth_user_id', user.id)
-      .single()
+
+    const { data } = artistId
+      ? await query.eq('id', artistId).single()
+      : await query.single()
 
     if (!data) { router.push('/dashboard'); return }
 

@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabaseBrowser'
 import ImageUpload from '@/app/dashboard/edit/ImageUpload'
 
@@ -24,7 +24,17 @@ const VENUE_TYPES = [
 ]
 
 export default function VenueDashboard() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', background: '#1a1814' }} />}>
+      <VenueDashboardInner />
+    </Suspense>
+  )
+}
+
+function VenueDashboardInner() {
   const router = useRouter()
+  const params = useSearchParams()
+  const venueId = params.get('id')
   const [venue, setVenue] = useState<Venue | null>(null)
   const [form, setForm] = useState<Venue | null>(null)
   const [loading, setLoading] = useState(true)
@@ -38,11 +48,14 @@ export default function VenueDashboard() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      const { data } = await supabase
+      const query = supabase
         .from('venues')
         .select('id, name, address, neighborhood, city, state, website, venue_type, image_url')
         .eq('auth_user_id', user.id)
-        .single()
+
+      const { data } = venueId
+        ? await query.eq('id', venueId).single()
+        : await query.single()
 
       if (!data) { router.push('/dashboard'); return }
 

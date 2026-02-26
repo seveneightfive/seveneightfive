@@ -101,12 +101,29 @@ function EventEditInner() {
       if (!isNew && eventId) {
         const { data } = await supabase
           .from('events')
-          .select('id, title, description, event_date, event_start_time, event_end_time, image_url, ticket_price, ticket_url, learnmore_link, event_types, star, venue_id, venues(id, name, neighborhood)')
+          .select('id, title, description, event_date, event_start_time, event_end_time, image_url, ticket_price, ticket_url, learnmore_link, event_types, star, venue_id, auth_user_id, venues(id, name, neighborhood)')
           .eq('id', eventId)
-          .eq('auth_user_id', user.id)
           .single()
 
         if (!data) { router.push('/dashboard/events'); return }
+
+        // Check access: creator, venue owner, or featured artist
+        let hasAccess = data.auth_user_id === user.id
+        if (!hasAccess && data.venue_id) {
+          const { data: ownedVenue } = await supabase
+            .from('venues').select('id').eq('id', data.venue_id).eq('auth_user_id', user.id).single()
+          hasAccess = !!ownedVenue
+        }
+        if (!hasAccess) {
+          const { data: myArtists } = await supabase.from('artists').select('id').eq('auth_user_id', user.id)
+          const myArtistIds = (myArtists || []).map((a: any) => a.id)
+          if (myArtistIds.length) {
+            const { data: link } = await supabase
+              .from('event_artists').select('artist_id').eq('event_id', eventId).in('artist_id', myArtistIds).limit(1).maybeSingle()
+            hasAccess = !!link
+          }
+        }
+        if (!hasAccess) { router.push('/dashboard/events'); return }
 
         const v = Array.isArray(data.venues) ? data.venues[0] : data.venues
         setSelectedVenueName(v?.name || '')
