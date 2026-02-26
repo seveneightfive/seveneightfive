@@ -22,8 +22,6 @@ export default function MyEventsPage() {
   const router = useRouter()
   const [events, setEvents] = useState<EventRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [deleting, setDeleting] = useState<string | null>(null)
-
   useEffect(() => {
     async function load() {
       const supabase = createClient()
@@ -34,7 +32,7 @@ export default function MyEventsPage() {
         .from('events')
         .select('id, title, event_date, slug, venue_id, venues(name)')
         .eq('auth_user_id', user.id)
-        .order('event_date', { ascending: false })
+        .order('event_date', { ascending: true })
 
       if (error) { console.error(error); setLoading(false); return }
 
@@ -49,21 +47,6 @@ export default function MyEventsPage() {
     load()
   }, [router])
 
-  const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return
-    setDeleting(id)
-    const supabase = createClient()
-    const { error } = await supabase.from('events').delete().eq('id', id)
-    if (!error) {
-      setEvents(prev => prev.filter(e => e.id !== id))
-    }
-    setDeleting(null)
-  }
-
-  const inputStyle: React.CSSProperties = {
-    display: 'none',
-  }
-
   return (
     <>
       <style>{`
@@ -71,15 +54,11 @@ export default function MyEventsPage() {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { background: #1a1814; color: #fff; font-family: 'DM Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
         @keyframes pulse { 0%,80%,100%{opacity:0.3;transform:scale(0.85)}40%{opacity:1;transform:scale(1)} }
-        .event-row { display: flex; align-items: center; gap: 16px; padding: 16px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; margin-bottom: 8px; }
-        .event-row:hover { background: rgba(255,255,255,0.06); }
+        .event-row { display: flex; align-items: center; gap: 16px; padding: 16px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; margin-bottom: 8px; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+        .event-row:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.14); }
         .event-date { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(200,6,80,0.8); white-space: nowrap; }
         .event-title { font-family: 'Oswald', sans-serif; font-size: 1rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
         .event-venue { font-size: 0.78rem; color: rgba(255,255,255,0.35); margin-top: 2px; }
-        .btn-edit { padding: '6px 14px'; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: rgba(255,255,255,0.6); font-family: 'DM Sans', sans-serif; font-size: 0.78rem; font-weight: 500; cursor: pointer; white-space: nowrap; text-decoration: none; display: inline-block; transition: all 0.15s; }
-        .btn-edit:hover { border-color: rgba(255,255,255,0.3); color: #fff; }
-        .btn-delete { padding: 6px 12px; background: transparent; border: 1px solid rgba(200,6,80,0.2); border-radius: 6px; color: rgba(200,6,80,0.5); font-family: 'DM Sans', sans-serif; font-size: 0.78rem; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
-        .btn-delete:hover { border-color: rgba(200,6,80,0.5); color: rgba(200,6,80,0.9); }
       `}</style>
 
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '0 24px 80px' }}>
@@ -140,31 +119,29 @@ export default function MyEventsPage() {
         ) : (
           <div>
             {events.map(event => (
-              <div key={event.id} className="event-row">
+              <div
+                key={event.id}
+                className="event-row"
+                onClick={() => router.push(`/dashboard/events/edit?id=${event.id}`)}
+              >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="event-date">{formatDate(event.event_date)}</div>
                   <div className="event-title">{event.title}</div>
                   {event.venue_name && <div className="event-venue">{event.venue_name}</div>}
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
                   {event.slug && (
                     <a
                       href={`/events/${event.slug}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.78rem', textDecoration: 'none' }}
+                      onClick={e => e.stopPropagation()}
+                      style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.85rem', textDecoration: 'none' }}
                     >
                       ↗
                     </a>
                   )}
-                  <a href={`/dashboard/events/edit?id=${event.id}`} className="btn-edit">Edit</a>
-                  <button
-                    className="btn-delete"
-                    onClick={() => handleDelete(event.id, event.title)}
-                    disabled={deleting === event.id}
-                  >
-                    {deleting === event.id ? '…' : 'Delete'}
-                  </button>
+                  <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '1rem' }}>→</span>
                 </div>
               </div>
             ))}

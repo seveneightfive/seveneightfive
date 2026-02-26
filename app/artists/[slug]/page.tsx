@@ -1008,7 +1008,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
 
       <footer className="artist-footer">
         <a href="/artists" className="footer-wordmark">
-          The <em>785</em> Artist Directory
+          <em>seveneightfive</em> + <em>ArtsConnect</em> Artist Directory
         </a>
       </footer>
     </>

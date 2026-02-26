@@ -16,7 +16,7 @@ export default async function DashboardPage() {
       .single(),
     supabase
       .from('venues')
-      .select('id, name, slug')
+      .select('id, name, slug, venue_type')
       .eq('auth_user_id', user.id)
       .single(),
   ])
@@ -43,7 +43,6 @@ export default async function DashboardPage() {
     )
   }
 
-  const heroImage = artist.image_url || artist.avatar_url
   const TYPE_LABEL: Record<string, string> = {
     Musician: 'Musician', Visual: 'Visual Artist', Performance: 'Performer', Literary: 'Literary Artist',
   }
@@ -65,31 +64,36 @@ export default async function DashboardPage() {
         .wordmark { font-family: var(--serif); font-size: 0.72rem; font-weight: 400; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(255,255,255,0.4); text-decoration: none; }
         .wordmark em { font-style: normal; color: var(--accent); font-weight: 600; }
 
-        .hero-strip {
-          position: relative; height: 220px; overflow: hidden;
-          background: #2a2620;
-        }
-        .hero-strip img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; opacity: 0.5; }
-        .hero-strip-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 0%, rgba(26,24,20,0.9) 100%); }
-        .hero-strip-body { position: absolute; bottom: 24px; left: 24px; right: 24px; }
-        .hero-type { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
-        .hero-name { font-family: var(--serif); font-size: clamp(1.8rem, 6vw, 3rem); font-weight: 700; text-transform: uppercase; line-height: 0.95; }
+        .content { max-width: 640px; margin: 0 auto; padding: 40px 24px 80px; }
 
-        .content { max-width: 640px; margin: 0 auto; padding: 32px 24px 80px; }
-
-        .dashboard-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; text-decoration: none; transition: background 0.15s, border-color 0.15s; }
-        .dashboard-card:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.16); }
+        /* Entity header — name + type above each section */
+        .entity-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+        .entity-header-left { display: flex; flex-direction: column; gap: 5px; }
+        .entity-type { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); }
+        .entity-name { font-family: var(--serif); font-size: clamp(1.4rem, 5vw, 2rem); font-weight: 700; text-transform: uppercase; line-height: 1; letter-spacing: 0.02em; }
+        /* Primary card */
+        .dashboard-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 18px 20px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 16px; text-decoration: none; transition: background 0.15s, border-color 0.15s; }
+        .dashboard-card:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.18); }
         .dashboard-card-left { display: flex; align-items: center; gap: 14px; }
-        .dashboard-card-icon { width: 40px; height: 40px; border-radius: 8px; background: rgba(200,6,80,0.12); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
-        .dashboard-card-label { font-family: var(--serif); font-size: 0.95rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--white); }
-        .dashboard-card-sub { font-size: 0.78rem; color: rgba(255,255,255,0.35); margin-top: 2px; }
-        .dashboard-card-arrow { color: rgba(255,255,255,0.25); font-size: 1rem; transition: transform 0.15s; }
+        .dashboard-card-icon { width: 38px; height: 38px; border-radius: 8px; background: rgba(200,6,80,0.12); display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+        .dashboard-card-label { font-family: var(--serif); font-size: 0.9rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--white); }
+        .dashboard-card-sub { font-size: 0.76rem; color: rgba(255,255,255,0.3); margin-top: 2px; }
+        .dashboard-card-arrow { color: rgba(255,255,255,0.2); font-size: 1rem; transition: transform 0.15s; }
         .dashboard-card:hover .dashboard-card-arrow { transform: translateX(3px); color: rgba(255,255,255,0.5); }
 
-        .section-label { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(255,255,255,0.3); margin: 28px 0 12px; }
+        /* Sub-card — secondary actions */
+        .sub-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 13px 18px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 16px; text-decoration: none; transition: background 0.15s, border-color 0.15s; }
+        .sub-card:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.12); }
+        .sub-card-label { font-family: var(--serif); font-size: 0.78rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.5); }
+        .sub-card-sub { font-size: 0.72rem; color: rgba(255,255,255,0.2); margin-top: 1px; }
+        .sub-card-arrow { color: rgba(255,255,255,0.15); font-size: 0.85rem; transition: transform 0.15s; }
+        .sub-card:hover .sub-card-arrow { transform: translateX(3px); color: rgba(255,255,255,0.4); }
 
-        .view-link { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: rgba(255,255,255,0.35); text-decoration: none; padding: 12px 0; transition: color 0.15s; }
-        .view-link:hover { color: rgba(255,255,255,0.7); }
+        /* Section divider */
+        .section-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 32px 0; }
+
+        /* Events section label */
+        .section-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.2); margin-bottom: 14px; }
       `}</style>
 
       <div className="topbar">
@@ -97,91 +101,90 @@ export default async function DashboardPage() {
         <LogoutButton />
       </div>
 
-      <div className="hero-strip">
-        {heroImage && <img src={heroImage} alt={artist.name} />}
-        <div className="hero-strip-scrim" />
-        <div className="hero-strip-body">
-          <div className="hero-type">{TYPE_LABEL[artist.artist_type || ''] || 'Artist'}</div>
-          <div className="hero-name">{artist.name}</div>
-        </div>
-      </div>
-
       <div className="content">
-        <div className="section-label">Edit Your Profile</div>
 
-        <a href="/dashboard/edit#profile" className="dashboard-card">
+        {/* ── ARTIST ── */}
+        <div className="entity-header">
+          <div className="entity-header-left">
+            <div className="entity-type">{TYPE_LABEL[artist.artist_type || ''] || 'Artist'}</div>
+            <div className="entity-name">{artist.name}</div>
+          </div>
+        </div>
+
+        <a href="/dashboard/edit" className="dashboard-card">
           <div className="dashboard-card-left">
             <div className="dashboard-card-icon">◉</div>
             <div>
-              <div className="dashboard-card-label">Profile & Bio</div>
-              <div className="dashboard-card-sub">Name, tagline, bio, location, awards</div>
+              <div className="dashboard-card-label">Edit Your Artist Profile</div>
+              <div className="dashboard-card-sub">Bio, images, links, media, portfolio</div>
             </div>
           </div>
           <span className="dashboard-card-arrow">→</span>
         </a>
 
-        <a href="/dashboard/edit#images" className="dashboard-card">
-          <div className="dashboard-card-left">
-            <div className="dashboard-card-icon">◈</div>
+        <a href="/dashboard/appearances" className="sub-card">
+          <div>
+            <div className="sub-card-label">★ Appearances</div>
+            <div className="sub-card-sub">Events you're featured in — add yourself to others</div>
+          </div>
+          <span className="sub-card-arrow">→</span>
+        </a>
+
+        {artist.slug && (
+          <a href={`/artists/${artist.slug}`} className="sub-card" target="_blank" rel="noopener noreferrer">
             <div>
-              <div className="dashboard-card-label">Images</div>
-              <div className="dashboard-card-sub">Hero photo and avatar</div>
+              <div className="sub-card-label">↗ View Public Artist Page</div>
+              <div className="sub-card-sub">785mag.com/artists/{artist.slug}</div>
             </div>
-          </div>
-          <span className="dashboard-card-arrow">→</span>
-        </a>
-
-        <a href="/dashboard/edit#links" className="dashboard-card">
-          <div className="dashboard-card-left">
-            <div className="dashboard-card-icon">↗</div>
-            <div>
-              <div className="dashboard-card-label">Links & Social</div>
-              <div className="dashboard-card-sub">Website, Instagram, Facebook, email</div>
-            </div>
-          </div>
-          <span className="dashboard-card-arrow">→</span>
-        </a>
-
-        <a href="/dashboard/edit#media" className="dashboard-card">
-          <div className="dashboard-card-left">
-            <div className="dashboard-card-icon">♫</div>
-            <div>
-              <div className="dashboard-card-label">Music & Media</div>
-              <div className="dashboard-card-sub">Audio, video, Spotify, genres</div>
-            </div>
-          </div>
-          <span className="dashboard-card-arrow">→</span>
-        </a>
-
-        {artist.artist_type === 'Visual' && (
-          <a href="/dashboard/edit#visual" className="dashboard-card">
-            <div className="dashboard-card-left">
-              <div className="dashboard-card-icon">◇</div>
-              <div>
-                <div className="dashboard-card-label">Visual Work</div>
-                <div className="dashboard-card-sub">Mediums and portfolio image</div>
-              </div>
-            </div>
-            <span className="dashboard-card-arrow">→</span>
+            <span className="sub-card-arrow">↗</span>
           </a>
         )}
 
+        {/* ── VENUE ── */}
         {venue && (
           <>
-            <div className="section-label">Your Venue</div>
+            <div className="section-divider" />
+
+            <div className="entity-header">
+              <div className="entity-header-left">
+                <div className="entity-type">{venue.venue_type || 'Venue'}</div>
+                <div className="entity-name">{venue.name}</div>
+              </div>
+            </div>
+
             <a href="/dashboard/venue" className="dashboard-card">
               <div className="dashboard-card-left">
                 <div className="dashboard-card-icon">◎</div>
                 <div>
-                  <div className="dashboard-card-label">{venue.name}</div>
-                  <div className="dashboard-card-sub">Edit venue details, address, image</div>
+                  <div className="dashboard-card-label">Edit Your Venue Profile</div>
+                  <div className="dashboard-card-sub">Address, type, image, website</div>
                 </div>
               </div>
               <span className="dashboard-card-arrow">→</span>
             </a>
+
+            <a href="/dashboard/events" className="sub-card">
+              <div>
+                <div className="sub-card-label">◷ Happenings</div>
+                <div className="sub-card-sub">Events at your venue</div>
+              </div>
+              <span className="sub-card-arrow">→</span>
+            </a>
+
+            {venue.slug && (
+              <a href={`/venues/${venue.slug}`} className="sub-card" target="_blank" rel="noopener noreferrer">
+                <div>
+                  <div className="sub-card-label">↗ View Public Venue Page</div>
+                  <div className="sub-card-sub">785mag.com/venues/{venue.slug}</div>
+                </div>
+                <span className="sub-card-arrow">↗</span>
+              </a>
+            )}
           </>
         )}
 
+        {/* ── EVENTS ── */}
+        <div className="section-divider" />
         <div className="section-label">Events</div>
 
         <a href="/dashboard/events" className="dashboard-card">
@@ -195,25 +198,6 @@ export default async function DashboardPage() {
           <span className="dashboard-card-arrow">→</span>
         </a>
 
-        {artist && (
-          <a href="/dashboard/appearances" className="dashboard-card">
-            <div className="dashboard-card-left">
-              <div className="dashboard-card-icon">★</div>
-              <div>
-                <div className="dashboard-card-label">Appearances</div>
-                <div className="dashboard-card-sub">Events you're featured in, add yourself to others</div>
-              </div>
-            </div>
-            <span className="dashboard-card-arrow">→</span>
-          </a>
-        )}
-
-        <div className="section-label">Your Public Page</div>
-        {artist.slug && (
-          <a href={`/artists/${artist.slug}`} className="view-link" target="_blank" rel="noopener noreferrer">
-            View public profile ↗
-          </a>
-        )}
       </div>
     </>
   )

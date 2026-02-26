@@ -109,6 +109,21 @@ export async function generateMetadata(
 
 // ─── JSON-LD ──────────────────────────────────────────────────────────────────
 
+const SCHEMA_TYPE_MAP: Record<string, string> = {
+  'Live Music':           'MusicEvent',
+  'Art':                  'VisualArtsEvent',
+  'Exhibition':           'ExhibitionEvent',
+  'Comedy Night':         'ComedyEvent',
+  'Poetry Reading':       'LiteraryEvent',
+  'Open Mic':             'LiteraryEvent',
+  'Theater':              'TheaterEvent',
+  'Dance':                'DanceEvent',
+  'Film / Screening':     'ScreeningEvent',
+  'Workshop / Class':     'EducationEvent',
+  'Holiday':              'Festival',
+  'Party For A Cause':    'SocialEvent',
+}
+
 function getJsonLd(event: Event) {
   const startDate = event.event_start_time
     ? `${event.event_date}T${event.event_start_time}`
@@ -118,14 +133,22 @@ function getJsonLd(event: Event) {
     ? `${event.event_date}T${event.event_end_time}`
     : event.end_date || undefined
 
+  const schemaType = event.event_types
+    ?.map(t => SCHEMA_TYPE_MAP[t])
+    .find(t => !!t) || 'Event'
+
   return {
     '@context': 'https://schema.org',
-    '@type': 'Event',
+    '@type': schemaType,
     name: event.title,
     description: event.description,
+    url: `https://785mag.com/events/${event.slug}`,
     startDate,
     ...(endDate && { endDate }),
     image: event.image_url,
+    ...(event.event_types && event.event_types.length > 0 && {
+      keywords: event.event_types.join(', '),
+    }),
     eventStatus: 'https://schema.org/EventScheduled',
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
     ...(event.venue && {
@@ -150,6 +173,13 @@ function getJsonLd(event: Event) {
         ...(event.ticket_url && { url: event.ticket_url }),
         validFrom: event.event_date,
       },
+    }),
+    ...(event.artists && event.artists.length > 0 && {
+      performer: event.artists.map(a => ({
+        '@type': 'Person',
+        name: a.name,
+        ...(a.slug && { url: `https://785mag.com/artists/${a.slug}` }),
+      })),
     }),
     organizer: {
       '@type': 'Organization',

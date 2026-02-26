@@ -43,6 +43,8 @@ const EVENT_TYPES = [
   'All', 'Live Music', 'Art', 'Entertainment', 'Lifestyle',
   'Local Flavor', 'Community / Cultural', 'Party For A Cause',
   'Shop Local', 'Holiday', 'Exhibition',
+  'Comedy Night', 'Open Mic', 'Poetry Reading', 'Trivia Night',
+  'Bingo', 'Workshop / Class', 'Film / Screening', 'Dance', 'Theater',
 ]
 
 function formatTime(t: string | null): string {

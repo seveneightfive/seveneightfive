@@ -10,6 +10,8 @@ const EVENT_TYPES = [
   'Live Music', 'Art', 'Entertainment', 'Lifestyle',
   'Local Flavor', 'Community / Cultural', 'Party For A Cause',
   'Shop Local', 'Holiday', 'Exhibition',
+  'Comedy Night', 'Open Mic', 'Poetry Reading', 'Trivia Night',
+  'Bingo', 'Workshop / Class', 'Film / Screening', 'Dance', 'Theater',
 ]
 
 type EventForm = {
@@ -31,6 +33,22 @@ type EventForm = {
 type VenueOption = { id: string; name: string; neighborhood: string | null }
 type LinkedArtist = { artist_id: string; name: string; slug: string | null }
 
+function toInputTime(t: string | null | undefined): string {
+  if (!t || t.trim() === ':') return ''
+  const ampmMatch = t.match(/(\d{1,2}):(\d{2})\s*(am|pm)/i)
+  if (ampmMatch) {
+    let h = parseInt(ampmMatch[1], 10)
+    const m = parseInt(ampmMatch[2], 10)
+    const isPm = ampmMatch[3].toLowerCase() === 'pm'
+    if (isPm && h !== 12) h += 12
+    if (!isPm && h === 12) h = 0
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  }
+  const match = t.match(/(\d{1,2}):(\d{2})/)
+  if (!match) return ''
+  return `${String(parseInt(match[1], 10)).padStart(2, '0')}:${match[2]}`
+}
+
 const EMPTY: EventForm = {
   title: '', description: '', event_date: '', event_start_time: '',
   event_end_time: '', image_url: '', ticket_price: '', ticket_url: '',
@@ -47,6 +65,7 @@ function EventEditInner() {
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
   const [userId, setUserId] = useState<string | null>(null)
 
@@ -98,8 +117,8 @@ function EventEditInner() {
           title: data.title || '',
           description: data.description || '',
           event_date: data.event_date || '',
-          event_start_time: data.event_start_time || '',
-          event_end_time: data.event_end_time || '',
+          event_start_time: toInputTime(data.event_start_time),
+          event_end_time: toInputTime(data.event_end_time),
           image_url: data.image_url || '',
           ticket_price: data.ticket_price != null ? String(data.ticket_price) : '',
           ticket_url: data.ticket_url || '',
@@ -260,6 +279,15 @@ function EventEditInner() {
     }, 1500)
   }
 
+  const handleDelete = async () => {
+    if (!form.id) return
+    if (!confirm(`Delete "${form.title}"? This cannot be undone.`)) return
+    setDeleting(true)
+    const supabase = createClient()
+    await supabase.from('events').delete().eq('id', form.id)
+    router.push('/dashboard/events')
+  }
+
   const inputStyle: React.CSSProperties = {
     width: '100%',
     padding: '10px 14px',
@@ -304,7 +332,7 @@ function EventEditInner() {
         input:focus, select:focus, textarea:focus { border-color: rgba(200,6,80,0.6) !important; }
         select option { background: #2a2420; }
         .type-chip { padding: 6px 14px; border-radius: 100px; border: 1.5px solid rgba(255,255,255,0.12); background: transparent; font-family: 'DM Sans', sans-serif; font-size: 0.76rem; font-weight: 500; color: rgba(255,255,255,0.4); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
-        .type-chip.active { background: rgba(200,6,80,0.15); border-color: rgba(200,6,80,0.5); color: #ff9ab0; }
+        .type-chip.active { background: rgba(200,6,80,0.15); border-color: rgba(200,6,80,0.5); color: #FFCE03; }
         .dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #2a2420; border: 1.5px solid rgba(255,255,255,0.12); border-radius: 8px; z-index: 50; overflow: hidden; }
         .dropdown-item { padding: 10px 14px; cursor: pointer; font-size: 0.88rem; transition: background 0.1s; }
         .dropdown-item:hover { background: rgba(255,255,255,0.08); }
@@ -320,9 +348,30 @@ function EventEditInner() {
           <a href="/dashboard/events" style={{ fontFamily: "'Oswald', sans-serif", fontSize: '0.72rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', textDecoration: 'none' }}>
             ← My Events
           </a>
-          <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: '0.72rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)' }}>
-            {isNew ? 'Add Event' : 'Edit Event'}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: '0.72rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)' }}>
+              {isNew ? 'Add Event' : 'Edit Event'}
+            </span>
+            {!isNew && (
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{
+                  padding: '5px 12px',
+                  background: 'transparent',
+                  border: '1px solid rgba(200,6,80,0.25)',
+                  borderRadius: 6,
+                  color: 'rgba(200,6,80,0.45)',
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: '0.72rem',
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {deleting ? '…' : 'Delete'}
+              </button>
+            )}
+          </div>
         </div>
 
         <h1 style={{ fontFamily: "'Oswald', sans-serif", fontSize: '1.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
@@ -508,7 +557,7 @@ function EventEditInner() {
         </div>
 
         {error && (
-          <div style={{ padding: '12px 16px', background: 'rgba(200,6,80,0.12)', border: '1px solid rgba(200,6,80,0.3)', borderRadius: 8, color: '#ff9ab0', fontSize: '0.85rem', marginBottom: 20 }}>
+          <div style={{ padding: '12px 16px', background: 'rgba(200,6,80,0.12)', border: '1px solid rgba(200,6,80,0.3)', borderRadius: 8, color: '#FFCE03', fontSize: '0.85rem', marginBottom: 20 }}>
             {error}
           </div>
         )}
@@ -522,7 +571,7 @@ function EventEditInner() {
             background: saved ? 'rgba(45,122,45,0.2)' : 'rgba(200,6,80,0.15)',
             border: `1.5px solid ${saved ? 'rgba(45,122,45,0.4)' : 'rgba(200,6,80,0.4)'}`,
             borderRadius: 10,
-            color: saved ? '#7ecf7e' : '#ff9ab0',
+            color: saved ? '#7ecf7e' : '#FFCE03',
             fontFamily: "'Oswald', sans-serif",
             fontSize: '0.85rem',
             fontWeight: 600,
