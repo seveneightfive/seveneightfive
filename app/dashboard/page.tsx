@@ -8,38 +8,27 @@ export default async function DashboardPage() {
 
   if (!user) redirect('/login')
 
-  const [{ data: artists }, { data: venues }] = await Promise.all([
+  const [{ data: artists }, { data: venues }, { data: profile }] = await Promise.all([
     supabase
       .from('artists')
       .select('id, name, slug, tagline, image_url, avatar_url, artist_type, verified')
       .eq('auth_user_id', user.id),
     supabase
       .from('venues')
-      .select('id, name, slug, venue_type')
+      .select('id, name, slug, venue_type, image_url, logo')
       .eq('auth_user_id', user.id),
+    supabase
+      .from('profiles')
+      .select('full_name, email, phone_number, role')
+      .eq('id', user.id)
+      .maybeSingle(),
   ])
 
-  if (!artists || artists.length === 0) {
-    return (
-      <>
-        <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap');
-          *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-          body { min-height: 100vh; background: #1a1814; color: #fff; font-family: 'DM Sans', system-ui, sans-serif; display: flex; align-items: center; justify-content: center; padding: 24px; -webkit-font-smoothing: antialiased; }
-          .msg { text-align: center; max-width: 380px; }
-          .icon { font-size: 2.5rem; margin-bottom: 16px; }
-          h1 { font-family: 'Oswald', sans-serif; font-size: 1.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; margin-bottom: 10px; }
-          p { font-size: 0.9rem; font-weight: 300; color: rgba(255,255,255,0.5); line-height: 1.7; }
-          a { color: #C80650; }
-        `}</style>
-        <div className="msg">
-          <div className="icon">⚠</div>
-          <h1>No Artist Profile Found</h1>
-          <p>Your email isn't linked to an artist profile yet. Contact <a href="mailto:seveneightfive@gmail.com">seveneightfive@gmail.com</a> to get set up.</p>
-        </div>
-      </>
-    )
-  }
+  const isCreator = (artists && artists.length > 0) || (venues && venues.length > 0)
+  const firstName = profile?.full_name?.split(' ')[0] || 'There'
+  const initials = profile?.full_name
+    ? profile.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+    : '?'
 
   const TYPE_LABEL: Record<string, string> = {
     Musician: 'Musician', Visual: 'Visual Artist', Performance: 'Performer', Literary: 'Literary Artist',
@@ -48,160 +37,451 @@ export default async function DashboardPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
-          --ink: #1a1814; --ink-soft: #6b6560; --ink-faint: #c0bab3;
-          --white: #fff; --off: #f7f6f4; --border: #ece8e2;
-          --accent: #C80650;
+          --ink: #1a1814; --ink2: #221f1b; --ink3: #2a2721;
+          --surface: rgba(255,255,255,0.04);
+          --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+          --white: #fff; --dim: rgba(255,255,255,0.6); --faint: rgba(255,255,255,0.28);
+          --accent: #C80650; --accent2: rgba(200,6,80,0.12);
+          --gold: #ffce03; --gold2: rgba(255,206,3,0.1);
           --serif: 'Oswald', sans-serif; --sans: 'DM Sans', system-ui, sans-serif;
         }
         html, body { background: var(--ink); color: var(--white); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
 
-        .topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-        .wordmark { font-family: var(--serif); font-size: 0.72rem; font-weight: 400; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(255,255,255,0.4); text-decoration: none; }
-        .wordmark em { font-style: normal; color: var(--accent); font-weight: 600; }
+        /* ── TOPBAR ── */
+        .topbar {
+          position: sticky; top: 0; z-index: 100;
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 0 20px; height: 52px;
+          background: rgba(26,24,20,0.95); backdrop-filter: blur(12px);
+          border-bottom: 1px solid var(--border);
+        }
+        .wordmark {
+          font-family: var(--serif); font-size: 0.68rem; font-weight: 600;
+          letter-spacing: 0.22em; text-transform: uppercase;
+          text-decoration: none; color: rgba(255,255,255,0.35);
+        }
+        .wordmark em { font-style: normal; color: var(--accent); }
 
-        .content { max-width: 640px; margin: 0 auto; padding: 40px 24px 80px; }
+        /* ── AVATAR DROPDOWN ── */
+        .avatar-wrap { position: relative; }
+        .avatar {
+          width: 32px; height: 32px; border-radius: 50%;
+          background: var(--accent); display: flex; align-items: center; justify-content: center;
+          font-family: var(--serif); font-size: 0.72rem; font-weight: 700; color: #fff;
+          cursor: pointer; border: 2px solid transparent; transition: border-color 0.15s;
+          user-select: none;
+        }
+        .avatar:hover { border-color: rgba(255,255,255,0.3); }
+        .dropdown {
+          display: none; position: absolute; top: calc(100% + 10px); right: 0;
+          width: 220px; background: #242019; border: 1px solid var(--border2);
+          border-radius: 14px; overflow: hidden;
+          box-shadow: 0 12px 40px rgba(0,0,0,0.5); z-index: 300;
+        }
+        .dropdown.open { display: block; animation: dropIn 0.15s ease; }
+        @keyframes dropIn {
+          from { opacity: 0; transform: translateY(-6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .dropdown-header { padding: 14px 16px 12px; border-bottom: 1px solid var(--border); }
+        .dropdown-name {
+          font-family: var(--serif); font-size: 0.95rem; font-weight: 700;
+          text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .dropdown-phone { font-size: 0.75rem; color: var(--dim); margin-top: 2px; }
+        .dropdown-item {
+          display: flex; align-items: center; gap: 12px;
+          padding: 12px 16px; cursor: pointer; text-decoration: none;
+          transition: background 0.12s;
+        }
+        .dropdown-item:hover { background: rgba(255,255,255,0.05); }
+        .dropdown-item-icon { font-size: 0.9rem; width: 18px; text-align: center; flex-shrink: 0; }
+        .dropdown-item-label { font-size: 0.82rem; font-weight: 400; color: rgba(255,255,255,0.75); }
+        .dropdown-divider { height: 1px; background: var(--border); }
+        .dropdown-item.danger .dropdown-item-label { color: var(--accent); }
 
-        /* Entity header — name + type above each section */
-        .entity-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
-        .entity-header-left { display: flex; flex-direction: column; gap: 5px; }
-        .entity-type { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); }
-        .entity-name { font-family: var(--serif); font-size: clamp(1.4rem, 5vw, 2rem); font-weight: 700; text-transform: uppercase; line-height: 1; letter-spacing: 0.02em; }
-        /* Primary card */
-        .dashboard-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 18px 20px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 16px; text-decoration: none; transition: background 0.15s, border-color 0.15s; }
-        .dashboard-card:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.18); }
-        .dashboard-card-left { display: flex; align-items: center; gap: 14px; }
-        .dashboard-card-icon { width: 38px; height: 38px; border-radius: 8px; background: rgba(200,6,80,0.12); display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
-        .dashboard-card-label { font-family: var(--serif); font-size: 0.9rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--white); }
-        .dashboard-card-sub { font-size: 0.76rem; color: rgba(255,255,255,0.3); margin-top: 2px; }
-        .dashboard-card-arrow { color: rgba(255,255,255,0.2); font-size: 1rem; transition: transform 0.15s; }
-        .dashboard-card:hover .dashboard-card-arrow { transform: translateX(3px); color: rgba(255,255,255,0.5); }
+        /* ── CONTENT ── */
+        .content { max-width: 600px; margin: 0 auto; padding: 0 0 60px; }
 
-        /* Sub-card — secondary actions */
-        .sub-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 13px 18px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 16px; text-decoration: none; transition: background 0.15s, border-color 0.15s; }
-        .sub-card:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.12); }
-        .sub-card-label { font-family: var(--serif); font-size: 0.78rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.5); }
-        .sub-card-sub { font-size: 0.72rem; color: rgba(255,255,255,0.2); margin-top: 1px; }
-        .sub-card-arrow { color: rgba(255,255,255,0.15); font-size: 0.85rem; transition: transform 0.15s; }
-        .sub-card:hover .sub-card-arrow { transform: translateX(3px); color: rgba(255,255,255,0.4); }
+        /* ── GREETING ── */
+        .greeting { padding: 28px 20px 24px; border-bottom: 1px solid var(--border); }
+        .greeting-eyebrow {
+          font-size: 0.6rem; font-weight: 700; letter-spacing: 0.2em;
+          text-transform: uppercase; color: var(--accent); margin-bottom: 6px;
+        }
+        .greeting-name {
+          font-family: var(--serif); font-size: 2.2rem; font-weight: 700;
+          text-transform: uppercase; line-height: 0.95; letter-spacing: -0.01em;
+        }
+        .greeting-sub {
+          margin-top: 8px; font-size: 0.82rem; font-weight: 300;
+          color: var(--dim); line-height: 1.5;
+        }
 
-        /* Section divider */
-        .section-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 32px 0; }
+        /* ── SECTION HEAD ── */
+        .section-head {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 20px 20px 12px;
+        }
+        .section-label {
+          font-size: 0.6rem; font-weight: 700; letter-spacing: 0.2em;
+          text-transform: uppercase; color: rgba(255,255,255,0.35);
+        }
+        .section-action {
+          font-size: 0.7rem; font-weight: 500; color: var(--accent);
+          text-decoration: none; letter-spacing: 0.04em;
+        }
 
-        /* Events section label */
-        .section-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.2); margin-bottom: 14px; }
+        /* ── CREATE GRID ── */
+        .create-grid {
+          display: grid; grid-template-columns: 1fr 1fr;
+          gap: 10px; padding: 4px 20px 16px;
+        }
+        .create-btn {
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          gap: 6px; padding: 16px 12px;
+          background: var(--surface); border: 1px solid var(--border);
+          border-radius: 12px; cursor: pointer; text-decoration: none;
+          transition: background 0.15s, border-color 0.15s;
+        }
+        .create-btn:hover { background: rgba(255,255,255,0.07); border-color: var(--border2); }
+        .create-btn.yellow { background: rgba(255,206,3,0.08); border-color: rgba(255,206,3,0.28); }
+        .create-btn.yellow:hover { background: rgba(255,206,3,0.15); }
+        .create-btn.red { background: rgba(200,6,80,0.08); border-color: rgba(200,6,80,0.28); }
+        .create-btn.red:hover { background: rgba(200,6,80,0.15); }
+        .create-icon {
+          font-size: 1.4rem; font-weight: 300; line-height: 1;
+          color: var(--white); font-family: var(--serif);
+        }
+        .create-btn.yellow .create-icon { color: var(--gold); }
+        .create-btn.red .create-icon { color: var(--accent); }
+        .create-label {
+          font-family: var(--serif); font-size: 0.78rem; font-weight: 600;
+          text-transform: uppercase; letter-spacing: 0.08em;
+          color: rgba(255,255,255,0.7); text-align: center;
+        }
+        .create-btn.yellow .create-label { color: var(--gold); }
+        .create-btn.red .create-label { color: var(--accent); }
+
+        /* ── DIVIDER ── */
+        .divider { height: 1px; background: var(--border); margin: 8px 0; }
+
+        /* ── FOLLOWING SCROLL ── */
+        .hscroll {
+          display: flex; gap: 10px; overflow-x: auto;
+          padding: 0 20px 16px; scrollbar-width: none;
+        }
+        .hscroll::-webkit-scrollbar { display: none; }
+        .follow-card {
+          flex-shrink: 0; width: 80px;
+          display: flex; flex-direction: column; align-items: center; gap: 8px;
+          cursor: pointer;
+        }
+        .follow-img {
+          width: 64px; height: 64px; border-radius: 50%;
+          background: var(--ink3); border: 2px solid var(--border2);
+          display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
+        }
+        .follow-img.venue { border-radius: 12px; }
+        .follow-name {
+          font-size: 0.68rem; font-weight: 400; text-align: center;
+          color: rgba(255,255,255,0.7); line-height: 1.3;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+        }
+        .follow-type {
+          font-size: 0.52rem; font-weight: 700; letter-spacing: 0.12em;
+          text-transform: uppercase; color: var(--faint); margin-top: -4px;
+        }
+        .empty-follow {
+          margin: 0 20px 16px; padding: 20px;
+          background: var(--surface); border: 1px dashed var(--border2);
+          border-radius: 12px; text-align: center;
+        }
+        .empty-follow p { font-size: 0.82rem; color: var(--dim); line-height: 1.6; }
+        .empty-follow a { color: var(--accent); text-decoration: none; font-weight: 500; }
+
+        /* ── EVENT CARDS ── */
+        .event-list { padding: 0 20px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px; }
+        .event-card {
+          display: flex; gap: 14px; align-items: center;
+          padding: 12px; background: var(--surface); border: 1px solid var(--border);
+          border-radius: 12px; cursor: pointer; text-decoration: none;
+          transition: background 0.15s, border-color 0.15s;
+        }
+        .event-card:hover { background: rgba(255,255,255,0.07); border-color: var(--border2); }
+        .event-date {
+          flex-shrink: 0; width: 44px; text-align: center;
+          display: flex; flex-direction: column; align-items: center;
+        }
+        .event-month {
+          font-size: 0.55rem; font-weight: 700; letter-spacing: 0.14em;
+          text-transform: uppercase; color: var(--accent);
+        }
+        .event-day {
+          font-family: var(--serif); font-size: 1.6rem; font-weight: 700; line-height: 1;
+        }
+        .event-info { flex: 1; min-width: 0; }
+        .event-title {
+          font-family: var(--serif); font-size: 0.95rem; font-weight: 600;
+          text-transform: uppercase; letter-spacing: 0.03em;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .event-meta { font-size: 0.75rem; color: var(--dim); margin-top: 3px; }
+        .event-img {
+          flex-shrink: 0; width: 52px; height: 52px; border-radius: 8px;
+          background: var(--ink3); overflow: hidden;
+          display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
+        }
+        .event-img img { width: 100%; height: 100%; object-fit: cover; }
+        .empty-events {
+          margin: 0 20px 16px; padding: 20px;
+          background: var(--surface); border: 1px dashed var(--border2);
+          border-radius: 12px; text-align: center;
+        }
+        .empty-events p { font-size: 0.82rem; color: var(--dim); line-height: 1.6; }
+
+        /* ── CREATOR SECTION ── */
+        .creator-head {
+          padding: 20px 20px 4px; display: flex; align-items: center; gap: 10px;
+        }
+        .creator-title {
+          font-size: 0.6rem; font-weight: 700; letter-spacing: 0.2em;
+          text-transform: uppercase; color: rgba(255,255,255,0.35);
+        }
+        .creator-badge {
+          font-size: 0.55rem; font-weight: 700; letter-spacing: 0.16em;
+          text-transform: uppercase; padding: 4px 10px; border-radius: 20px;
+          background: rgba(255,206,3,0.12); color: var(--gold);
+          border: 1px solid rgba(255,206,3,0.25);
+        }
+
+        /* ── ENTITY CARDS ── */
+        .entity-cards { padding: 12px 20px; display: flex; flex-direction: column; gap: 10px; }
+        .entity-card {
+          background: var(--surface); border: 1px solid var(--border);
+          border-radius: 14px; overflow: hidden;
+        }
+        .entity-card-header {
+          display: flex; align-items: center; gap: 14px;
+          padding: 14px 16px; border-bottom: 1px solid var(--border);
+        }
+        .entity-thumb {
+          width: 44px; height: 44px; border-radius: 10px;
+          background: var(--ink3); display: flex; align-items: center;
+          justify-content: center; font-size: 1.1rem; flex-shrink: 0;
+          overflow: hidden;
+        }
+        .entity-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .entity-card-name {
+          font-family: var(--serif); font-size: 1rem; font-weight: 700;
+          text-transform: uppercase; letter-spacing: 0.02em;
+        }
+        .entity-card-type {
+          font-size: 0.6rem; font-weight: 700; letter-spacing: 0.14em;
+          text-transform: uppercase; color: var(--accent); margin-top: 2px;
+        }
+        .entity-actions { display: flex; }
+        .entity-action {
+          flex: 1; padding: 11px 8px; text-align: center; cursor: pointer;
+          font-size: 0.65rem; font-weight: 600; letter-spacing: 0.1em;
+          text-transform: uppercase; color: var(--dim);
+          border-right: 1px solid var(--border);
+          transition: color 0.15s, background 0.15s;
+          text-decoration: none; display: flex; flex-direction: column;
+          align-items: center; gap: 4px;
+        }
+        .entity-action:last-child { border-right: none; }
+        .entity-action:hover { color: var(--white); background: rgba(255,255,255,0.04); }
+        .entity-action-icon { font-size: 0.9rem; }
       `}</style>
 
+      {/* ── TOPBAR ── */}
       <div className="topbar">
-        <a href="/" className="wordmark">Your <em>seveneightfive</em> Dashboard</a>
-        <LogoutButton />
+        <a href="/" className="wordmark"><em>785</em>MAGAZINE</a>
+        <div className="avatar-wrap">
+          <div className="avatar" id="avatarBtn" onClick={() => {
+            document.getElementById('dropdown')?.classList.toggle('open')
+          }}>
+            {initials}
+          </div>
+          <div className="dropdown" id="dropdown">
+            <div className="dropdown-header">
+              <div className="dropdown-name">{profile?.full_name || 'Your Account'}</div>
+              <div className="dropdown-phone">{profile?.phone_number || profile?.email || ''}</div>
+            </div>
+            <a href="/dashboard/settings/phone" className="dropdown-item">
+              <span className="dropdown-item-icon">📱</span>
+              <span className="dropdown-item-label">Update Phone Number</span>
+            </a>
+            <a href="/dashboard/settings/email" className="dropdown-item">
+              <span className="dropdown-item-icon">✉️</span>
+              <span className="dropdown-item-label">Update Email</span>
+            </a>
+            <a href="/dashboard/settings/notifications" className="dropdown-item">
+              <span className="dropdown-item-icon">🔔</span>
+              <span className="dropdown-item-label">Notification Settings</span>
+            </a>
+            <a href="/dashboard/settings/profile" className="dropdown-item">
+              <span className="dropdown-item-icon">👤</span>
+              <span className="dropdown-item-label">Edit Profile</span>
+            </a>
+            <div className="dropdown-divider"></div>
+            <LogoutButton asDropdownItem />
+          </div>
+        </div>
       </div>
 
       <div className="content">
 
-        {/* ── ARTISTS ── */}
-        {artists.map((artist, i) => (
-          <div key={artist.id}>
-            {i > 0 && <div className="section-divider" />}
-            <div className="entity-header">
-              <div className="entity-header-left">
-                <div className="entity-type">{TYPE_LABEL[artist.artist_type || ''] || 'Artist'}</div>
-                <div className="entity-name">{artist.name}</div>
-              </div>
+        {/* ── GREETING ── */}
+        <div className="greeting">
+          <div className="greeting-eyebrow">Your 785</div>
+          <div className="greeting-name">Hey,<br />{firstName}</div>
+          <div className="greeting-sub">Your personal feed of artists, venues & events.</div>
+        </div>
+
+        {/* ── CREATE GRID ── */}
+        <div className="section-head" style={{paddingBottom: '4px'}}>
+          <span className="section-label">Create</span>
+        </div>
+        <div className="create-grid">
+          <a href="/dashboard/events/edit" className="create-btn yellow">
+            <span className="create-icon">+</span>
+            <span className="create-label">Event</span>
+          </a>
+          <a href="/dashboard/announcements/new" className="create-btn red">
+            <span className="create-icon">+</span>
+            <span className="create-label">Announcement</span>
+          </a>
+          <a href="/dashboard/artists/new" className="create-btn">
+            <span className="create-icon">+</span>
+            <span className="create-label">Artist Page</span>
+          </a>
+          <a href="/dashboard/venues/new" className="create-btn">
+            <span className="create-icon">+</span>
+            <span className="create-label">Venue Page</span>
+          </a>
+        </div>
+
+        <div className="divider" />
+
+        {/* ── FOLLOWING ── */}
+        <div className="section-head">
+          <span className="section-label">Following</span>
+          <a href="/artists" className="section-action">Explore →</a>
+        </div>
+
+        {/* Empty state — replace with real follow data once follow tables exist */}
+        <div className="empty-follow">
+          <p>You're not following anyone yet.<br />
+          <a href="/artists">Discover artists</a> and <a href="/venues">venues</a> to follow.</p>
+        </div>
+
+        {/* ── UPCOMING ── */}
+        <div className="section-head">
+          <span className="section-label">Upcoming from your follows</span>
+          <a href="/events" className="section-action">All →</a>
+        </div>
+
+        <div className="empty-events">
+          <p>Follow artists and venues to see their upcoming events here.</p>
+        </div>
+
+        <div className="divider" />
+
+        {/* ── CREATOR TOOLS ── only shows if user has artist or venue linked ── */}
+        {isCreator && (
+          <>
+            <div className="creator-head">
+              <span className="creator-title">Your Pages</span>
+              <span className="creator-badge">✦ Creator</span>
             </div>
 
-            <a href={`/dashboard/edit?id=${artist.id}`} className="dashboard-card">
-              <div className="dashboard-card-left">
-                <div className="dashboard-card-icon">◉</div>
-                <div>
-                  <div className="dashboard-card-label">Edit Your Artist Profile</div>
-                  <div className="dashboard-card-sub">Bio, images, links, media, portfolio</div>
+            <div className="entity-cards">
+
+              {/* Artist cards */}
+              {(artists || []).map(artist => (
+                <div className="entity-card" key={artist.id}>
+                  <div className="entity-card-header">
+                    <div className="entity-thumb">
+                      {artist.avatar_url || artist.image_url
+                        ? <img src={artist.avatar_url || artist.image_url} alt={artist.name} />
+                        : '🎨'}
+                    </div>
+                    <div>
+                      <div className="entity-card-name">{artist.name}</div>
+                      <div className="entity-card-type">{TYPE_LABEL[artist.artist_type || ''] || 'Artist'}</div>
+                    </div>
+                  </div>
+                  <div className="entity-actions">
+                    <a href={`/dashboard/edit?id=${artist.id}`} className="entity-action">
+                      <span className="entity-action-icon">◉</span>
+                      Edit
+                    </a>
+                    <a href="/dashboard/appearances" className="entity-action">
+                      <span className="entity-action-icon">★</span>
+                      Shows
+                    </a>
+                    {artist.slug && (
+                      <a href={`/artists/${artist.slug}`} className="entity-action" target="_blank" rel="noopener noreferrer">
+                        <span className="entity-action-icon">↗</span>
+                        View
+                      </a>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <span className="dashboard-card-arrow">→</span>
-            </a>
+              ))}
 
-            <a href="/dashboard/appearances" className="sub-card">
-              <div>
-                <div className="sub-card-label">★ Appearances</div>
-                <div className="sub-card-sub">Events you're featured in — add yourself to others</div>
-              </div>
-              <span className="sub-card-arrow">→</span>
-            </a>
-
-            {artist.slug && (
-              <a href={`/artists/${artist.slug}`} className="sub-card" target="_blank" rel="noopener noreferrer">
-                <div>
-                  <div className="sub-card-label">↗ View Public Artist Page</div>
-                  <div className="sub-card-sub">785mag.com/artists/{artist.slug}</div>
+              {/* Venue cards */}
+              {(venues || []).map(venue => (
+                <div className="entity-card" key={venue.id}>
+                  <div className="entity-card-header">
+                    <div className="entity-thumb">
+                      {venue.logo || venue.image_url
+                        ? <img src={venue.logo || venue.image_url} alt={venue.name} />
+                        : '🏛️'}
+                    </div>
+                    <div>
+                      <div className="entity-card-name">{venue.name}</div>
+                      <div className="entity-card-type">{venue.venue_type || 'Venue'}</div>
+                    </div>
+                  </div>
+                  <div className="entity-actions">
+                    <a href={`/dashboard/venue?id=${venue.id}`} className="entity-action">
+                      <span className="entity-action-icon">◎</span>
+                      Edit
+                    </a>
+                    <a href="/dashboard/events" className="entity-action">
+                      <span className="entity-action-icon">◷</span>
+                      Events
+                    </a>
+                    {venue.slug && (
+                      <a href={`/venues/${venue.slug}`} className="entity-action" target="_blank" rel="noopener noreferrer">
+                        <span className="entity-action-icon">↗</span>
+                        View
+                      </a>
+                    )}
+                  </div>
                 </div>
-                <span className="sub-card-arrow">↗</span>
-              </a>
-            )}
-          </div>
-        ))}
+              ))}
 
-        {/* ── VENUES ── */}
-        {(venues || []).map(venue => (
-          <div key={venue.id}>
-            <div className="section-divider" />
-
-            <div className="entity-header">
-              <div className="entity-header-left">
-                <div className="entity-type">{venue.venue_type || 'Venue'}</div>
-                <div className="entity-name">{venue.name}</div>
-              </div>
             </div>
-
-            <a href={`/dashboard/venue?id=${venue.id}`} className="dashboard-card">
-              <div className="dashboard-card-left">
-                <div className="dashboard-card-icon">◎</div>
-                <div>
-                  <div className="dashboard-card-label">Edit Your Venue Profile</div>
-                  <div className="dashboard-card-sub">Address, type, image, website</div>
-                </div>
-              </div>
-              <span className="dashboard-card-arrow">→</span>
-            </a>
-
-            <a href="/dashboard/events" className="sub-card">
-              <div>
-                <div className="sub-card-label">◷ Happenings</div>
-                <div className="sub-card-sub">Events at your venue</div>
-              </div>
-              <span className="sub-card-arrow">→</span>
-            </a>
-
-            {venue.slug && (
-              <a href={`/venues/${venue.slug}`} className="sub-card" target="_blank" rel="noopener noreferrer">
-                <div>
-                  <div className="sub-card-label">↗ View Public Venue Page</div>
-                  <div className="sub-card-sub">785mag.com/venues/{venue.slug}</div>
-                </div>
-                <span className="sub-card-arrow">↗</span>
-              </a>
-            )}
-          </div>
-        ))}
-
-        {/* ── EVENTS ── */}
-        <div className="section-divider" />
-        <div className="section-label">Events</div>
-
-        <a href="/dashboard/events" className="dashboard-card">
-          <div className="dashboard-card-left">
-            <div className="dashboard-card-icon">◷</div>
-            <div>
-              <div className="dashboard-card-label">My Events</div>
-              <div className="dashboard-card-sub">Add and edit events you've created</div>
-            </div>
-          </div>
-          <span className="dashboard-card-arrow">→</span>
-        </a>
+          </>
+        )}
 
       </div>
+
+      <script dangerouslySetInnerHTML={{__html: `
+        document.addEventListener('click', function(e) {
+          const wrap = document.querySelector('.avatar-wrap');
+          if (wrap && !wrap.contains(e.target)) {
+            document.getElementById('dropdown')?.classList.remove('open');
+          }
+        });
+      `}} />
     </>
   )
 }

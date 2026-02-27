@@ -156,7 +156,7 @@ setLoading(false)
           --sans: 'DM Sans', system-ui, sans-serif;
         }
 
-        body { background: var(--paper); color: var(--ink); font-family: var(--sans); }
+        body { background: #ffffff; color: var(--ink); font-family: var(--sans); }
         .page { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 
         .header { padding: 48px 0 32px; border-bottom: 1px solid var(--border); margin-bottom: 48px; }

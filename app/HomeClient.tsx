@@ -191,7 +191,7 @@ export default function HomeClient({
         </div>
 
         <div className={styles.footerRule} />
-        <p className={styles.footerText}>© 2026 Pulse City Guide — All events & times subject to change</p>
+        <p className={styles.footerText}>© seveneightfive magazine — Events & times subject to change</p>
 
       </main>
 
