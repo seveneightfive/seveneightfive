@@ -70,7 +70,6 @@ export default function LoginPage() {
 
   const supabase = createClient()
 
-  // Normalize to E.164 (+1 for US)
   const normalizePhone = (raw: string) => {
     const digits = raw.replace(/\D/g, '')
     return digits.startsWith('1') ? `+${digits}` : `+1${digits}`
@@ -121,18 +120,20 @@ export default function LoginPage() {
       return
     }
 
-    // Check if this user already has an email in profiles
+    // maybeSingle() returns null cleanly if no profile row exists yet
     const { data: profile } = await supabase
       .from('profiles')
       .select('email, role')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
 
-    if (profile?.email) {
+    const hasEmail = profile?.email && profile.email.trim().length > 0
+
+    if (hasEmail) {
       // Returning user — route by role
-      router.push(profile.role === 'creator' ? '/dashboard' : '/')
+      router.push(profile!.role === 'creator' ? '/dashboard' : '/')
     } else {
-      // New user — collect email
+      // New user or existing phone user with no email — collect it
       setStep('email')
     }
     setLoading(false)
@@ -151,9 +152,15 @@ export default function LoginPage() {
     }
 
     // Upsert profile with email
-    await supabase
+    const { error: upsertError } = await supabase
       .from('profiles')
       .upsert({ id: user.id, email, phone_number: user.phone })
+
+    if (upsertError) {
+      setError(upsertError.message)
+      setLoading(false)
+      return
+    }
 
     // Run the matching function
     const { data: role, error: matchError } = await supabase.rpc('match_user_to_entities', {
@@ -180,7 +187,6 @@ export default function LoginPage() {
         <div className="card">
           <div className="wordmark">The <em>785</em></div>
 
-          {/* Step indicators */}
           <div className="step-indicator">
             {[0, 1, 2].map(i => (
               <div
