@@ -9,7 +9,7 @@ type EventRow = {
   event_date: string
   event_start_time: string | null
   event_end_time: string | null
-  ticket_price: string | null
+  ticket_price: number | null
   event_types: string[] | null
   slug: string | null
   star: boolean | null
