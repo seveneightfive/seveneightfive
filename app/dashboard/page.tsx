@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabaseServerAuth'
-import LogoutButton from './LogoutButton'
+import AvatarMenu from './AvatarMenu'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -64,44 +64,6 @@ export default async function DashboardPage() {
           text-decoration: none; color: rgba(255,255,255,0.35);
         }
         .wordmark em { font-style: normal; color: var(--accent); }
-
-        /* ── AVATAR DROPDOWN ── */
-        .avatar-wrap { position: relative; }
-        .avatar {
-          width: 32px; height: 32px; border-radius: 50%;
-          background: var(--accent); display: flex; align-items: center; justify-content: center;
-          font-family: var(--serif); font-size: 0.72rem; font-weight: 700; color: #fff;
-          cursor: pointer; border: 2px solid transparent; transition: border-color 0.15s;
-          user-select: none;
-        }
-        .avatar:hover { border-color: rgba(255,255,255,0.3); }
-        .dropdown {
-          display: none; position: absolute; top: calc(100% + 10px); right: 0;
-          width: 220px; background: #242019; border: 1px solid var(--border2);
-          border-radius: 14px; overflow: hidden;
-          box-shadow: 0 12px 40px rgba(0,0,0,0.5); z-index: 300;
-        }
-        .dropdown.open { display: block; animation: dropIn 0.15s ease; }
-        @keyframes dropIn {
-          from { opacity: 0; transform: translateY(-6px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .dropdown-header { padding: 14px 16px 12px; border-bottom: 1px solid var(--border); }
-        .dropdown-name {
-          font-family: var(--serif); font-size: 0.95rem; font-weight: 700;
-          text-transform: uppercase; letter-spacing: 0.04em;
-        }
-        .dropdown-phone { font-size: 0.75rem; color: var(--dim); margin-top: 2px; }
-        .dropdown-item {
-          display: flex; align-items: center; gap: 12px;
-          padding: 12px 16px; cursor: pointer; text-decoration: none;
-          transition: background 0.12s;
-        }
-        .dropdown-item:hover { background: rgba(255,255,255,0.05); }
-        .dropdown-item-icon { font-size: 0.9rem; width: 18px; text-align: center; flex-shrink: 0; }
-        .dropdown-item-label { font-size: 0.82rem; font-weight: 400; color: rgba(255,255,255,0.75); }
-        .dropdown-divider { height: 1px; background: var(--border); }
-        .dropdown-item.danger .dropdown-item-label { color: var(--accent); }
 
         /* ── CONTENT ── */
         .content { max-width: 600px; margin: 0 auto; padding: 0 0 60px; }
@@ -301,37 +263,11 @@ export default async function DashboardPage() {
       {/* ── TOPBAR ── */}
       <div className="topbar">
         <a href="/" className="wordmark"><em>785</em>MAGAZINE</a>
-        <div className="avatar-wrap">
-          <div className="avatar" id="avatarBtn" onClick={() => {
-            document.getElementById('dropdown')?.classList.toggle('open')
-          }}>
-            {initials}
-          </div>
-          <div className="dropdown" id="dropdown">
-            <div className="dropdown-header">
-              <div className="dropdown-name">{profile?.full_name || 'Your Account'}</div>
-              <div className="dropdown-phone">{profile?.phone_number || profile?.email || ''}</div>
-            </div>
-            <a href="/dashboard/settings/phone" className="dropdown-item">
-              <span className="dropdown-item-icon">📱</span>
-              <span className="dropdown-item-label">Update Phone Number</span>
-            </a>
-            <a href="/dashboard/settings/email" className="dropdown-item">
-              <span className="dropdown-item-icon">✉️</span>
-              <span className="dropdown-item-label">Update Email</span>
-            </a>
-            <a href="/dashboard/settings/notifications" className="dropdown-item">
-              <span className="dropdown-item-icon">🔔</span>
-              <span className="dropdown-item-label">Notification Settings</span>
-            </a>
-            <a href="/dashboard/settings/profile" className="dropdown-item">
-              <span className="dropdown-item-icon">👤</span>
-              <span className="dropdown-item-label">Edit Profile</span>
-            </a>
-            <div className="dropdown-divider"></div>
-            <LogoutButton asDropdownItem />
-          </div>
-        </div>
+        <AvatarMenu
+          initials={initials}
+          fullName={profile?.full_name || 'Your Account'}
+          phoneOrEmail={profile?.phone_number || profile?.email || ''}
+        />
       </div>
 
       <div className="content">
@@ -474,14 +410,6 @@ export default async function DashboardPage() {
 
       </div>
 
-      <script dangerouslySetInnerHTML={{__html: `
-        document.addEventListener('click', function(e) {
-          const wrap = document.querySelector('.avatar-wrap');
-          if (wrap && !wrap.contains(e.target)) {
-            document.getElementById('dropdown')?.classList.remove('open');
-          }
-        });
-      `}} />
     </>
   )
 }
