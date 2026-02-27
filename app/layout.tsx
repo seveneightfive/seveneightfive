@@ -16,13 +16,13 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "The 785",
-  description: "Kansas artists and events directory",
+  title: "seveneightfive",
+  description: "Topeka City Guide + Kansas Artists Directory",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "The 785",
+    title: "seveneightfive",
   },
   icons: {
     apple: "/icons/icon-192.png",
@@ -40,6 +40,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=DM+Sans:ital,wght@0,300;0,400;1,300&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
         <InstallButton />

@@ -1,0 +1,683 @@
+/* ── Variables ── */
+.main {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* ── Desktop Top Nav ── */
+.topnav {
+  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #ffffff;
+  border-bottom: 2px solid #0A0A0A;
+  padding: 0 40px;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+}
+
+.topnav .logo,
+.mobileHeader .logo {
+  font-family: 'Oswald', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: #0A0A0A;
+  text-decoration: none;
+}
+
+.topnav .logo span,
+.mobileHeader .logo span {
+  color: #C80650;
+}
+
+.topnav nav {
+  display: flex;
+  gap: 4px;
+}
+
+.navLink {
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: #0A0A0A;
+  padding: 8px 16px;
+  border-radius: 2px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.navLink:hover {
+  background: #FFCE03;
+}
+
+.navLink.activeNav {
+  background: #0A0A0A;
+  color: #ffffff;
+}
+
+/* ── Mobile Header ── */
+.mobileHeader {
+  padding: 20px 20px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid #0A0A0A;
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  z-index: 100;
+}
+
+.mobileHeader .logo {
+  font-size: 26px;
+}
+
+.date {
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  color: #AAAAAA;
+  text-transform: uppercase;
+}
+
+/* ── Bottom Nav (mobile) ── */
+.bottomnav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #0A0A0A;
+  display: flex;
+  border-top: 3px solid #FFCE03;
+  z-index: 200;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.bnLink {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 4px 12px;
+  text-decoration: none;
+  color: #AAAAAA;
+  gap: 4px;
+  transition: color 0.15s;
+  font-family: 'Oswald', sans-serif;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.bnLink.active {
+  color: #FFCE03;
+}
+
+.bnLink:hover {
+  color: #ffffff;
+}
+
+/* ── Hero ── */
+.hero {
+  background: #0A0A0A;
+  padding: 40px 20px 36px;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: 'PULSE';
+  position: absolute;
+  right: -10px;
+  top: -20px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 160px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.04);
+  letter-spacing: -4px;
+  pointer-events: none;
+}
+
+.kicker {
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #FFCE03;
+  margin-bottom: 10px;
+}
+
+.hero h1 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 52px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -1px;
+  color: #ffffff;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+.hero h1 em {
+  font-style: normal;
+  color: #FFCE03;
+}
+
+.hero p {
+  font-size: 14px;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.6;
+  max-width: 320px;
+  margin-bottom: 24px;
+}
+
+.heroCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFCE03;
+  color: #0A0A0A;
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 12px 24px;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.heroCta:hover {
+  background: #C80650;
+  color: #ffffff;
+}
+
+/* ── Section Headers ── */
+.sectionHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 40px 20px 16px;
+  border-top: 2px solid #0A0A0A;
+}
+
+.sectionHeader h2 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  text-transform: uppercase;
+}
+
+.sectionHeader a {
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #C80650;
+  text-decoration: none;
+}
+
+.sectionHeader a:hover {
+  text-decoration: underline;
+}
+
+/* ── Events ── */
+.events {
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.eventCard {
+  display: flex;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid #E8E8E8;
+  text-decoration: none;
+  color: #0A0A0A;
+  transition: opacity 0.15s;
+}
+
+.eventCard:last-child {
+  border-bottom: none;
+}
+
+.eventCard:hover {
+  opacity: 0.7;
+}
+
+.eventDate {
+  min-width: 52px;
+  background: #0A0A0A;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 6px;
+  font-family: 'Oswald', sans-serif;
+}
+
+.day {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.mon {
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #FFCE03;
+}
+
+.eventInfo {
+  flex: 1;
+}
+
+.eventTag {
+  font-family: 'Oswald', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #C80650;
+  margin-bottom: 4px;
+}
+
+.eventName {
+  font-family: 'Oswald', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+
+.eventMeta {
+  font-size: 12px;
+  font-weight: 300;
+  color: #AAAAAA;
+}
+
+.eventPrice {
+  font-family: 'Oswald', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  align-self: center;
+  white-space: nowrap;
+}
+
+/* ── Artists ── */
+.artistsScroll {
+  padding: 0 20px;
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+
+.artistsScroll::-webkit-scrollbar {
+  display: none;
+}
+
+.artistCard {
+  flex: 0 0 140px;
+  cursor: pointer;
+  text-decoration: none;
+  color: #0A0A0A;
+}
+
+.artistImg {
+  width: 140px;
+  height: 170px;
+  background: #F5F5F5;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.colorFill {
+  position: absolute;
+  inset: 0;
+}
+
+.initials {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Oswald', sans-serif;
+  font-size: 44px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.artistImgTag {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #FFCE03;
+  font-family: 'Oswald', sans-serif;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 5px 8px;
+  color: #0A0A0A;
+}
+
+.artistName {
+  font-family: 'Oswald', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.artistGenre {
+  font-size: 12px;
+  font-weight: 300;
+  color: #AAAAAA;
+}
+
+/* ── Neighborhoods ── */
+.neighborhoods {
+  padding: 0 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.nbhCard {
+  position: relative;
+  height: 130px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #0A0A0A;
+  text-decoration: none;
+  display: block;
+}
+
+.nbhLarge {
+  grid-column: 1 / -1;
+  height: 160px;
+}
+
+.nbhBg {
+  position: absolute;
+  inset: 0;
+  opacity: 0.65;
+}
+
+.nbhContent {
+  position: absolute;
+  inset: 0;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.nbhLabel {
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #FFCE03;
+  margin-bottom: 2px;
+}
+
+.nbhName {
+  font-family: 'Oswald', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #ffffff;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.nbhLarge .nbhName {
+  font-size: 32px;
+}
+
+.nbhCount {
+  font-size: 12px;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 3px;
+}
+
+/* ── Announcement ── */
+.announcement {
+  margin: 40px 20px 0;
+  border: 2px solid #0A0A0A;
+  padding: 28px 24px;
+  position: relative;
+}
+
+.announcement::before {
+  content: 'ANNOUNCEMENT';
+  position: absolute;
+  top: -10px;
+  left: 16px;
+  background: #ffffff;
+  padding: 0 8px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #AAAAAA;
+}
+
+.announcement h3 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.3px;
+  margin-bottom: 10px;
+  line-height: 1.1;
+}
+
+.announcement h3 span {
+  color: #C80650;
+}
+
+.announcement p {
+  font-size: 13px;
+  font-weight: 300;
+  line-height: 1.65;
+  color: #555;
+  margin-bottom: 16px;
+}
+
+.annCta {
+  font-family: 'Oswald', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #C80650;
+  text-decoration: none;
+  border-bottom: 2px solid #C80650;
+  padding-bottom: 2px;
+}
+
+/* ── Advertisement ── */
+.adBlock {
+  margin: 32px 20px;
+  background: #FFCE03;
+  padding: 28px 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.adBlock::after {
+  content: 'AD';
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  color: rgba(0, 0, 0, 0.3);
+}
+
+.adEyebrow {
+  font-family: 'Oswald', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.5);
+  margin-bottom: 8px;
+}
+
+.adBlock h3 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  text-transform: uppercase;
+  line-height: 1;
+  color: #0A0A0A;
+  margin-bottom: 10px;
+  letter-spacing: -0.5px;
+}
+
+.adBlock p {
+  font-size: 13px;
+  font-weight: 300;
+  color: rgba(0, 0, 0, 0.65);
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+
+.adBtn {
+  display: inline-block;
+  background: #0A0A0A;
+  color: #ffffff;
+  font-family: 'Oswald', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 11px 22px;
+  text-decoration: none;
+}
+
+.adDeco {
+  position: absolute;
+  right: -20px;
+  bottom: -30px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 100px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.06);
+  pointer-events: none;
+}
+
+/* ── Footer ── */
+.footerRule {
+  height: 3px;
+  background: #0A0A0A;
+  margin: 40px 20px 20px;
+}
+
+.footerText {
+  padding: 0 20px 20px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #AAAAAA;
+  text-align: center;
+}
+
+/* ── Desktop Overrides ── */
+@media (min-width: 640px) {
+  .topnav {
+    display: flex;
+  }
+
+  .mobileHeader {
+    display: none;
+  }
+
+  .bottomnav {
+    display: none;
+  }
+
+  body {
+    padding-bottom: 0;
+  }
+
+  .main {
+    max-width: 900px;
+  }
+
+  .hero {
+    padding: 60px 40px;
+  }
+
+  .hero h1 {
+    font-size: 80px;
+  }
+
+  .sectionHeader {
+    padding: 60px 40px 20px;
+  }
+
+  .events {
+    padding: 0 40px;
+  }
+
+  .artistsScroll {
+    padding: 0 40px;
+  }
+
+  .neighborhoods {
+    padding: 0 40px;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .nbhLarge {
+    grid-column: span 2;
+  }
+
+  .announcement {
+    margin: 60px 40px 0;
+  }
+
+  .adBlock {
+    margin: 40px 40px;
+  }
+
+  .footerRule {
+    margin: 60px 40px 24px;
+  }
+
+  .footerText {
+    padding: 0 40px 40px;
+  }
+}
