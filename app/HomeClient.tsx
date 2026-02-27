@@ -151,7 +151,7 @@ export default function HomeClient({
               </p>
             ) : (
               artists.map((artist) => (
-                <Link href={`/artists/${artist.id}`} key={artist.id} className={styles.artistCard}>
+                <Link href={artist.slug ? `/artists/${artist.slug}` : '#'} key={artist.id} className={styles.artistCard}>
                   <div className={styles.artistImg}>
                     {artist.avatar_url || artist.image_url ? (
                         <img
