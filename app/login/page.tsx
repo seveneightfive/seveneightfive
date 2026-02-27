@@ -82,10 +82,13 @@ export default function LoginPage() {
     setError('')
 
     const normalized = normalizePhone(phone)
-    const { error } = await supabase.auth.signInWithOtp({ phone: normalized })
+    const { error } = await supabase.auth.signInWithOtp({
+      phone: normalized,
+      options: { shouldCreateUser: true },
+    })
 
     if (error) {
-      setError(error.message)
+      setError(`${error.message}${error.status ? ` (${error.status})` : ''}`)
     } else {
       sessionStorage.setItem('pending_phone', normalized)
       setStep('otp')
@@ -185,7 +188,7 @@ export default function LoginPage() {
       <style>{STYLES}</style>
       <div className="wrap">
         <div className="card">
-          <div className="wordmark">The <em>785</em></div>
+          <div className="wordmark"> <em>785</em>MAGAZINE</div>
 
           <div className="step-indicator">
             {[0, 1, 2].map(i => (
@@ -217,7 +220,7 @@ export default function LoginPage() {
                   {loading ? 'Sending…' : 'Send Code'}
                 </button>
               </form>
-              <a href="/" className="back-link">← Back to The 785</a>
+              <a href="/" className="back-link">← Back to seveneightfive</a>
             </>
           )}
 
@@ -273,7 +276,7 @@ export default function LoginPage() {
                   {loading ? 'Checking…' : 'Continue'}
                 </button>
               </form>
-              <div className="hint">Don't have a profile yet? <strong>No worries</strong> — you'll be taken to the home page and can explore The 785.</div>
+              <div className="hint">Don't have a profile yet? <strong>No worries</strong> — you'll be taken to the home page and can explore seveneightfive.</div>
             </>
           )}
 
