@@ -70,9 +70,11 @@ export default function LoginPage() {
 
   const supabase = createClient()
 
-  const normalizePhone = (raw: string) => {
+  const normalizePhone = (raw: string): string => {
     const digits = raw.replace(/\D/g, '')
-    return digits.startsWith('1') ? `+${digits}` : `+1${digits}`
+    if (digits.length === 10) return `+1${digits}`
+    if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
+    return `+1${digits}`
   }
 
   // Step 1: Send OTP
@@ -82,6 +84,11 @@ export default function LoginPage() {
     setError('')
 
     const normalized = normalizePhone(phone)
+    if (normalized.replace(/\D/g, '').length !== 11) {
+      setError('Please enter a valid 10-digit US phone number.')
+      setLoading(false)
+      return
+    }
     const { error } = await supabase.auth.signInWithOtp({
       phone: normalized,
       options: { shouldCreateUser: true },
