@@ -20,9 +20,12 @@ type Event = {
 type Artist = {
   id: string
   name: string
-  genre: string
-  tag: string
-  color: string
+  slug: string | null
+  tagline: string | null
+  artist_type: string | null
+  avatar_url: string | null   // ← add this
+  image_url: string | null    // ← add this
+  upcomingCount: number
 }
 
 const NEIGHBORHOODS = [
