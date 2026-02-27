@@ -13,6 +13,7 @@ type EventRow = {
   event_types: string[] | null
   slug: string | null
   star: boolean | null
+  image_url: string | null
   venue: { name: string } | { name: string }[] | null
 }
 
@@ -46,6 +47,7 @@ export default async function HomePage() {
         event_types,
         slug,
         star,
+        image_url,
         venue:venues ( name )
       `)
       .in('event_date', [today, tomorrow])

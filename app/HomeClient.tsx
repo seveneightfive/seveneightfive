@@ -14,7 +14,8 @@ type Event = {
   event_types: string[] | null
   slug: string | null
   star: boolean | null
-  venue: { name: string } | null   // ← object, not string
+  image_url: string | null
+  venue: { name: string } | null
 }
 
 type Artist = {
@@ -128,9 +129,13 @@ export default function HomeClient({
                       <div className={styles.eventName}>{event.title}</div>
                       <div className={styles.eventMeta}>{event.venue?.name} · {event.event_start_time}</div>
                     </div>
-                    <div className={styles.eventPrice}>
-  {event.ticket_price ? `$${event.ticket_price}` : 'Free'}
-</div>
+                    <div className={styles.eventThumb}>
+                      {event.image_url ? (
+                        <img src={event.image_url} alt="" className={styles.eventThumbImg} />
+                      ) : (
+                        <div className={styles.eventThumbFallback} />
+                      )}
+                    </div>
                   </Link>
                 )
               })
