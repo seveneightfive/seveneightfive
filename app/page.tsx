@@ -3,6 +3,19 @@ import HomeClient from './HomeClient'
 
 export const revalidate = 3600
 
+type EventRow = {
+  id: string
+  title: string
+  event_date: string
+  event_start_time: string | null
+  event_end_time: string | null
+  ticket_price: string | null
+  event_types: string[] | null
+  slug: string | null
+  star: boolean | null
+  venue: { name: string } | { name: string }[] | null
+}
+
 export default async function HomePage() {
   const now = new Date()
 
@@ -86,5 +99,10 @@ export default async function HomePage() {
     }))
     .sort((a, b) => b.upcomingCount - a.upcomingCount)
 
-  return <HomeClient events={events ?? []} artists={sortedArtists} />
+  const normalizedEvents = (events as EventRow[] ?? []).map((e) => ({
+    ...e,
+    venue: Array.isArray(e.venue) ? e.venue[0] ?? null : e.venue,
+  }))
+
+  return <HomeClient events={normalizedEvents} artists={sortedArtists} />
 }
