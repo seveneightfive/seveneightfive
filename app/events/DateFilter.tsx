@@ -138,7 +138,7 @@ export default function DateFilter({ selectedDate, onSelect }: DateFilterProps) 
           z-index: 301;
           background: var(--white);
           border-radius: 20px 20px 0 0;
-          padding: 0 0 env(safe-area-inset-bottom, 16px);
+          padding: 0 0 calc(60px + env(safe-area-inset-bottom, 0px));
           animation: sheetUp 0.28s cubic-bezier(0.22,1,0.36,1);
           max-height: 80vh;
           overflow-y: auto;
