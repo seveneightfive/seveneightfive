@@ -24,7 +24,33 @@ export default async function DashboardPage() {
       .maybeSingle(),
   ])
 
-  const isCreator = (artists && artists.length > 0) || (venues && venues.length > 0)
+  // Also fetch via junction tables (covers entities where auth_user_id isn't set but user is linked)
+  const [{ data: venueUserLinks }, { data: artistUserLinks }] = await Promise.all([
+    supabase.from('venue_users').select('venue_id').eq('user_id', user.id),
+    supabase.from('artist_users').select('artist_id').eq('user_id', user.id),
+  ])
+
+  const extraVenueIds = (venueUserLinks || [])
+    .map((r: any) => r.venue_id)
+    .filter((id: string) => !(venues || []).some((v: any) => v.id === id))
+
+  const extraArtistIds = (artistUserLinks || [])
+    .map((r: any) => r.artist_id)
+    .filter((id: string) => !(artists || []).some((a: any) => a.id === id))
+
+  const [{ data: extraVenues }, { data: extraArtists }] = await Promise.all([
+    extraVenueIds.length
+      ? supabase.from('venues').select('id, name, slug, venue_type, image_url, logo').in('id', extraVenueIds)
+      : Promise.resolve({ data: [] as any[] }),
+    extraArtistIds.length
+      ? supabase.from('artists').select('id, name, slug, tagline, image_url, avatar_url, artist_type, verified').in('id', extraArtistIds)
+      : Promise.resolve({ data: [] as any[] }),
+  ])
+
+  const allVenues = [...(venues || []), ...(extraVenues || [])]
+  const allArtists = [...(artists || []), ...(extraArtists || [])]
+
+  const isCreator = allArtists.length > 0 || allVenues.length > 0
   const firstName = profile?.full_name?.split(' ')[0] || 'There'
   const initials = profile?.full_name
     ? profile.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
@@ -339,7 +365,7 @@ export default async function DashboardPage() {
             <div className="entity-cards">
 
               {/* Artist cards */}
-              {(artists || []).map(artist => (
+              {allArtists.map(artist => (
                 <div className="entity-card" key={artist.id}>
                   <div className="entity-card-header">
                     <div className="entity-thumb">
@@ -372,7 +398,7 @@ export default async function DashboardPage() {
               ))}
 
               {/* Venue cards */}
-              {(venues || []).map(venue => (
+              {allVenues.map(venue => (
                 <div className="entity-card" key={venue.id}>
                   <div className="entity-card-header">
                     <div className="entity-thumb">

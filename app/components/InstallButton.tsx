@@ -19,8 +19,17 @@ export default function InstallButton() {
     const ios = /iphone|ipad|ipod/i.test(ua) && !(window as any).MSStream
     setIsIOS(ios)
 
-    // Already running as installed PWA
-    if (window.matchMedia("(display-mode: standalone)").matches) {
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches
+
+    // Already running as installed PWA — persist flag and hide
+    if (isStandalone) {
+      localStorage.setItem("pwa_installed", "1")
+      setInstalled(true)
+      return
+    }
+
+    // Previously installed (covers iOS: user opens site in browser after adding to home screen)
+    if (localStorage.getItem("pwa_installed")) {
       setInstalled(true)
       return
     }
@@ -30,7 +39,10 @@ export default function InstallButton() {
       setPrompt(e as BeforeInstallPromptEvent)
     }
     window.addEventListener("beforeinstallprompt", handler)
-    window.addEventListener("appinstalled", () => setInstalled(true))
+    window.addEventListener("appinstalled", () => {
+      localStorage.setItem("pwa_installed", "1")
+      setInstalled(true)
+    })
 
     return () => window.removeEventListener("beforeinstallprompt", handler)
   }, [])

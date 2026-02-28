@@ -38,11 +38,12 @@ export default function MyEventsPage() {
 
       const EVENT_SELECT = 'id, title, event_date, slug, venue_id, venues(name)'
 
-      // Fetch from all 3 sources in parallel
+      // Fetch from all 4 sources in parallel
       const [
         { data: createdEvents },
         venueEventsResult,
         artistLinksResult,
+        { data: userEventLinks },
       ] = await Promise.all([
         supabase.from('events').select(EVENT_SELECT).eq('auth_user_id', user.id),
         venueIds.length
@@ -51,6 +52,7 @@ export default function MyEventsPage() {
         artistIds.length
           ? supabase.from('event_artists').select(`event_id, events(${EVENT_SELECT})`).in('artist_id', artistIds)
           : Promise.resolve({ data: [] as any[] }),
+        supabase.from('event_users').select(`event_id, events(${EVENT_SELECT})`).eq('user_id', user.id),
       ])
 
       // Flatten artist-linked events
@@ -59,8 +61,14 @@ export default function MyEventsPage() {
         return e
       }).filter(Boolean)
 
+      // Flatten event_users-linked events
+      const userLinkedEvents = (userEventLinks || []).map((l: any) => {
+        const e = Array.isArray(l.events) ? l.events[0] : l.events
+        return e
+      }).filter(Boolean)
+
       // Merge and deduplicate
-      const allEvents = [...(createdEvents || []), ...((venueEventsResult.data) || []), ...linkedEvents]
+      const allEvents = [...(createdEvents || []), ...((venueEventsResult.data) || []), ...linkedEvents, ...userLinkedEvents]
       const seen = new Set<string>()
       const merged: EventRow[] = allEvents
         .filter((e: any) => { if (seen.has(e.id)) return false; seen.add(e.id); return true })

@@ -72,7 +72,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${origin}/dashboard`)
     }
 
-    // No match — send to home
+    // No entity match — check if user has completed signup (has a profile)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (!profile) {
+      // New user who signed up via magic link but hasn't completed merge yet
+      return NextResponse.redirect(`${origin}/login?complete=1`)
+    }
+
+    // Returning user with no linked entities — send home
     return NextResponse.redirect(`${origin}/`)
   }
 
