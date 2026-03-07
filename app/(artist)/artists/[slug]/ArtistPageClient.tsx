@@ -1,8 +1,8 @@
-import { supabase } from '@/lib/supabase'
-import { notFound } from 'next/navigation'
-import type { Metadata } from 'next'
+'use client'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+import { useState, useEffect } from 'react'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type MusicianProfile = {
   musical_genres: string[] | null
@@ -65,164 +65,83 @@ type PortfolioImage = {
   display_order: number
 }
 
-// ─── SEO ─────────────────────────────────────────────────────────────────────
+type SocialLink = { label: string; url: string; icon: string; color: string }
+type NavItem = { id: string; label: string; icon: string }
 
-export async function generateMetadata(
-  { params }: { params: Promise<{ slug: string }> }
-): Promise<Metadata> {
-  const { slug } = await params
-  const artist = await getArtist(slug)
-  if (!artist) return { title: 'Artist Not Found' }
-  const description = artist.bio || artist.tagline || `${artist.name} — Kansas artist on The 785`
-  const image = artist.image_url || artist.avatar_url
-  return {
-    title: `${artist.name} | The 785`,
-    description,
-    openGraph: { title: artist.name, description, images: image ? [{ url: image }] : [], type: 'profile' },
-    twitter: { card: 'summary_large_image', title: artist.name, description, images: image ? [image] : [] },
-  }
+// ─── Props ────────────────────────────────────────────────────────────────────
+
+type Props = {
+  artist: Artist
+  events: Event[]
+  portfolioImages: PortfolioImage[]
+  socialLinks: SocialLink[]
+  navItems: NavItem[]
+  genres: string[]
+  videoId: string | null
+  hasMusic: boolean
+  hasWork: boolean
+  jsonLd: object
 }
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
+// ─── Component ───────────────────────────────────────────────────────────────
 
-async function getArtist(slug: string): Promise<Artist | null> {
-  const { data, error } = await supabase
-    .from('artists')
-    .select(`
-      id, name, slug, bio, tagline, image_url, avatar_url,
-      artist_type, verified, location_city, location_state,
-      birth_place, awards, artist_website, social_facebook,
-      artist_email, given_name, family_name, url, same_as,
-      artist_musician_profiles (
-        musical_genres, audio_file_url, audio_title,
-        video_url, video_title, artistvideoabout,
-        artist_spotify, artist_youtube, purchase_link
-      ),
-      artist_visual_profiles (visual_mediums, works)
-    `)
-    .eq('slug', slug)
-    .eq('published', true)
-    .single()
-
-  if (error || !data) return null
-  return {
-    ...data,
-    musician_profile: Array.isArray(data.artist_musician_profiles)
-      ? data.artist_musician_profiles[0] || null
-      : (data.artist_musician_profiles as any) || null,
-    visual_profile: Array.isArray(data.artist_visual_profiles)
-      ? data.artist_visual_profiles[0] || null
-      : (data.artist_visual_profiles as any) || null,
-  } as Artist
-}
-
-async function getArtistEvents(artistId: string): Promise<Event[]> {
-  const { data: links } = await supabase
-    .from('event_artists')
-    .select('event_id')
-    .eq('artist_id', artistId)
-
-  if (!links || links.length === 0) return []
-
-  const eventIds = links.map((l: any) => l.event_id)
-
-  const { data } = await supabase
-    .from('events')
-    .select(`
-      id, slug, title, event_date, event_start_time, ticket_url, image_url, ticket_price,
-      venue:venues (name, neighborhood)
-    `)
-    .in('id', eventIds)
-    .order('event_date', { ascending: true })
-    .limit(10)
-
-  return (data || []).map((e: any) => ({
-    ...e,
-    venue: Array.isArray(e.venue) ? (e.venue[0] ?? null) : e.venue,
-  })) as Event[]
-}
-
-async function getPortfolioImages(artistId: string): Promise<PortfolioImage[]> {
-  const { data } = await supabase
-    .from('artist_portfolio_images')
-    .select('id, image_url, caption, display_order')
-    .eq('artist_id', artistId)
-    .order('display_order', { ascending: true })
-  return (data || []) as PortfolioImage[]
-}
-
-function getJsonLd(artist: Artist) {
-  const genres = [...(artist.musician_profile?.musical_genres || []), ...(artist.visual_profile?.visual_mediums || [])]
-  return {
-    '@context': 'https://schema.org',
-    '@type': artist.artist_type === 'Musician' ? 'MusicGroup' : 'Person',
-    name: artist.name,
-    description: artist.bio || artist.tagline,
-    image: artist.image_url || artist.avatar_url,
-    url: artist.url || artist.artist_website,
-    sameAs: artist.same_as || [],
-    ...(genres.length > 0 && { genre: genres }),
-    ...(artist.location_city && { homeLocation: { '@type': 'Place', addressLocality: artist.location_city, addressRegion: artist.location_state } }),
-    ...(artist.awards && { award: artist.awards }),
-  }
-}
-
-function getYouTubeId(url: string): string | null {
-  const match = url.match(/(?:youtu\.be\/|youtube\.com(?:\/embed\/|\/v\/|\/watch\?v=|\/watch\?.+&v=))([\w-]{11})/)
-  return match ? match[1] : null
-}
-
-function getSocialLinks(artist: Artist) {
-  const links: { label: string; url: string; icon: string; color: string }[] = []
-  const mp = artist.musician_profile
-  if (artist.artist_website) links.push({ label: 'Website', url: artist.artist_website, icon: '🌐', color: '#1a1814' })
-  if (mp?.artist_spotify) links.push({ label: 'Spotify', url: mp.artist_spotify, icon: '♫', color: '#1DB954' })
-  if (mp?.artist_youtube) links.push({ label: 'YouTube', url: mp.artist_youtube, icon: '▶', color: '#FF0000' })
-  if (artist.social_facebook) links.push({ label: 'Facebook', url: artist.social_facebook, icon: 'f', color: '#1877F2' })
-  if (mp?.purchase_link) links.push({ label: 'Buy / Book', url: mp.purchase_link, icon: '🎟', color: '#C80650' })
-  if (artist.artist_email) links.push({ label: 'Email', url: `mailto:${artist.artist_email}`, icon: '✉', color: '#6b6560' })
-  artist.same_as?.forEach(url => {
-    if (url.includes('soundcloud')) links.push({ label: 'SoundCloud', url, icon: '☁', color: '#FF5500' })
-    if (url.includes('instagram')) links.push({ label: 'Instagram', url, icon: '◎', color: '#E1306C' })
-    if (url.includes('apple')) links.push({ label: 'Apple Music', url, icon: '♪', color: '#FA243C' })
-    if (url.includes('tiktok')) links.push({ label: 'TikTok', url, icon: '♩', color: '#010101' })
-  })
-  return links
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
-export default async function ArtistPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params
-  const artist = await getArtist(slug)
-  if (!artist) notFound()
-
-  const [events, portfolioImages] = await Promise.all([
-    getArtistEvents(artist.id),
-    getPortfolioImages(artist.id),
-  ])
+export default function ArtistPageClient({
+  artist,
+  events,
+  portfolioImages,
+  socialLinks,
+  navItems,
+  genres,
+  videoId,
+  hasMusic,
+  hasWork,
+  jsonLd,
+}: Props) {
+  const [shareOpen, setShareOpen] = useState(false)
+  const [saveOpen, setSaveOpen] = useState(false)
+  const [lightboxImage, setLightboxImage] = useState<PortfolioImage | null>(null)
+  const [activeSection, setActiveSection] = useState<string>('')
+  const [saveEmail, setSaveEmail] = useState('')
+  const [copied, setCopied] = useState(false)
 
   const mp = artist.musician_profile
   const vp = artist.visual_profile
-  const genres = [...(mp?.musical_genres || []), ...(vp?.visual_mediums || [])]
   const heroImage = artist.image_url || artist.avatar_url
-  const socialLinks = getSocialLinks(artist)
-  const videoId = mp?.video_url ? getYouTubeId(mp.video_url) : null
-  const jsonLd = getJsonLd(artist)
-  const hasMusic = !!(mp?.audio_file_url || mp?.video_url)
-  const hasWork = !!(vp?.works) || portfolioImages.length > 0
 
   const TYPE_LABEL: Record<string, string> = {
     Musician: 'Musician', Visual: 'Visual Artist', Performance: 'Performer', Literary: 'Literary Artist',
   }
 
-  const navItems = [
-    { id: 'about', label: 'About', icon: '◉', show: true },
-    { id: 'music', label: 'Music', icon: '♫', show: hasMusic },
-    { id: 'work', label: 'Work', icon: '◈', show: hasWork },
-    { id: 'events', label: 'Events', icon: '◷', show: true },
-    { id: 'links', label: 'Links', icon: '↗', show: socialLinks.length > 0 },
-  ].filter(n => n.show)
+  // IntersectionObserver — track active section
+  useEffect(() => {
+    const observers: IntersectionObserver[] = []
+    navItems.forEach(({ id }) => {
+      const el = document.getElementById(id)
+      if (!el) return
+      const obs = new IntersectionObserver(
+        ([entry]) => { if (entry.isIntersecting) setActiveSection(id) },
+        { threshold: 0.4 }
+      )
+      obs.observe(el)
+      observers.push(obs)
+    })
+    return () => observers.forEach(o => o.disconnect())
+  }, [navItems])
+
+  // Escape closes lightbox
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightboxImage(null) }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
+  const handleCopyLink = async () => {
+    await navigator.clipboard.writeText(window.location.href)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const pageUrl = typeof window !== 'undefined' ? window.location.href : ''
 
   return (
     <>
@@ -242,6 +161,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
           --accent: #C80650;
           --accent-light: #fdeef3;
           --border: #ece8e2;
+          --gold: #FFCE0A;
           --serif: 'Oswald', sans-serif;
           --sans: 'DM Sans', system-ui, sans-serif;
           --nav-h: 56px;
@@ -383,6 +303,41 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
           padding-left: 0;
         }
 
+        /* ── HERO ACTION BUTTONS ──────────────────────── */
+        .hero-actions {
+          display: flex;
+          gap: 10px;
+          margin-top: 16px;
+          animation: fadeUp 0.6s 0.24s cubic-bezier(0.22,1,0.36,1) both;
+        }
+        .hero-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 9px 18px;
+          border-radius: 100px;
+          font-family: var(--sans);
+          font-size: 0.75rem;
+          font-weight: 500;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          cursor: pointer;
+          border: none;
+          transition: opacity 0.15s;
+          -webkit-tap-highlight-color: transparent;
+        }
+        .hero-btn-share {
+          background: rgba(255,255,255,0.12);
+          color: rgba(255,255,255,0.85);
+          backdrop-filter: blur(8px);
+          border: 1px solid rgba(255,255,255,0.18);
+        }
+        .hero-btn-save {
+          background: var(--gold);
+          color: var(--ink);
+        }
+        .hero-btn:hover { opacity: 0.8; }
+
         /* ── DESKTOP TOP NAV ──────────────────────────── */
         .top-nav {
           position: sticky;
@@ -444,7 +399,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
           right: 0;
           z-index: 200;
           background: var(--white);
-          border-top: 1px solid var(--border);
+          border-top: 2px solid var(--gold);
           height: var(--bottom-nav-h);
           padding: 0;
           padding-bottom: env(safe-area-inset-bottom);
@@ -468,8 +423,20 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
           transition: color 0.15s;
           padding: 8px 2px;
           min-width: 0;
+          position: relative;
         }
         .bottom-nav-item:hover, .bottom-nav-item:active { color: var(--accent); }
+        .bottom-nav-item.active { color: var(--accent); }
+        .bottom-nav-item.active::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 8px;
+          right: 8px;
+          height: 2px;
+          background: var(--gold);
+          border-radius: 0 0 2px 2px;
+        }
         .bottom-nav-icon {
           font-size: 1rem;
           line-height: 1;
@@ -632,7 +599,10 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
         .portfolio-img {
           width: 100%; aspect-ratio: 4/3; object-fit: cover;
           border-radius: 8px; display: block; background: var(--off);
+          cursor: zoom-in;
+          transition: opacity 0.15s;
         }
+        .portfolio-img:hover { opacity: 0.85; }
         .portfolio-caption {
           font-size: 0.75rem; color: var(--ink-faint);
           font-style: italic; line-height: 1.4;
@@ -753,16 +723,187 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
         .footer-wordmark em { font-style: normal; color: var(--accent); font-weight: 600; }
         .footer-wordmark:hover { color: var(--ink); }
 
+        /* ── BOTTOM SHEET ─────────────────────────────── */
+        .sheet-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.5);
+          z-index: 400;
+          display: flex;
+          align-items: flex-end;
+        }
+        .sheet {
+          width: 100%;
+          background: var(--white);
+          border-radius: 20px 20px 0 0;
+          padding: 0 0 env(safe-area-inset-bottom);
+          max-height: 85svh;
+          overflow-y: auto;
+        }
+        .sheet-handle {
+          width: 36px;
+          height: 4px;
+          background: var(--border);
+          border-radius: 2px;
+          margin: 12px auto 0;
+        }
+        .sheet-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 16px 20px 12px;
+          border-bottom: 1px solid var(--border);
+        }
+        .sheet-title {
+          font-family: var(--serif);
+          font-size: 1rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+        }
+        .sheet-close {
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-size: 1.2rem;
+          color: var(--ink-soft);
+          padding: 4px;
+          line-height: 1;
+        }
+        .sheet-row {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 16px 20px;
+          border-bottom: 1px solid var(--border);
+          cursor: pointer;
+          text-decoration: none;
+          color: var(--ink);
+          background: none;
+          border-left: none;
+          border-right: none;
+          border-top: none;
+          width: 100%;
+          font-family: var(--sans);
+          font-size: 0.9rem;
+          text-align: left;
+          transition: background 0.1s;
+          -webkit-tap-highlight-color: transparent;
+        }
+        .sheet-row:last-child { border-bottom: none; }
+        .sheet-row:hover { background: var(--off); }
+        .sheet-icon {
+          width: 38px;
+          height: 38px;
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.1rem;
+          flex-shrink: 0;
+        }
+        .sheet-input-wrap {
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .sheet-input {
+          width: 100%;
+          padding: 13px 16px;
+          border: 1.5px solid var(--border);
+          border-radius: 10px;
+          font-family: var(--sans);
+          font-size: 0.95rem;
+          color: var(--ink);
+          outline: none;
+        }
+        .sheet-input:focus { border-color: var(--ink); }
+        .sheet-submit {
+          width: 100%;
+          padding: 14px;
+          background: var(--ink);
+          color: var(--white);
+          border: none;
+          border-radius: 10px;
+          font-family: var(--serif);
+          font-size: 0.9rem;
+          font-weight: 600;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: background 0.15s;
+        }
+        .sheet-submit:hover { background: var(--accent); }
+
+        /* ── COPY TOAST ───────────────────────────────── */
+        .copy-toast {
+          position: fixed;
+          bottom: 100px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: var(--ink);
+          color: var(--white);
+          padding: 10px 20px;
+          border-radius: 100px;
+          font-size: 0.8rem;
+          font-weight: 500;
+          z-index: 500;
+          pointer-events: none;
+          animation: fadeUp 0.25s ease both;
+        }
+
+        /* ── LIGHTBOX ─────────────────────────────────── */
+        .lightbox-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.95);
+          z-index: 500;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+        }
+        .lightbox-img {
+          max-height: 80vh;
+          max-width: 90vw;
+          object-fit: contain;
+          border-radius: 4px;
+        }
+        .lightbox-caption {
+          color: rgba(255,255,255,0.6);
+          font-size: 0.82rem;
+          font-style: italic;
+          margin-top: 14px;
+          text-align: center;
+          max-width: 480px;
+        }
+        .lightbox-close {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: rgba(255,255,255,0.1);
+          color: white;
+          border: none;
+          border-radius: 100px;
+          width: 40px;
+          height: 40px;
+          font-size: 1.2rem;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
         /* ── RESPONSIVE ──────────────────────────────── */
 
-        /* Desktop: top nav visible, bottom nav hidden */
         @media (min-width: 641px) {
           .bottom-nav { display: none !important; }
           .top-nav { display: flex; }
           body { padding-bottom: 0; }
         }
 
-        /* Mobile: bottom nav visible, top nav hidden */
         @media (max-width: 640px) {
           .top-nav { display: none !important; }
           .bottom-nav { display: flex; }
@@ -781,7 +922,6 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
           .artist-footer { padding-bottom: 20px; }
         }
 
-        /* Prevent iOS bounce on scroll within fixed bottom nav */
         @supports (padding-bottom: env(safe-area-inset-bottom)) {
           .bottom-nav {
             padding-bottom: calc(env(safe-area-inset-bottom) + 4px);
@@ -813,7 +953,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
             {artist.verified && <span className="hero-verified">✓ Featured</span>}
           </div>
           <h1 className="hero-name">{artist.name}</h1>
-          {artist.tagline && <p className="hero-tagline">"{artist.tagline}"</p>}
+          {artist.tagline && <p className="hero-tagline">&ldquo;{artist.tagline}&rdquo;</p>}
           <div className="hero-pills">
             {(artist.location_city || artist.location_state) && (
               <span className="hero-pill location">
@@ -824,6 +964,14 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
               </span>
             )}
             {genres.slice(0, 3).map(g => <span key={g} className="hero-pill">{g}</span>)}
+          </div>
+          <div className="hero-actions">
+            <button className="hero-btn hero-btn-share" onClick={() => setShareOpen(true)}>
+              ↑ Share
+            </button>
+            <button className="hero-btn hero-btn-save" onClick={() => setSaveOpen(true)}>
+              ♡ Save Artist
+            </button>
           </div>
         </div>
       </section>
@@ -851,7 +999,11 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
             <span className="bottom-nav-label">Back</span>
           </a>
           {navItems.map(n => (
-            <a key={n.id} href={`#${n.id}`} className="bottom-nav-item">
+            <a
+              key={n.id}
+              href={`#${n.id}`}
+              className={`bottom-nav-item${activeSection === n.id ? ' active' : ''}`}
+            >
               <span className="bottom-nav-icon">{n.icon}</span>
               <span className="bottom-nav-label">{n.label}</span>
             </a>
@@ -870,7 +1022,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
           }
           {artist.awards && artist.awards.trim() && (
             <div className="awards-block">
-              <div className="awards-label">Awards & Recognition</div>
+              <div className="awards-label">Awards &amp; Recognition</div>
               <div className="awards-text">{artist.awards}</div>
             </div>
           )}
@@ -919,7 +1071,12 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
               <div className="portfolio-grid">
                 {portfolioImages.map(img => (
                   <div key={img.id} className="portfolio-item">
-                    <img src={img.image_url} alt={img.caption || artist.name} className="portfolio-img" />
+                    <img
+                      src={img.image_url}
+                      alt={img.caption || artist.name}
+                      className="portfolio-img"
+                      onClick={() => setLightboxImage(img)}
+                    />
                     {img.caption && <p className="portfolio-caption">{img.caption}</p>}
                   </div>
                 ))}
@@ -1011,6 +1168,83 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
           <em>seveneightfive</em> + <em>ArtsConnect</em> Artist Directory
         </a>
       </footer>
+
+      {/* ── LIGHTBOX ── */}
+      {lightboxImage && (
+        <div className="lightbox-overlay" onClick={() => setLightboxImage(null)}>
+          <img
+            src={lightboxImage.image_url}
+            className="lightbox-img"
+            onClick={e => e.stopPropagation()}
+            alt={lightboxImage.caption || ''}
+          />
+          {lightboxImage.caption && <p className="lightbox-caption">{lightboxImage.caption}</p>}
+          <button className="lightbox-close" onClick={() => setLightboxImage(null)}>×</button>
+        </div>
+      )}
+
+      {/* ── SHARE SHEET ── */}
+      {shareOpen && (
+        <div className="sheet-overlay" onClick={() => setShareOpen(false)}>
+          <div className="sheet" onClick={e => e.stopPropagation()}>
+            <div className="sheet-handle" />
+            <div className="sheet-header">
+              <span className="sheet-title">Share</span>
+              <button className="sheet-close" onClick={() => setShareOpen(false)}>×</button>
+            </div>
+            <a className="sheet-row" href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer">
+              <span className="sheet-icon" style={{ background: '#fdf0f5', color: '#E1306C' }}>◎</span>
+              Instagram
+            </a>
+            <a className="sheet-row" href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}`} target="_blank" rel="noopener noreferrer">
+              <span className="sheet-icon" style={{ background: '#eef3fd', color: '#1877F2' }}>f</span>
+              Facebook
+            </a>
+            <a className="sheet-row" href={`sms:?body=${encodeURIComponent(pageUrl)}`}>
+              <span className="sheet-icon" style={{ background: '#edfbf0', color: '#30D158' }}>✉</span>
+              Messages
+            </a>
+            <a className="sheet-row" href={`mailto:?subject=${encodeURIComponent(artist.name)}&body=${encodeURIComponent(pageUrl)}`}>
+              <span className="sheet-icon" style={{ background: '#f5f5f5', color: '#6b6560' }}>@</span>
+              Email
+            </a>
+            <button className="sheet-row" onClick={handleCopyLink}>
+              <span className="sheet-icon" style={{ background: '#f7f6f4', color: '#1a1814' }}>⎘</span>
+              {copied ? 'Copied!' : 'Copy Link'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── SAVE ARTIST SHEET ── */}
+      {saveOpen && (
+        <div className="sheet-overlay" onClick={() => setSaveOpen(false)}>
+          <div className="sheet" onClick={e => e.stopPropagation()}>
+            <div className="sheet-handle" />
+            <div className="sheet-header">
+              <span className="sheet-title">Save Artist</span>
+              <button className="sheet-close" onClick={() => setSaveOpen(false)}>×</button>
+            </div>
+            <div className="sheet-input-wrap">
+              <p style={{ fontSize: '0.88rem', color: 'var(--ink-soft)', lineHeight: 1.55 }}>
+                Get notified when {artist.name} announces new events or releases.
+              </p>
+              <input
+                className="sheet-input"
+                type="email"
+                placeholder="Your email address"
+                value={saveEmail}
+                onChange={e => setSaveEmail(e.target.value)}
+              />
+              <button className="sheet-submit" onClick={() => setSaveOpen(false)}>
+                Save Artist
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {copied && <div className="copy-toast">Link copied!</div>}
     </>
   )
 }

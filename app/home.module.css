@@ -515,7 +515,9 @@
   }
 
   .hero {
-    padding: 60px 40px;
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+    padding: 60px calc(50vw - 50% + 40px);
   }
 
   .hero h1 {
@@ -524,6 +526,11 @@
 
   .sectionHeader {
     padding: 60px 40px 20px;
+  }
+
+  .eventThumb {
+    width: 128px;
+    height: 72px;
   }
 
   .events {
