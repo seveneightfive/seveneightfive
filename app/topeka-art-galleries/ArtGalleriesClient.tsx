@@ -52,7 +52,7 @@ export default function ArtGalleriesClient() {
           .gte('event_date', today)
           .order('event_date', { ascending: true })
 
-        setEvents((eventData || []) as unkown as Event[])
+        setEvents((eventData || []) as unknown as Event[])
       }
 
       setLoading(false)
