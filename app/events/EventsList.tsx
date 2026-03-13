@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import DateFilter from './DateFilter'
+import { useNavState } from '../components/NavContext'
+import FilloutEmbed from '../components/FilloutEmbed'
 
 type Venue = {
   id: string
@@ -110,6 +112,15 @@ export default function EventsList() {
   const [showPast, setShowPast] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)  // ← ADD THIS
   const scrollRestored = useRef(false)
+  const { setRightText } = useNavState()
+
+  useEffect(() => {
+    return () => { setRightText('') }
+  }, [setRightText])
+
+  useEffect(() => {
+    if (!loading) setRightText(`${filtered.length} ${filtered.length === 1 ? 'Event' : 'Events'}`)
+  }, [loading, filtered.length, setRightText])
 
   // ── Restore scroll position after events load ──────────────────────────────
   useEffect(() => {
@@ -302,10 +313,6 @@ export default function EventsList() {
           <div className="header-inner">
             <div>
               <div className="header-date">{todayStr}</div>
-              <h1 className="header-title"><em>785</em> Events</h1>
-              {!loading && (
-                <div className="header-count">{filtered.length} upcoming {filtered.length === 1 ? 'event' : 'events'}</div>
-              )}
             </div>
             <div className="search-wrap">
               <svg className="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -437,6 +444,7 @@ export default function EventsList() {
           </>
         )}
       </div>
+      <FilloutEmbed />
     </>
   )
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useNavState } from '../components/NavContext'
 
 type Artist = {
   id: string
@@ -56,6 +57,16 @@ export default function ArtistsPage() {
   const [search, setSearch] = useState('')
   const [activeType, setActiveType] = useState('All')
   const [activeGenre, setActiveGenre] = useState('')
+  const { setLogoSuffix, setRightText } = useNavState()
+
+  useEffect(() => {
+    setLogoSuffix('ARTISTS')
+    return () => { setLogoSuffix('MAGAZINE'); setRightText('') }
+  }, [setLogoSuffix, setRightText])
+
+  useEffect(() => {
+    if (!loading) setRightText(`${artists.length} Artists`)
+  }, [loading, artists.length, setRightText])
 
   useEffect(() => {
     async function fetchArtists() {
@@ -235,25 +246,17 @@ setLoading(false)
 
       <div className="page">
         <header className="header">
-          <div className="header-inner">
-            <div>
-              <h1 className="header-title">The <em>785</em><br />Artist Directory</h1>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'flex-end' }}>
-              <span className="header-count">{artists.length} Artists</span>
-              <div className="search-wrap">
-                <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                </svg>
-                <input
-                  className="search-input"
-                  type="text"
-                  placeholder="Search artists..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                />
-              </div>
-            </div>
+          <div className="search-wrap" style={{ maxWidth: '100%' }}>
+            <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <input
+              className="search-input"
+              type="text"
+              placeholder="Search artists..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
           </div>
         </header>
 

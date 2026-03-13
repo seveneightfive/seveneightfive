@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import styles from './home.module.css'
+import FeaturedSlider, { type FeaturedEvent } from './FeaturedSlider'
+import FilloutEmbed from './components/FilloutEmbed'
 
 type Event = {
   id: string
@@ -14,7 +16,7 @@ type Event = {
   slug: string | null
   star: boolean | null
   image_url: string | null
-  venue: { name: string } | null
+  venue: { name: string; neighborhood: string | null } | null
 }
 
 type Artist = {
@@ -28,8 +30,7 @@ type Artist = {
   upcomingCount: number
 }
 
-const NEIGHBORHOODS = [
-  { large: true,  label: 'Most Active', name: 'The Arts District', count: '34 venues · 12 events this week', bg: 'linear-gradient(135deg, #C80650 0%, #7a0030 60%, #1a1a1a 100%)' },
+const STATIC_NEIGHBORHOODS = [
   { large: false, label: 'Nightlife',   name: 'Midtown Strip',     count: '18 bars',    bg: 'linear-gradient(160deg, #1a1a1a, #3d3d3d)' },
   { large: false, label: 'Culture',     name: 'East Side',         count: '9 galleries',bg: 'linear-gradient(160deg, #2a4000, #4a7000)' },
   { large: false, label: 'Live Music',  name: 'The Docks',         count: '11 stages',  bg: 'linear-gradient(160deg, #003c5a, #006090)' },
@@ -39,9 +40,15 @@ const NEIGHBORHOODS = [
 export default function HomeClient({
   events,
   artists,
+  featuredEvents,
+  notoVenueCount,
+  notoEventCount,
 }: {
   events: Event[]
   artists: Artist[]
+  featuredEvents: FeaturedEvent[]
+  notoVenueCount: number
+  notoEventCount: number
 }) {
   return (
     <>
@@ -61,6 +68,17 @@ export default function HomeClient({
             Browse Events
           </Link>
         </section>
+
+        {/* ── Featured Events Slider ── */}
+        {featuredEvents.length > 0 && (
+          <section>
+            <div className={styles.sectionHeader}>
+              <h2>Featured</h2>
+              <Link href="/events">All Events →</Link>
+            </div>
+            <FeaturedSlider events={featuredEvents} />
+          </section>
+        )}
 
         {/* ── Upcoming Events ── */}
         <section id="events">
@@ -148,14 +166,30 @@ export default function HomeClient({
         <section id="neighborhoods">
           <div className={styles.sectionHeader}>
             <h2>Explore the City</h2>
-            <Link href="/venues">Map view →</Link>
+            <Link href="/venues">All Venues →</Link>
           </div>
           <div className={styles.neighborhoods}>
-            {NEIGHBORHOODS.map((nbh) => (
+            {/* NOTO — live data */}
+            <Link
+              href="/venues?neighborhood=NOTO"
+              className={`${styles.nbhCard} ${styles.nbhLarge}`}
+            >
+              <div className={styles.nbhBg} style={{ background: 'linear-gradient(135deg, #C80650 0%, #7a0030 60%, #1a1a1a 100%)' }} />
+              <div className={styles.nbhContent}>
+                <div className={styles.nbhLabel}>Most Active</div>
+                <div className={styles.nbhName}>NOTO Arts District</div>
+                <div className={styles.nbhCount}>
+                  {notoVenueCount} {notoVenueCount === 1 ? 'venue' : 'venues'}
+                  {notoEventCount > 0 && ` · ${notoEventCount} upcoming ${notoEventCount === 1 ? 'event' : 'events'}`}
+                </div>
+              </div>
+            </Link>
+            {/* Static neighborhood cards */}
+            {STATIC_NEIGHBORHOODS.map((nbh) => (
               <Link
                 href="/venues"
                 key={nbh.name}
-                className={`${styles.nbhCard} ${nbh.large ? styles.nbhLarge : ''}`}
+                className={styles.nbhCard}
               >
                 <div className={styles.nbhBg} style={{ background: nbh.bg }} />
                 <div className={styles.nbhContent}>
@@ -168,7 +202,7 @@ export default function HomeClient({
           </div>
         </section>
 
-        {/* ── Announcement ── */}
+        {/* ── Announcement ── (hidden)
         <div className={styles.announcement}>
           <h3>Summer<br />Festival <span>2026</span><br />Lineup Drops</h3>
           <p>
@@ -178,8 +212,9 @@ export default function HomeClient({
           </p>
           <Link href="/events" className={styles.annCta}>Get Early Access</Link>
         </div>
+        */}
 
-        {/* ── Advertisement ── */}
+        {/* ── Advertisement ── (hidden)
         <div className={styles.adBlock}>
           <div className={styles.adEyebrow}>Sponsored</div>
           <h3>Sound<br />Better<br />Live</h3>
@@ -189,7 +224,9 @@ export default function HomeClient({
           </a>
           <div className={styles.adDeco}>♪</div>
         </div>
+        */}
 
+        <FilloutEmbed />
         <div className={styles.footerRule} />
         <p className={styles.footerText}>© seveneightfive magazine — Events & times subject to change</p>
 

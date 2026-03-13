@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useNavState } from '../components/NavContext'
 
 type Venue = {
   id: string
@@ -16,14 +17,24 @@ type Venue = {
   venue_type: string | null
 }
 
-export default function VenuesList() {
+export default function VenuesList({ initialNeighborhood }: { initialNeighborhood?: string }) {
   const [venues, setVenues] = useState<Venue[]>([])
   const [filtered, setFiltered] = useState<Venue[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [activeNeighborhood, setActiveNeighborhood] = useState('All')
+  const [activeNeighborhood, setActiveNeighborhood] = useState(initialNeighborhood || 'All')
   const [activeType, setActiveType] = useState('All')
   const scrollRestored = useRef(false)
+  const { setLogoSuffix, setRightText } = useNavState()
+
+  useEffect(() => {
+    setLogoSuffix('PLACES')
+    return () => { setLogoSuffix('MAGAZINE'); setRightText('') }
+  }, [setLogoSuffix, setRightText])
+
+  useEffect(() => {
+    if (!loading) setRightText(`${filtered.length} ${filtered.length === 1 ? 'Venue' : 'Venues'}`)
+  }, [loading, filtered.length, setRightText])
 
   useEffect(() => {
     if (!loading && !scrollRestored.current) {
@@ -163,26 +174,17 @@ export default function VenuesList() {
 
       <div className="page">
         <header className="header">
-          <div className="header-inner">
-            <div>
-              <div className="header-eyebrow">Topeka, KS</div>
-              <h1 className="header-title"><em>785</em> Venues</h1>
-              {!loading && (
-                <div className="header-count">{filtered.length} {filtered.length === 1 ? 'venue' : 'venues'}</div>
-              )}
-            </div>
-            <div className="search-wrap">
-              <svg className="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-              </svg>
-              <input
-                className="search-input"
-                type="text"
-                placeholder="Search venues..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-            </div>
+          <div className="search-wrap" style={{ maxWidth: '100%' }}>
+            <svg className="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <input
+              className="search-input"
+              type="text"
+              placeholder="Search venues..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
           </div>
         </header>
       </div>
@@ -195,11 +197,11 @@ export default function VenuesList() {
               {neighborhoods.map(n => (
                 <button key={n} className={`filter-chip ${activeNeighborhood === n ? 'active' : ''}`} onClick={() => setActiveNeighborhood(n)}>{n}</button>
               ))}
+              {venueTypes.length > 1 && <div className="filter-divider" />}
+              {venueTypes.length > 1 && venueTypes.map(t => (
+                <button key={t} className={`filter-chip ${activeType === t ? 'active' : ''}`} onClick={() => setActiveType(t)}>{t}</button>
+              ))}
             </div>
-            {venueTypes.length > 1 && <div className="filter-divider" />}
-            {venueTypes.length > 1 && venueTypes.map(t => (
-              <button key={t} className={`filter-chip ${activeType === t ? 'active' : ''}`} onClick={() => setActiveType(t)}>{t}</button>
-            ))}
           </div>
         )}
       </div>

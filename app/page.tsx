@@ -14,7 +14,8 @@ type EventRow = {
   slug: string | null
   star: boolean | null
   image_url: string | null
-  venue: { name: string } | { name: string }[] | null
+  ticket_url: string | null
+  venue: { name: string; neighborhood: string | null } | { name: string; neighborhood: string | null }[] | null
 }
 
 export default async function HomePage() {
@@ -28,10 +29,12 @@ export default async function HomePage() {
   tomorrowEnd.setDate(tomorrowEnd.getDate() + 1)
   const tomorrow = tomorrowEnd.toISOString().split('T')[0]
 
-  // Run all three queries in parallel
+  // Run all queries in parallel
   const [
     { data: events },
     { data: upcomingEventIds },
+    { data: featuredRaw },
+    { data: notoVenues },
   ] = await Promise.all([
 
     // 1. Events for today + tomorrow for the home page list
@@ -48,7 +51,8 @@ export default async function HomePage() {
         slug,
         star,
         image_url,
-        venue:venues ( name )
+        ticket_url,
+        venue:venues ( name, neighborhood )
       `)
       .in('event_date', [today, tomorrow])
       .order('event_date', { ascending: true })
@@ -60,7 +64,32 @@ export default async function HomePage() {
       .from('events')
       .select('id')
       .gte('event_date', today),
+
+    // 3. Featured (starred) upcoming events for the hero slider
+    supabase
+      .from('events')
+      .select('id, title, event_date, event_start_time, event_types, slug, image_url, ticket_url, venues ( name, neighborhood )')
+      .eq('star', true)
+      .gte('event_date', today)
+      .order('event_date', { ascending: true })
+      .limit(6),
+
+    // 4. NOTO neighborhood venues
+    supabase
+      .from('venues')
+      .select('id')
+      .eq('neighborhood', 'NOTO'),
   ])
+
+  // Count upcoming events at NOTO venues
+  const notoVenueIds = (notoVenues ?? []).map((v) => v.id)
+  const { count: notoEventCount } = notoVenueIds.length > 0
+    ? await supabase
+        .from('events')
+        .select('id', { count: 'exact', head: true })
+        .in('venue_id', notoVenueIds)
+        .gte('event_date', today)
+    : { count: 0 }
 
   // 3. Get artist_ids from event_artists for those upcoming event IDs
   const eventIdList = (upcomingEventIds ?? []).map((e) => e.id)
@@ -84,17 +113,42 @@ export default async function HomePage() {
     .slice(0, 8)
     .map(([id]) => id)
 
-  // 4. Fetch full artist details for those top artists
-  const { data: artists } = topArtistIds.length > 0
-    ? await supabase
-        .from('artists')
-        .select('id, name, slug, tagline, artist_type, avatar_url, image_url')
-        .in('id', topArtistIds)
-        .eq('published', true)
-    : { data: [] }
+  // 4. Fetch full artist details — prefer event-linked artists, fall back to verified/published
+  let artists: any[] = []
+  if (topArtistIds.length > 0) {
+    const { data } = await supabase
+      .from('artists')
+      .select('id, name, slug, tagline, artist_type, avatar_url, image_url')
+      .in('id', topArtistIds)
+      .eq('published', true)
+    artists = data ?? []
+  }
+
+  // Fallback: if event_artists join returned nothing, show verified published artists
+  if (artists.length === 0) {
+    const { data } = await supabase
+      .from('artists')
+      .select('id, name, slug, tagline, artist_type, avatar_url, image_url')
+      .eq('published', true)
+      .eq('verified', true)
+      .order('name')
+      .limit(8)
+    artists = data ?? []
+  }
+
+  // Final fallback: any published artists
+  if (artists.length === 0) {
+    const { data } = await supabase
+      .from('artists')
+      .select('id, name, slug, tagline, artist_type, avatar_url, image_url')
+      .eq('published', true)
+      .order('name')
+      .limit(8)
+    artists = data ?? []
+  }
 
   // Re-attach the count and restore sort order
-  const sortedArtists = (artists ?? [])
+  const sortedArtists = artists
     .map((artist) => ({
       ...artist,
       upcomingCount: countMap[artist.id] ?? 0,
@@ -106,5 +160,18 @@ export default async function HomePage() {
     venue: Array.isArray(e.venue) ? e.venue[0] ?? null : e.venue,
   }))
 
-  return <HomeClient events={normalizedEvents} artists={sortedArtists} />
+  const featuredEvents = (featuredRaw ?? []).map((e: any) => ({
+    ...e,
+    venue: Array.isArray(e.venues) ? e.venues[0] ?? null : e.venues ?? null,
+  }))
+
+  return (
+    <HomeClient
+      events={normalizedEvents}
+      artists={sortedArtists}
+      featuredEvents={featuredEvents}
+      notoVenueCount={notoVenueIds.length}
+      notoEventCount={notoEventCount ?? 0}
+    />
+  )
 }

@@ -3,9 +3,12 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import styles from './nav.module.css'
+import { useNavState } from './NavContext'
 
 export default function SiteNav() {
   const pathname = usePathname()
+  const { logoSuffix, rightText } = useNavState()
+  const date = new Date().toLocaleString('en-US', { month: 'short', year: 'numeric' })
 
   const isActive = (prefix: string) => pathname.startsWith(prefix)
 
@@ -14,7 +17,7 @@ export default function SiteNav() {
       {/* ── Desktop Top Nav ── */}
       <header className={styles.topnav}>
         <Link href="/" className={styles.logo}>
-          785<span>MAGAZINE</span>
+          785<span>{logoSuffix}</span>
         </Link>
         <nav>
           <Link href="/events"    className={`${styles.navLink} ${isActive('/events')    ? styles.activeNav : ''}`}>Events</Link>
@@ -27,10 +30,10 @@ export default function SiteNav() {
       {/* ── Mobile Header ── */}
       <header className={styles.mobileHeader}>
         <Link href="/" className={styles.logo}>
-          785<span>MAGAZINE</span>
+          785<span>{logoSuffix}</span>
         </Link>
         <span className={styles.date}>
-          {new Date().toLocaleString('en-US', { month: 'short', year: 'numeric' })}
+          {rightText || date}
         </span>
       </header>
 

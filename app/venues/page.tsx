@@ -16,6 +16,7 @@ export const metadata: Metadata = {
   },
 }
 
-export default function VenuesPage() {
-  return <VenuesList />
+export default async function VenuesPage({ searchParams }: { searchParams: Promise<{ neighborhood?: string }> }) {
+  const params = await searchParams
+  return <VenuesList initialNeighborhood={params.neighborhood} />
 }
