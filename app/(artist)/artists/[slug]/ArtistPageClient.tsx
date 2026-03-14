@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-
+import FollowFavoriteButtons from '@/app/components/FollowFavoriteButtons'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type MusicianProfile = {
@@ -970,9 +970,12 @@ export default function ArtistPageClient({
             <button className="hero-btn hero-btn-share" onClick={() => setShareOpen(true)}>
               ↑ Share
             </button>
-            <button className="hero-btn hero-btn-save" onClick={() => setSaveOpen(true)}>
-              ♡ Save Artist
-            </button>
+            <FollowFavoriteButtons
+              entityType="artist"
+              entityId={artist.id}
+              showFollow={true}
+              showFavorite={true}
+            />
           </div>
         </div>
       </section>
