@@ -1,4 +1,4 @@
-import { Suspense } from 'next/dist/compiled/react'
+import { Suspense } from 'react'
 import TicketSuccessInner from './TicketSuccessInner'
 
 export default function TicketSuccessPage() {
