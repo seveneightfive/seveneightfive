@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabaseServer"
+import { createClient } from "@/lib/supabaseServerAuth"
 import OpportunityCard from "./OpportunityCard"
 import Link from "next/link"
 
