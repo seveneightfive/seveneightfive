@@ -374,10 +374,10 @@ export default function ArtistPageClient({
         .top-nav-back:hover { color: var(--ink); }
         .top-nav-link {
           font-size: 0.72rem;
-          font-weight: 500;
+          font-weight: 600;
           letter-spacing: 0.1em;
           text-transform: uppercase;
-          color: var(--ink-faint);
+          color: var(--ink-soft);
           text-decoration: none;
           padding: 0 16px;
           height: 100%;
@@ -389,6 +389,7 @@ export default function ArtistPageClient({
           transition: all 0.15s;
         }
         .top-nav-link:hover { color: var(--ink); border-bottom-color: var(--ink); }
+.top-nav-link.active { color: var(--ink); border-bottom-color: var(--accent); }
 
         /* ── MOBILE BOTTOM NAV ────────────────────────── */
         .bottom-nav {
