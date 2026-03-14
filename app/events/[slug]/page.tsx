@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import BackButton from './BackButton'
 import ImageLightbox from './ImageLightbox'
-
+import TicketPurchaseButton from '@/app/components/TicketPurchaseButton'
+import FollowFavoriteButtons from '@/app/components/FollowFavoriteButtons'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Venue = {
@@ -42,6 +43,7 @@ type Event = {
   star: boolean | null
   slug: string | null
   capacity: number | null
+  ticketing_enabled: boolean | null
   venue: Venue | null
   artists: Artist[]
 }
@@ -54,7 +56,7 @@ async function getEvent(slug: string): Promise<Event | null> {
     .select(`
       id, title, description, event_date, event_start_time, event_end_time,
       end_date, image_url, ticket_price, ticket_url, learnmore_link,
-      event_types, star, slug, capacity,
+      event_types, star, slug, capacity, ticketing_enabled,
       venues (id, name, address, neighborhood, city, state, slug, website, image_url),
       event_artists (
         display_order,
@@ -447,18 +449,29 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         </div>
 
         {/* CTA BUTTONS */}
-        {ctaUrl && (
-          <div className="cta-row">
+        {event.ticketing_enabled && event.id && event.slug && (
+          <TicketPurchaseButton eventId={event.id} eventSlug={event.slug} />
+        )}
+
+        <div className="cta-row">
+          <FollowFavoriteButtons
+            entityType="event"
+            entityId={event.id}
+            showFollow={true}
+            showFavorite={true}
+            className="ffb-light"
+          />
+          {ctaUrl && !event.ticketing_enabled && (
             <a href={ctaUrl} target="_blank" rel="noopener noreferrer" className="cta-btn cta-primary">
               {event.ticket_url ? '🎟 Get Tickets' : '↗ Learn More'}
             </a>
-            {event.ticket_url && event.learnmore_link && event.learnmore_link !== event.ticket_url && (
-              <a href={event.learnmore_link} target="_blank" rel="noopener noreferrer" className="cta-btn cta-secondary">
-                Learn More
-              </a>
-            )}
-          </div>
-        )}
+          )}
+          {ctaUrl && event.ticketing_enabled && event.learnmore_link && (
+            <a href={event.learnmore_link} target="_blank" rel="noopener noreferrer" className="cta-btn cta-secondary">
+              Learn More
+            </a>
+          )}
+        </div>
 
         {/* DESCRIPTION */}
         {event.description && (
