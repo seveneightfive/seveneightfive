@@ -3,7 +3,7 @@ import OpportunityCard from "./OpportunityCard"
 import Link from "next/link"
 
 export default async function FeaturedOpportunities() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const today = new Date().toISOString().split("T")[0]
 
   const { data: opportunities } = await supabase
