@@ -50,6 +50,34 @@ export default async function DashboardPage() {
   const allVenues = [...(venues || []), ...(extraVenues || [])]
   const allArtists = [...(artists || []), ...(extraArtists || [])]
 
+  // Fetch followed artists + venues for the feed
+  const { data: follows } = await supabase
+    .from('follows')
+    .select('entity_type, entity_id')
+    .eq('follower_id', user.id)
+    .in('entity_type', ['artist', 'venue'])
+
+  const followedArtistIds = (follows || []).filter(f => f.entity_type === 'artist').map(f => f.entity_id)
+  const followedVenueIds = (follows || []).filter(f => f.entity_type === 'venue').map(f => f.entity_id)
+
+  const [{ data: followedArtists }, { data: followedVenues }] = await Promise.all([
+    followedArtistIds.length
+      ? supabase.from('artists').select('id, name, slug, avatar_url, artist_type').in('id', followedArtistIds)
+      : Promise.resolve({ data: [] as any[] }),
+    followedVenueIds.length
+      ? supabase.from('venues').select('id, name, slug, logo, image_url, venue_type').in('id', followedVenueIds)
+      : Promise.resolve({ data: [] as any[] }),
+  ])
+
+  // Fetch upcoming tickets
+  const { data: tickets } = await supabase
+    .from('my_tickets')
+    .select('id, event_title, event_date, event_slug, tier_name, venue_name, status')
+    .eq('payment_status', 'paid')
+    .gte('event_date', new Date().toISOString().slice(0, 10))
+    .order('event_date', { ascending: true })
+    .limit(3)
+
   const isCreator = allArtists.length > 0 || allVenues.length > 0
   const firstName = profile?.full_name?.split(' ')[0] || 'There'
   const initials = profile?.full_name
@@ -330,29 +358,78 @@ export default async function DashboardPage() {
 
         <div className="divider" />
 
+        {/* ── MY TICKETS ── */}
+        <div className="section-head">
+          <span className="section-label">🎟 My Tickets</span>
+          <a href="/dashboard/tickets" className="section-action">All →</a>
+        </div>
+
+        {!tickets || tickets.length === 0 ? (
+          <div className="empty-follow">
+            <p>No upcoming tickets. <a href="/events">Browse events →</a></p>
+          </div>
+        ) : (
+          <div className="event-list">
+            {tickets.map((ticket: any) => {
+              const d = new Date(ticket.event_date + 'T12:00:00')
+              const month = d.toLocaleDateString('en-US', { month: 'short' })
+              const day = d.getDate()
+              return (
+                <a key={ticket.id} href={`/events/${ticket.event_slug}`} className="event-card">
+                  <div className="event-date">
+                    <span className="event-month">{month}</span>
+                    <span className="event-day">{day}</span>
+                  </div>
+                  <div className="event-info">
+                    <div className="event-title">{ticket.event_title}</div>
+                    <div className="event-meta">{ticket.venue_name || 'Venue TBA'} · {ticket.tier_name}</div>
+                  </div>
+                  <div className="event-img">🎟</div>
+                </a>
+              )
+            })}
+          </div>
+        )}
+
+        <div className="divider" />
+
         {/* ── FOLLOWING ── */}
         <div className="section-head">
           <span className="section-label">Following</span>
           <a href="/artists" className="section-action">Explore →</a>
         </div>
 
-        {/* Empty state — replace with real follow data once follow tables exist */}
-        <div className="empty-follow">
-          <p>You're not following anyone yet.<br />
-          <a href="/artists">Discover artists</a> and <a href="/venues">venues</a> to follow.</p>
-        </div>
-
-        {/* ── UPCOMING ── */}
-        <div className="section-head">
-          <span className="section-label">Upcoming from your follows</span>
-          <a href="/events" className="section-action">All →</a>
-        </div>
-
-        <div className="empty-events">
-          <p>Follow artists and venues to see their upcoming events here.</p>
-        </div>
-
-        <div className="divider" />
+        {(!followedArtists || followedArtists.length === 0) && (!followedVenues || followedVenues.length === 0) ? (
+          <div className="empty-follow">
+            <p>You're not following anyone yet.<br />
+            <a href="/artists">Discover artists</a> and <a href="/venues">venues</a> to follow.</p>
+          </div>
+        ) : (
+          <div className="hscroll">
+            {(followedArtists || []).map((a: any) => (
+              <a key={a.id} href={`/artists/${a.slug}`} className="follow-card" style={{textDecoration:'none',color:'inherit'}}>
+                <div className="follow-img">
+                  {a.avatar_url
+                    ? <img src={a.avatar_url} alt={a.name} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} />
+                    : '🎨'}
+                </div>
+                <div className="follow-name">{a.name}</div>
+                <div className="follow-type">{a.artist_type || 'Artist'}</div>
+              </a>
+            ))}
+            {(followedVenues || []).map((v: any) => (
+              <a key={v.id} href={`/venues/${v.slug}`} className="follow-card" style={{textDecoration:'none',color:'inherit'}}>
+                <div className="follow-img venue">
+                  {v.logo || v.image_url
+                    ? <img src={v.logo || v.image_url} alt={v.name} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'12px'}} />
+                    : '🏛️'}
+                </div>
+                <div className="follow-name">{v.name}</div>
+                <div className="follow-type">Venue</div>
+              </a>
+            ))}
+          </div>
+        )}
 
         {/* ── CREATOR TOOLS ── only shows if user has artist or venue linked ── */}
         {isCreator && (
