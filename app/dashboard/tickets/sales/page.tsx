@@ -104,6 +104,12 @@ export default async function TicketSalesPage() {
             const eventTickets = (tickets || []).filter(t => t.event_id === event.id)
             const totalSold = eventTickets.length
             const totalRevenue = eventTickets.reduce((sum, t) => sum + (parseFloat(t.amount_paid) || 0), 0)
+            // Payout = gross minus (2.9% of each ticket + $1.00 per ticket)
+            // $1.00 = $0.30 Stripe processing + $0.70 platform fee
+            const totalPayout = eventTickets.reduce((sum, t) => {
+              const price = parseFloat(t.amount_paid) || 0
+              return sum + (price - (price * 0.029) - 1.00)
+            }, 0)
             const totalCapacity = eventTiers.reduce((sum, t) => sum + (t.quantity || 0), 0)
 
             return (
@@ -129,8 +135,8 @@ export default async function TicketSalesPage() {
                     <div className="stat-label">Gross Revenue</div>
                   </div>
                   <div className="stat">
-                    <div className="stat-val">${(totalRevenue * 0.95).toFixed(2)}</div>
-                    <div className="stat-label">Your Payout (est.)</div>
+                    <div className="stat-val">${Math.max(0, totalPayout).toFixed(2)}</div>
+                    <div className="stat-label">Est. Payout</div>
                   </div>
                 </div>
 
