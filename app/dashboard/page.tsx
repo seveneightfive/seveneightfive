@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabaseServerAuth'
 import AvatarMenu from './AvatarMenu'
+import StripeConnectButton from '@/app/components/StripeConnectButton'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -19,7 +20,7 @@ export default async function DashboardPage() {
       .eq('auth_user_id', user.id),
     supabase
       .from('profiles')
-      .select('full_name, email, phone_number, role')
+      .select('full_name, email, phone_number, role, stripe_account_id, stripe_account_status')
       .eq('id', user.id)
       .maybeSingle(),
   ])
@@ -439,6 +440,17 @@ export default async function DashboardPage() {
               <span className="creator-badge">✦ Creator</span>
             </div>
 
+            {/* ── STRIPE CONNECT ── */}
+            <div style={{ padding: '0 20px 16px' }}>
+              <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)', marginBottom: 10 }}>
+                785 Tickets — Payouts
+              </div>
+              <StripeConnectButton
+                accountStatus={profile?.stripe_account_status || null}
+                returnPath="/dashboard"
+              />
+            </div>
+
             <div className="entity-cards">
 
               {/* Artist cards */}
@@ -496,6 +508,10 @@ export default async function DashboardPage() {
                     <a href="/dashboard/events" className="entity-action">
                       <span className="entity-action-icon">◷</span>
                       Events
+                    </a>
+                    <a href="/dashboard/tickets/sales" className="entity-action">
+                      <span className="entity-action-icon">🎟</span>
+                      Tickets
                     </a>
                     {venue.slug && (
                       <a href={`/venues/${venue.slug}`} className="entity-action" target="_blank" rel="noopener noreferrer">
