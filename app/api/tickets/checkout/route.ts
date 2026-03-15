@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabaseServerAuth'
 import { createClient as createAdminClient } from '@/lib/supabaseServer'
-import { stripe, PLATFORM_FEE_PERCENT } from '@/lib/stripe'
+import { stripe, platformFeeAmount } from '@/lib/stripe'
 
 /**
  * POST /api/tickets/checkout
@@ -115,7 +115,8 @@ export async function POST(request: NextRequest) {
     // Calculate amounts in cents
     const unitAmount = Math.round(Number(tier.price) * 100)
     const totalAmount = unitAmount * quantity
-    const platformFeeAmount = Math.round(totalAmount * PLATFORM_FEE_PERCENT)
+    // Platform fee: $0.70 per ticket (Stripe takes its own 2.9% + $0.30 on top)
+    const applicationFeeAmount = platformFeeAmount(unitAmount) * quantity
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
@@ -137,7 +138,7 @@ export async function POST(request: NextRequest) {
         },
       ],
       payment_intent_data: {
-        application_fee_amount: platformFeeAmount,
+        application_fee_amount: applicationFeeAmount,
         transfer_data: {
           destination: stripeAccountId,
         },
