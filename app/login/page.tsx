@@ -143,6 +143,7 @@ function LoginPageInner() {
   // ── Verify OTP ──
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (loading) return // hard guard against double-submission
     setLoading(true)
     resetError()
     const pendingPhone = sessionStorage.getItem('pending_phone') || normalizePhone(phone)
@@ -158,6 +159,7 @@ function LoginPageInner() {
     const user = data.user
     if (!user) { setError('Something went wrong. Please try again.'); setLoading(false); return }
 
+    // Keep loading=true and disable all interaction while redirecting
     if (mode === 'signup') {
       // Sign up: call merge directly with pre-collected name + email
       const res = await fetch('/api/auth/merge', {
@@ -177,10 +179,11 @@ function LoginPageInner() {
       ])
       if (artist || venue) {
         router.push('/dashboard')
+        // leave loading=true — page is navigating away
       } else {
+        setLoading(false)
         setStep('profile')
       }
-      setLoading(false)
     }
   }
 
@@ -368,7 +371,7 @@ function LoginPageInner() {
                 </div>
                 {error && <div className="error">{error}</div>}
                 <button type="submit" className="btn" disabled={loading || otp.length < 6}>
-                  {loading ? 'Verifying…' : 'Verify Code'}
+                  {loading ? '✓ Verified — signing in…' : 'Verify Code'}
                 </button>
                 <button type="button" className="btn-ghost" onClick={() => { setStep('phone'); setOtp(''); resetError() }}>
                   ← Change Number
