@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabaseBrowser'
 import ImageUpload from '@/app/dashboard/edit/ImageUpload'
 import { Suspense } from 'react'
+import TicketTiersEditor from '@/app/components/TicketTiersEditor'
 
 const EVENT_TYPES = [
   'Live Music', 'Art', 'Entertainment', 'Lifestyle',
@@ -68,6 +69,7 @@ function EventEditInner() {
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
   const [userId, setUserId] = useState<string | null>(null)
+  const [stripeAccountStatus, setStripeAccountStatus] = useState<string | null>(null)
 
   // Venue picker
   const [venueSearch, setVenueSearch] = useState('')
@@ -97,6 +99,14 @@ function EventEditInner() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setUserId(user.id)
+
+      // Fetch stripe status for ticket tier editor
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('stripe_account_status')
+        .eq('id', user.id)
+        .single()
+      setStripeAccountStatus(profile?.stripe_account_status || null)
 
       if (!isNew && eventId) {
         const { data } = await supabase
@@ -572,6 +582,17 @@ function EventEditInner() {
             </div>
           )}
         </div>
+
+        {/* ── 785 TICKETS ── only on existing events */}
+        {!isNew && (form.id || eventId) && (
+          <>
+            <div className="section-head">785 Tickets</div>
+            <TicketTiersEditor
+              eventId={form.id || eventId!}
+              stripeAccountStatus={stripeAccountStatus}
+            />
+          </>
+        )}
 
         {error && (
           <div style={{ padding: '12px 16px', background: 'rgba(200,6,80,0.12)', border: '1px solid rgba(200,6,80,0.3)', borderRadius: 8, color: '#FFCE03', fontSize: '0.85rem', marginBottom: 20 }}>
