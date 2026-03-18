@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import DateFilter from './DateFilter'
 import { useNavState } from '../components/NavContext'
-import FilloutEmbed from '../components/FilloutEmbed'
 
 type Venue = {
   id: string
@@ -404,7 +403,6 @@ export default function EventsList() {
           </section>
         )}
       </div>
-      <FilloutEmbed />
     </>
   )
 }
