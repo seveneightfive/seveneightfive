@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabaseBrowser'
 import { useRouter } from 'next/navigation'
 import { SETTINGS_CSS } from '../settingsStyles'
@@ -30,6 +30,9 @@ export default function EditProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState('')
   const [usernameError, setUsernameError] = useState('')
   const [checkingUsername, setCheckingUsername] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     async function load() {
@@ -78,6 +81,25 @@ export default function EditProfilePage() {
     }, 500)
     return () => clearTimeout(timer)
   }, [username, profile])
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !profile) return
+    if (file.size > 8 * 1024 * 1024) { setUploadError('File must be under 8MB'); return }
+    setUploading(true)
+    setUploadError('')
+    const ext = file.name.split('.').pop()
+    const path = `${profile.id}/avatar-${Date.now()}.${ext}`
+    const { error: err } = await supabase.storage
+      .from('avatars')
+      .upload(path, file, { upsert: true })
+    if (err) { setUploadError(err.message); setUploading(false); return }
+    const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+    setAvatarUrl(data.publicUrl)
+    setStatus('idle')
+    setUploading(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
 
   const initials = fullName
     ? fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
@@ -207,19 +229,26 @@ export default function EditProfilePage() {
           <div className="section-title">Avatar</div>
 
           <div className="field">
-            <label className="field-label" htmlFor="avatar-url">Avatar Image URL</label>
+            <label className="field-label">Profile Photo</label>
             <input
-              id="avatar-url"
-              type="url"
-              className="field-input"
-              value={avatarUrl}
-              onChange={e => { setAvatarUrl(e.target.value); setStatus('idle') }}
-              placeholder="https://example.com/photo.jpg"
-              disabled={saving}
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={handleAvatarUpload}
+              disabled={uploading || saving}
             />
-            <p className="field-hint">
-              Paste a direct URL to your profile photo. Square images work best.
-            </p>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading || saving}
+              style={{ marginTop: 8 }}
+            >
+              {uploading ? 'Uploading…' : avatarUrl ? 'Change Photo' : 'Upload Photo'}
+            </button>
+            {uploadError && <p className="field-error" style={{ marginTop: 6 }}>{uploadError}</p>}
+            <p className="field-hint">Square images work best. Max 8MB.</p>
           </div>
         </div>
 

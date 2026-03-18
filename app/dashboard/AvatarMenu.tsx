@@ -8,9 +8,10 @@ type Props = {
   initials: string
   fullName: string
   phoneOrEmail: string
+  avatarUrl?: string | null
 }
 
-export default function AvatarMenu({ initials, fullName, phoneOrEmail }: Props) {
+export default function AvatarMenu({ initials, fullName, phoneOrEmail, avatarUrl }: Props) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
@@ -37,13 +38,17 @@ export default function AvatarMenu({ initials, fullName, phoneOrEmail }: Props) 
         onClick={() => setOpen(o => !o)}
         style={{
           width: '32px', height: '32px', borderRadius: '50%',
-          background: '#C80650', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: avatarUrl ? 'transparent' : '#C80650',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontFamily: "'Oswald', sans-serif", fontSize: '0.72rem', fontWeight: 700, color: '#fff',
           cursor: 'pointer', border: open ? '2px solid rgba(255,255,255,0.3)' : '2px solid transparent',
-          transition: 'border-color 0.15s', userSelect: 'none',
+          transition: 'border-color 0.15s', userSelect: 'none', overflow: 'hidden',
         }}
       >
-        {initials}
+        {avatarUrl
+          ? <img src={avatarUrl} alt={fullName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : initials
+        }
       </div>
 
       {open && (

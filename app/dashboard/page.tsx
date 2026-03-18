@@ -21,7 +21,7 @@ export default async function DashboardPage() {
       .eq('auth_user_id', user.id),
     supabase
       .from('profiles')
-      .select('full_name, email, phone_number, role, stripe_account_id, stripe_account_status')
+      .select('full_name, email, phone_number, role, stripe_account_id, stripe_account_status, avatar_url')
       .eq('id', user.id)
       .maybeSingle(),
   ])
@@ -323,6 +323,7 @@ export default async function DashboardPage() {
           initials={initials}
           fullName={profile?.full_name || 'Your Account'}
           phoneOrEmail={profile?.phone_number || profile?.email || ''}
+          avatarUrl={profile?.avatar_url || null}
         />
       </div>
 
