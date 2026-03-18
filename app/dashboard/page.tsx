@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabaseServerAuth'
 import AvatarMenu from './AvatarMenu'
 import StripeConnectButton from '@/app/components/StripeConnectButton'
+import DashboardCreateButtons from '@/app/components/DashboardCreateButtons'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -338,24 +339,7 @@ export default async function DashboardPage() {
         <div className="section-head" style={{paddingBottom: '4px'}}>
           <span className="section-label">Create</span>
         </div>
-        <div className="create-grid">
-          <a href="/dashboard/events/edit" className="create-btn yellow">
-            <span className="create-icon">+</span>
-            <span className="create-label">Event</span>
-          </a>
-          <a href="/dashboard/announcements/new" className="create-btn red">
-            <span className="create-icon">+</span>
-            <span className="create-label">Announcement</span>
-          </a>
-          <a href="/dashboard/artists/new" className="create-btn">
-            <span className="create-icon">+</span>
-            <span className="create-label">Artist Page</span>
-          </a>
-          <a href="/dashboard/venues/new" className="create-btn">
-            <span className="create-icon">+</span>
-            <span className="create-label">Venue Page</span>
-          </a>
-        </div>
+        <DashboardCreateButtons />
 
         <div className="divider" />
 

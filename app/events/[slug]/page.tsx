@@ -17,6 +17,7 @@ type Venue = {
   slug: string | null
   website: string | null
   image_url: string | null
+  logo: string | null
 }
 
 type Artist = {
@@ -57,7 +58,7 @@ async function getEvent(slug: string): Promise<Event | null> {
       id, title, description, event_date, event_start_time, event_end_time,
       end_date, image_url, ticket_price, ticket_url, learnmore_link,
       event_types, star, slug, capacity, ticketing_enabled,
-      venues (id, name, address, neighborhood, city, state, slug, website, image_url),
+      venues (id, name, address, neighborhood, city, state, slug, website, image_url, logo),
       event_artists (
         display_order,
         role,
@@ -399,16 +400,6 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
               </div>
             )}
 
-            {/* Admission */}
-            <div className="info-cell">
-              <div className="info-label">Admission</div>
-              <div className="info-value">
-                {event.ticket_price === null && 'See details'}
-                {isFree && <span className="price-free">Free</span>}
-                {isPaid && <span className="price-paid">${event.ticket_price}</span>}
-              </div>
-            </div>
-
             {/* Capacity */}
             {event.capacity && (
               <div className="info-cell">
@@ -458,12 +449,12 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
             entityType="event"
             entityId={event.id}
             showFollow={true}
-            showFavorite={true}
+            showFavorite={false}
             className="ffb-light"
           />
           {ctaUrl && !event.ticketing_enabled && (
             <a href={ctaUrl} target="_blank" rel="noopener noreferrer" className="cta-btn cta-primary">
-              {event.ticket_url ? '🎟 Get Tickets' : '↗ Learn More'}
+              {event.ticket_url ? 'Get Tickets' : 'Learn More'}
             </a>
           )}
           {ctaUrl && event.ticketing_enabled && event.learnmore_link && (
@@ -495,8 +486,8 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
               rel={event.venue.slug ? undefined : 'noopener noreferrer'}
               className="venue-card"
             >
-              {event.venue.image_url
-                ? <img src={event.venue.image_url} alt={event.venue.name} className="venue-img" />
+              {event.venue.logo || event.venue.image_url
+                ? <img src={event.venue.logo ?? event.venue.image_url ?? ''} alt={event.venue.name} className="venue-img" />
                 : <div className="venue-img-placeholder">{event.venue.name[0]}</div>
               }
               <div className="venue-info">

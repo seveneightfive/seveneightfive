@@ -196,7 +196,7 @@ const BTN_STYLES = `
   }
   .ffb-light .ffb-btn.ffb-follow:hover { border-color: rgba(0,0,0,0.5); color: #000; }
   .ffb-light .ffb-btn.ffb-following {
-    background: rgba(0,0,0,0.07); border-color: rgba(0,0,0,0.3); color: #000;
+    background: #FFCE03; border-color: #FFCE03; color: #0A0A0A;
   }
   .ffb-light .ffb-btn.ffb-fav { border-color: rgba(0,0,0,0.15); color: rgba(0,0,0,0.4); }
   .ffb-light .ffb-btn.ffb-fav:hover { border-color: #C80650; color: #C80650; }
