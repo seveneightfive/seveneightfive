@@ -193,7 +193,7 @@ export default function FeaturedSlider({ events }: { events: FeaturedEvent[] }) 
           const href = event.slug ? `/events/${event.slug}` : event.ticket_url || '#'
           const isExternal = !event.slug
           return (
-            
+            <a
               key={event.id}
               href={href}
               target={isExternal ? '_blank' : '_self'}
