@@ -26,6 +26,7 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
   const [quantity, setQuantity] = useState(1)
   const [loading, setLoading] = useState(true)
   const [purchasing, setPurchasing] = useState(false)
+  const [rsvpDone, setRsvpDone] = useState(false)
   const [error, setError] = useState('')
   const [expanded, setExpanded] = useState(false)
 
@@ -51,8 +52,12 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
       })
   }, [eventId])
 
-  const handlePurchase = async () => {
-    if (!selectedTier) return
+  const isFreeEvent = tiers.length > 0 && tiers.every(t => t.price === 0)
+  const tier = tiers.find(t => t.id === selectedTier) || tiers[0]
+  const isFree = tier?.price === 0
+
+  const handleAction = async () => {
+    if (!selectedTier || !tier) return
     setPurchasing(true)
     setError('')
 
@@ -65,23 +70,37 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         return
       }
 
-      const res = await fetch('/api/tickets/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tierId: selectedTier, eventId, quantity }),
-      })
-
-      const json = await res.json()
-
-      if (!res.ok) {
-        setError(json.error || 'Something went wrong. Please try again.')
+      if (isFree) {
+        // Free ticket — RSVP directly, no Stripe needed
+        const res = await fetch('/api/tickets/rsvp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tierId: selectedTier, eventId, quantity }),
+        })
+        const json = await res.json()
+        if (!res.ok) {
+          setError(json.error || 'Something went wrong. Please try again.')
+          setPurchasing(false)
+          return
+        }
+        setRsvpDone(true)
+        setExpanded(false)
         setPurchasing(false)
-        return
+      } else {
+        // Paid ticket — redirect to Stripe Checkout
+        const res = await fetch('/api/tickets/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tierId: selectedTier, eventId, quantity }),
+        })
+        const json = await res.json()
+        if (!res.ok) {
+          setError(json.error || 'Something went wrong. Please try again.')
+          setPurchasing(false)
+          return
+        }
+        window.location.href = json.url
       }
-
-      // Redirect to Stripe Checkout
-      window.location.href = json.url
-
     } catch {
       setError('Something went wrong. Please try again.')
       setPurchasing(false)
@@ -90,10 +109,13 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
 
   if (loading || tiers.length === 0) return null
 
-  const tier = tiers.find(t => t.id === selectedTier) || tiers[0]
-  const remaining = tier.quantity !== null ? tier.quantity - tier.quantity_sold : null
+  const remaining = tier?.quantity !== null ? (tier?.quantity ?? 0) - tier.quantity_sold : null
   const maxQty = Math.min(remaining ?? 10, 10)
-  const totalPrice = (tier.price * quantity).toFixed(2)
+  const totalPrice = ((tier?.price ?? 0) * quantity).toFixed(2)
+
+  const headerLabel = isFreeEvent ? 'Free Event' : '🎟 785 Tickets'
+  const headerPrice = isFree ? 'Free' : `$${tier.price.toFixed(2)}`
+  const ctaLabel = isFree ? 'RSVP' : 'Get Tickets'
 
   return (
     <div style={{ margin: '24px 0' }}>
@@ -104,144 +126,142 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         .tpb-eyebrow { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #b8b3ad; }
         .tpb-price { font-family: 'Oswald', sans-serif; font-size: 1.3rem; font-weight: 600; color: #1a1814; }
         .tpb-price-free { color: #2d7a2d; }
-        .tpb-buy-btn {
-          padding: 11px 22px; background: #C80650; border: none; border-radius: 8px;
+        .tpb-action-btn {
+          padding: 11px 22px; border: none; border-radius: 8px;
           font-family: 'Oswald', sans-serif; font-size: 0.85rem; font-weight: 600;
           letter-spacing: 0.1em; text-transform: uppercase; color: #fff;
           cursor: pointer; transition: all 0.15s; white-space: nowrap;
         }
-        .tpb-buy-btn:hover { background: #a8041f; }
-        .tpb-buy-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .tpb-action-btn.paid { background: #C80650; }
+        .tpb-action-btn.paid:hover { background: #a8041f; }
+        .tpb-action-btn.free { background: #2d7a2d; }
+        .tpb-action-btn.free:hover { background: #235e23; }
+        .tpb-action-btn.done { background: #2d7a2d; opacity: 0.7; cursor: default; }
         .tpb-expand { padding: 0 20px 20px; border-top: 1px solid #ece8e2; }
         .tpb-tiers { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
-        .tpb-tier {
-          padding: 12px 14px; border-radius: 8px; border: 1.5px solid #ece8e2;
-          background: #fff; cursor: pointer; transition: all 0.15s;
-          display: flex; align-items: center; justify-content: space-between;
-        }
+        .tpb-tier { padding: 12px 14px; border-radius: 8px; border: 1.5px solid #ece8e2; background: #fff; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: space-between; }
         .tpb-tier.selected { border-color: #C80650; background: rgba(200,6,80,0.04); }
         .tpb-tier-name { font-weight: 500; font-size: 0.9rem; color: #1a1814; }
         .tpb-tier-desc { font-size: 0.78rem; color: #6b6560; margin-top: 2px; }
         .tpb-tier-price { font-family: 'Oswald', sans-serif; font-size: 1rem; font-weight: 600; color: #1a1814; flex-shrink: 0; margin-left: 12px; }
-        .tpb-tier-sold-out { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #b8b3ad; }
         .tpb-qty-row { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
         .tpb-qty-label { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #6b6560; }
-        .tpb-qty-ctrl { display: flex; align-items: center; gap: 0; border: 1.5px solid #ece8e2; border-radius: 8px; overflow: hidden; }
+        .tpb-qty-ctrl { display: flex; align-items: center; border: 1.5px solid #ece8e2; border-radius: 8px; overflow: hidden; }
         .tpb-qty-btn { width: 36px; height: 36px; border: none; background: #fff; font-size: 1.1rem; cursor: pointer; color: #1a1814; transition: background 0.1s; }
         .tpb-qty-btn:hover { background: #f0ede8; }
         .tpb-qty-btn:disabled { color: #b8b3ad; cursor: not-allowed; }
         .tpb-qty-num { width: 36px; text-align: center; font-weight: 600; font-size: 0.95rem; background: #fff; border-left: 1.5px solid #ece8e2; border-right: 1.5px solid #ece8e2; height: 36px; display: flex; align-items: center; justify-content: center; }
         .tpb-total { margin-left: auto; font-family: 'Oswald', sans-serif; font-size: 1rem; font-weight: 600; color: #1a1814; }
-        .tpb-remaining { font-size: 0.72rem; color: #a85a30; font-weight: 500; margin-top: 8px; }
+        .tpb-remaining { font-size: 0.72rem; color: #a85a30; font-weight: 500; }
         .tpb-error { margin-top: 12px; padding: 10px 14px; background: rgba(200,6,80,0.08); border: 1px solid rgba(200,6,80,0.2); border-radius: 8px; font-size: 0.82rem; color: #C80650; }
         .tpb-confirm-btn {
-          margin-top: 16px; width: 100%; padding: 14px;
-          background: #C80650; border: none; border-radius: 8px;
+          margin-top: 16px; width: 100%; padding: 14px; border: none; border-radius: 8px;
           font-family: 'Oswald', sans-serif; font-size: 0.9rem; font-weight: 600;
           letter-spacing: 0.1em; text-transform: uppercase; color: #fff;
           cursor: pointer; transition: all 0.15s;
         }
-        .tpb-confirm-btn:hover { background: #a8041f; }
+        .tpb-confirm-btn.paid { background: #C80650; }
+        .tpb-confirm-btn.paid:hover { background: #a8041f; }
+        .tpb-confirm-btn.free { background: #2d7a2d; }
+        .tpb-confirm-btn.free:hover { background: #235e23; }
         .tpb-confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .tpb-rsvp-done { padding: 16px 20px; display: flex; align-items: center; gap: 10px; background: rgba(45,122,45,0.06); }
+        .tpb-rsvp-check { font-size: 1.1rem; }
+        .tpb-rsvp-text { font-size: 0.85rem; color: #2d7a2d; font-weight: 500; }
+        .tpb-rsvp-sub { font-size: 0.75rem; color: #6b6560; margin-top: 2px; }
       `}</style>
 
       <div className="tpb-wrap">
-        {/* Collapsed header — quick buy */}
-        <div className="tpb-header" onClick={() => setExpanded(e => !e)}>
-          <div className="tpb-header-left">
-            <span className="tpb-eyebrow">🎟 785 Tickets</span>
-            <span className={`tpb-price ${tier.price === 0 ? 'tpb-price-free' : ''}`}>
-              {tier.price === 0 ? 'Free' : `$${tier.price.toFixed(2)}`}
-              {tiers.length > 1 && <span style={{ fontSize: '0.7rem', fontWeight: 400, color: '#6b6560', marginLeft: 6 }}>+ more tiers</span>}
-            </span>
+        {rsvpDone ? (
+          <div className="tpb-rsvp-done">
+            <span className="tpb-rsvp-check">✓</span>
+            <div>
+              <div className="tpb-rsvp-text">You're going!</div>
+              <div className="tpb-rsvp-sub">Check your dashboard to view your RSVP.</div>
+            </div>
           </div>
-          {!expanded && (
-            <button
-              className="tpb-buy-btn"
-              onClick={e => { e.stopPropagation(); setExpanded(true) }}
-            >
-              Get Tickets
-            </button>
-          )}
-          {expanded && (
-            <span style={{ fontSize: '0.75rem', color: '#6b6560', cursor: 'pointer' }}>✕ Close</span>
-          )}
-        </div>
-
-        {/* Expanded detail */}
-        {expanded && (
-          <div className="tpb-expand">
-            {/* Tier selection (only show if multiple tiers) */}
-            {tiers.length > 1 && (
-              <div className="tpb-tiers">
-                {tiers.map(t => {
-                  const rem = t.quantity !== null ? t.quantity - t.quantity_sold : null
-                  const soldOut = rem !== null && rem <= 0
-                  return (
-                    <div
-                      key={t.id}
-                      className={`tpb-tier${selectedTier === t.id ? ' selected' : ''}${soldOut ? ' disabled' : ''}`}
-                      onClick={() => !soldOut && setSelectedTier(t.id)}
-                      style={soldOut ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
-                    >
-                      <div>
-                        <div className="tpb-tier-name">{t.name}</div>
-                        {t.description && <div className="tpb-tier-desc">{t.description}</div>}
-                        {soldOut && <div className="tpb-tier-sold-out">Sold Out</div>}
-                        {!soldOut && rem !== null && rem <= 10 && (
-                          <div style={{ fontSize: '0.72rem', color: '#a85a30', marginTop: 2 }}>
-                            Only {rem} left
-                          </div>
-                        )}
-                      </div>
-                      <span className="tpb-tier-price">
-                        {t.price === 0 ? 'Free' : `$${t.price.toFixed(2)}`}
-                      </span>
-                    </div>
-                  )
-                })}
+        ) : (
+          <>
+            <div className="tpb-header" onClick={() => setExpanded(e => !e)}>
+              <div className="tpb-header-left">
+                <span className="tpb-eyebrow">{headerLabel}</span>
+                <span className={`tpb-price ${isFree ? 'tpb-price-free' : ''}`}>
+                  {headerPrice}
+                  {tiers.length > 1 && <span style={{ fontSize: '0.7rem', fontWeight: 400, color: '#6b6560', marginLeft: 6 }}>+ more options</span>}
+                </span>
               </div>
-            )}
-
-            {/* Quantity selector */}
-            <div className="tpb-qty-row">
-              <span className="tpb-qty-label">Qty</span>
-              <div className="tpb-qty-ctrl">
+              {!expanded && (
                 <button
-                  className="tpb-qty-btn"
-                  onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                  disabled={quantity <= 1}
-                >−</button>
-                <span className="tpb-qty-num">{quantity}</span>
-                <button
-                  className="tpb-qty-btn"
-                  onClick={() => setQuantity(q => Math.min(maxQty, q + 1))}
-                  disabled={quantity >= maxQty}
-                >+</button>
-              </div>
-              {remaining !== null && remaining <= 20 && (
-                <span className="tpb-remaining">{remaining} remaining</span>
+                  className={`tpb-action-btn ${isFree ? 'free' : 'paid'}`}
+                  onClick={e => { e.stopPropagation(); setExpanded(true) }}
+                >
+                  {ctaLabel}
+                </button>
               )}
-              {quantity > 1 && (
-                <span className="tpb-total">Total: ${totalPrice}</span>
+              {expanded && (
+                <span style={{ fontSize: '0.75rem', color: '#6b6560', cursor: 'pointer' }}>✕ Close</span>
               )}
             </div>
 
-            {error && <div className="tpb-error">{error}</div>}
+            {expanded && (
+              <div className="tpb-expand">
+                {tiers.length > 1 && (
+                  <div className="tpb-tiers">
+                    {tiers.map(t => {
+                      const rem = t.quantity !== null ? t.quantity - t.quantity_sold : null
+                      const soldOut = rem !== null && rem <= 0
+                      return (
+                        <div
+                          key={t.id}
+                          className={`tpb-tier${selectedTier === t.id ? ' selected' : ''}`}
+                          onClick={() => !soldOut && setSelectedTier(t.id)}
+                          style={soldOut ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                        >
+                          <div>
+                            <div className="tpb-tier-name">{t.name}</div>
+                            {t.description && <div className="tpb-tier-desc">{t.description}</div>}
+                          </div>
+                          <span className="tpb-tier-price">
+                            {t.price === 0 ? 'Free' : `$${t.price.toFixed(2)}`}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
 
-            <button
-              className="tpb-confirm-btn"
-              onClick={handlePurchase}
-              disabled={purchasing || !selectedTier}
-            >
-              {purchasing
-                ? 'Redirecting to checkout…'
-                : tier.price === 0
-                  ? 'Reserve Free Ticket'
-                  : `Buy ${quantity > 1 ? `${quantity} Tickets` : 'Ticket'} · $${totalPrice}`
-              }
-            </button>
-          </div>
+                {!isFree && (
+                  <div className="tpb-qty-row">
+                    <span className="tpb-qty-label">Qty</span>
+                    <div className="tpb-qty-ctrl">
+                      <button className="tpb-qty-btn" onClick={() => setQuantity(q => Math.max(1, q - 1))} disabled={quantity <= 1}>−</button>
+                      <span className="tpb-qty-num">{quantity}</span>
+                      <button className="tpb-qty-btn" onClick={() => setQuantity(q => Math.min(maxQty, q + 1))} disabled={quantity >= maxQty}>+</button>
+                    </div>
+                    {remaining !== null && remaining <= 20 && (
+                      <span className="tpb-remaining">{remaining} remaining</span>
+                    )}
+                    {quantity > 1 && <span className="tpb-total">Total: ${totalPrice}</span>}
+                  </div>
+                )}
+
+                {error && <div className="tpb-error">{error}</div>}
+
+                <button
+                  className={`tpb-confirm-btn ${isFree ? 'free' : 'paid'}`}
+                  onClick={handleAction}
+                  disabled={purchasing || !selectedTier}
+                >
+                  {purchasing
+                    ? (isFree ? 'Saving your RSVP…' : 'Redirecting to checkout…')
+                    : isFree
+                      ? `RSVP — I'm Going!`
+                      : `Buy ${quantity > 1 ? `${quantity} Tickets` : 'Ticket'} · $${totalPrice}`
+                  }
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

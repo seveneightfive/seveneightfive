@@ -125,7 +125,7 @@ export default function HomeClient({
         <section id="artists">
           <div className={styles.sectionHeader}>
             <h2>Featured Artists</h2>
-            <Link href="/artists">Directory →</Link>
+            <Link href="/artists">Discover More Artists →</Link>
           </div>
           <div className={styles.artistsScroll}>
             {artists.length === 0 ? (
@@ -137,26 +137,25 @@ export default function HomeClient({
                 <Link href={artist.slug ? `/artists/${artist.slug}` : '#'} key={artist.id} className={styles.artistCard}>
                   <div className={styles.artistImg}>
                     {artist.avatar_url || artist.image_url ? (
-                        <img
-          src={artist.avatar_url ?? artist.image_url ?? ''}
-          alt={artist.name}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        />
-      ) : (
-        <>
-          <div className={styles.colorFill} style={{ background: 'linear-gradient(145deg, #1a1a1a, #444)' }} />
-          <div className={styles.initials}>
-            {artist.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2)}
-          </div>
-        </>
-      )}
-      <div className={styles.artistImgTag}>
-        {artist.upcomingCount} upcoming
-      </div>
-    </div>
-    <div className={styles.artistName}>{artist.name}</div>
-    <div className={styles.artistGenre}>{artist.artist_type ?? ''}</div>
-  </Link>
+                      <img
+                        src={artist.avatar_url ?? artist.image_url ?? ''}
+                        alt={artist.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <>
+                        <div className={styles.colorFill} style={{ background: 'linear-gradient(145deg, #1a1a1a, #444)' }} />
+                        <div className={styles.initials}>
+                          {artist.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2)}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <div className={styles.artistName}>{artist.name}</div>
+                  <div className={styles.artistUpcoming}>
+                    {artist.upcomingCount} upcoming {artist.upcomingCount === 1 ? 'event' : 'events'}
+                  </div>
+                </Link>
 ))
             )}
           </div>

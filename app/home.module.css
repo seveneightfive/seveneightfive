@@ -229,19 +229,20 @@
 }
 
 .artistCard {
-  flex: 0 0 140px;
+  flex: 0 0 calc(48vw - 20px);
   cursor: pointer;
   text-decoration: none;
   color: #0A0A0A;
 }
 
 .artistImg {
-  width: 140px;
-  height: 170px;
+  width: 100%;
+  aspect-ratio: 3 / 4;
   background: #F5F5F5;
   position: relative;
   overflow: hidden;
   margin-bottom: 10px;
+  border-radius: 12px;
 }
 
 .colorFill {
@@ -261,19 +262,11 @@
   color: rgba(255, 255, 255, 0.3);
 }
 
-.artistImgTag {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: #FFCE03;
-  font-family: 'Oswald', sans-serif;
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  padding: 5px 8px;
-  color: #0A0A0A;
+.artistUpcoming {
+  font-size: 12px;
+  font-weight: 400;
+  color: #AAAAAA;
+  margin-top: 2px;
 }
 
 .artistName {
@@ -285,11 +278,6 @@
   margin-bottom: 2px;
 }
 
-.artistGenre {
-  font-size: 12px;
-  font-weight: 300;
-  color: #AAAAAA;
-}
 
 /* ── Neighborhoods ── */
 .neighborhoods {
@@ -539,6 +527,10 @@
 
   .artistsScroll {
     padding: 0 40px;
+  }
+
+  .artistCard {
+    flex: 0 0 180px;
   }
 
   .neighborhoods {
