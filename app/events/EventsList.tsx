@@ -338,7 +338,7 @@ export default function EventsList() {
                       const href = event.slug ? `/events/${event.slug}` : event.ticket_url || event.learnmore_link || '#'
                       const isExternal = !event.slug
                       return (
-                        
+                        <a
                           key={event.id}
                           href={href}
                           target={isExternal ? '_blank' : '_self'}
