@@ -183,7 +183,6 @@ export default function EventsList() {
   useEffect(() => { applyFilters() }, [applyFilters])
 
   const dayGroups = getDayGroups(filtered)
-  const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
   return (
     <>
@@ -203,7 +202,7 @@ export default function EventsList() {
         .header-inner { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
         .header-date { font-size: 0.68rem; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
         .search-wrap { position: relative; width: 100%; max-width: 340px; }
-        .search-input { width: 100%; padding: 11px 16px 11px 42px; background: var(--off); border: 1.5px solid var(--border); border-radius: 100px; font-family: var(--sans); font-size: 0.88rem; color: var(--ink); outline: none; transition: border-color 0.15s, background 0.15s; }
+        .search-input { width: 100%; padding: 7px 12px 7px 38px; background: #f5f5f5; border: 0.5px solid #e0e0e0; border-radius: 20px; font-family: var(--sans); font-size: 0.88rem; color: var(--ink); outline: none; transition: border-color 0.15s, background 0.15s; }
         .search-input:focus { border-color: var(--ink); background: var(--white); }
         .search-input::placeholder { color: var(--ink-faint); }
         .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--ink-faint); pointer-events: none; }
@@ -220,7 +219,7 @@ export default function EventsList() {
         .day-label { font-family: var(--serif); font-size: 1.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; line-height: 1; }
         .day-label.today { color: var(--accent); }
         .day-sublabel { font-size: 0.78rem; color: var(--ink-faint); }
-        .day-count { margin-left: auto; font-size: 0.68rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+        .day-count { margin-left: auto; font-size: 11px; font-weight: 500; color: #111; background: #f0f0f0; padding: 2px 8px; border-radius: 10px; border: 0.5px solid #ddd; text-transform: lowercase; }
         .events-list { display: flex; flex-direction: column; gap: 1px; background: var(--border); border-radius: 8px; overflow: hidden; }
         .event-card { display: grid; grid-template-columns: 80px 1fr auto; background: var(--white); text-decoration: none; color: var(--ink); transition: background 0.12s; -webkit-tap-highlight-color: transparent; }
         .event-card:hover { background: var(--off); }
@@ -234,7 +233,7 @@ export default function EventsList() {
         .event-types-row { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 5px; }
         .event-type-tag { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
         .event-type-tag + .event-type-tag::before { content: '·'; margin-right: 5px; color: var(--ink-faint); }
-        .event-title { font-family: var(--serif); font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; line-height: 1.2; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .event-title { font-family: var(--serif); font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; line-height: 1.2; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .event-venue { font-size: 0.78rem; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .event-venue-name { font-weight: 500; }
         .event-venue-neighborhood { color: var(--ink-faint); font-size: 0.72rem; }
@@ -276,9 +275,6 @@ export default function EventsList() {
       <div className="page">
         <header className="header">
           <div className="header-inner">
-            <div>
-              <div className="header-date">{todayStr}</div>
-            </div>
             <div className="search-wrap">
               <svg className="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
