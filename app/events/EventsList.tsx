@@ -51,8 +51,6 @@ const EVENT_TYPES = [
 
 function formatTime(t: string | null): string {
   if (!t || t.trim() === ':') return ''
-  
-  // Already has am/pm (e.g. "06:30 pm") — just clean it up
   const ampmMatch = t.match(/(\d{1,2}):(\d{2})\s*(am|pm)/i)
   if (ampmMatch) {
     const h = parseInt(ampmMatch[1], 10)
@@ -61,8 +59,6 @@ function formatTime(t: string | null): string {
     const hour = h === 0 ? 12 : h > 12 ? h - 12 : h
     return m === 0 ? `${hour} ${ampm}` : `${hour}:${m.toString().padStart(2, '0')} ${ampm}`
   }
-  
-  // Fallback: 24-hour format (e.g. "18:30")
   const match = t.match(/(\d{1,2}):(\d{2})/)
   if (!match) return ''
   const h = parseInt(match[1], 10)
@@ -110,7 +106,7 @@ export default function EventsList() {
   const [activeType, setActiveType] = useState('All')
   const [search, setSearch] = useState('')
   const [showPast, setShowPast] = useState(false)
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)  // ← ADD THIS
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const scrollRestored = useRef(false)
   const { setRightText } = useNavState()
 
@@ -122,13 +118,11 @@ export default function EventsList() {
     if (!loading) setRightText(`${filtered.length} ${filtered.length === 1 ? 'Event' : 'Events'}`)
   }, [loading, filtered.length, setRightText])
 
-  // ── Restore scroll position after events load ──────────────────────────────
   useEffect(() => {
     if (!loading && !scrollRestored.current) {
       const saved = sessionStorage.getItem('eventsScrollPos')
       if (saved) {
         scrollRestored.current = true
-        // rAF ensures DOM is fully painted before scrolling
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             window.scrollTo({ top: parseInt(saved), behavior: 'instant' })
@@ -139,7 +133,6 @@ export default function EventsList() {
     }
   }, [loading])
 
-  // ── Save scroll position before navigating to event ───────────────────────
   const handleEventClick = useCallback((isExternal: boolean) => {
     if (!isExternal) {
       sessionStorage.setItem('eventsScrollPos', window.scrollY.toString())
@@ -174,24 +167,23 @@ export default function EventsList() {
   }, [showPast])
 
   const applyFilters = useCallback(() => {
-  let result = [...events]
-  if (activeType !== 'All') result = result.filter(e => e.event_types?.includes(activeType))
-  if (selectedDate) result = result.filter(e => e.event_date === selectedDate)
-  if (search.trim()) {
-    const q = search.toLowerCase()
-    result = result.filter(e =>
-      e.title.toLowerCase().includes(q) ||
-      e.description?.toLowerCase().includes(q) ||
-      e.venue?.name.toLowerCase().includes(q)
-    )
-  }
-  setFiltered(result)
-}, [events, activeType, search, selectedDate])
+    let result = [...events]
+    if (activeType !== 'All') result = result.filter(e => e.event_types?.includes(activeType))
+    if (selectedDate) result = result.filter(e => e.event_date === selectedDate)
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      result = result.filter(e =>
+        e.title.toLowerCase().includes(q) ||
+        e.description?.toLowerCase().includes(q) ||
+        e.venue?.name.toLowerCase().includes(q)
+      )
+    }
+    setFiltered(result)
+  }, [events, activeType, search, selectedDate])
 
   useEffect(() => { applyFilters() }, [applyFilters])
 
   const dayGroups = getDayGroups(filtered)
-  const featuredEvents = events.filter(e => e.star).slice(0, 3)
   const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
   return (
@@ -205,18 +197,12 @@ export default function EventsList() {
           --accent: #c8502a; --accent-light: #fdf1ec; --border: #ece8e2;
           --serif: 'Oswald', sans-serif; --sans: 'DM Sans', system-ui, sans-serif;
         }
-          html, body { 
-  overflow-x: hidden; 
-  max-width: 100vw; 
-}
+        html, body { overflow-x: hidden; max-width: 100vw; }
         html, body { background: var(--white); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
-        .page { max-width: 1100px; margin: 0 auto; padding: 0 24px; overflow:hidden; }
+        .page { max-width: 1100px; margin: 0 auto; padding: 0 24px; overflow: hidden; }
         .header { padding: 48px 0 36px; border-bottom: 1px solid var(--border); }
         .header-inner { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
         .header-date { font-size: 0.68rem; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
-        .header-title { font-family: var(--serif); font-size: clamp(2.4rem, 6vw, 4rem); font-weight: 700; text-transform: uppercase; line-height: 0.95; letter-spacing: -0.01em; }
-        .header-title em { font-style: normal; color: var(--accent); }
-        .header-count { font-size: 0.75rem; color: var(--ink-faint); margin-top: 10px; }
         .search-wrap { position: relative; width: 100%; max-width: 340px; }
         .search-input { width: 100%; padding: 11px 16px 11px 42px; background: var(--off); border: 1.5px solid var(--border); border-radius: 100px; font-family: var(--sans); font-size: 0.88rem; color: var(--ink); outline: none; transition: border-color 0.15s, background 0.15s; }
         .search-input:focus { border-color: var(--ink); background: var(--white); }
@@ -229,24 +215,6 @@ export default function EventsList() {
         .filter-chip { padding: 6px 14px; border-radius: 100px; border: 1.5px solid var(--border); background: transparent; font-family: var(--sans); font-size: 0.78rem; font-weight: 500; color: var(--ink-soft); cursor: pointer; transition: all 0.15s; white-space: nowrap; flex-shrink: 0; }
         .filter-chip:hover { border-color: var(--ink); color: var(--ink); }
         .filter-chip.active { background: var(--ink); border-color: var(--ink); color: white; }
-        .past-toggle { font-size: 0.72rem; font-weight: 500; color: var(--ink-faint); background: none; border: none; cursor: pointer; white-space: nowrap; padding: 6px 0; flex-shrink: 0; transition: color 0.15s; }
-        .past-toggle:hover { color: var(--ink); }
-        .past-toggle.active { color: var(--accent); }
-        .featured-section { padding: 40px 0 0; }
-        .section-eyebrow { font-size: 0.65rem; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
-        .section-eyebrow::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-        .featured-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-        .featured-card { position: relative; border-radius: 8px; overflow: hidden; aspect-ratio: 4/3; text-decoration: none; display: block; background: var(--ink); }
-        .featured-card:first-child { grid-column: span 2; aspect-ratio: 16/9; }
-        .featured-img { width: 100%; height: 100%; object-fit: cover; opacity: 0.75; transition: transform 0.5s ease, opacity 0.3s; }
-        .featured-card:hover .featured-img { transform: scale(1.04); opacity: 0.65; }
-        .featured-no-img { width: 100%; height: 100%; background: linear-gradient(135deg, #2a2620, #1a1814); display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 3rem; color: rgba(255,255,255,0.06); text-transform: uppercase; }
-        .featured-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(26,24,20,0.9) 0%, transparent 55%); padding: 16px; display: flex; flex-direction: column; justify-content: flex-end; }
-        .featured-type { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); margin-bottom: 5px; }
-        .featured-title { font-family: var(--serif); font-size: 1rem; font-weight: 600; color: white; line-height: 1.2; text-transform: uppercase; letter-spacing: 0.02em; }
-        .featured-card:first-child .featured-title { font-size: 1.3rem; }
-        .featured-meta { font-size: 0.72rem; color: rgba(255,255,255,0.55); margin-top: 5px; }
-        .star-badge { position: absolute; top: 12px; right: 12px; background: var(--accent); color: white; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; border-radius: 100px; }
         .calendar { padding: 40px 0 80px; }
         .day-group { margin-bottom: 48px; }
         .day-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid var(--ink); }
@@ -291,8 +259,6 @@ export default function EventsList() {
           .header { padding: 32px 0 24px; }
           .header-inner { flex-direction: column; align-items: flex-start; gap: 16px; }
           .search-wrap { max-width: 100%; }
-          .featured-grid { grid-template-columns: 1fr; }
-          .featured-card:first-child { grid-column: span 1; aspect-ratio: 16/9; }
           .event-card { grid-template-columns: 68px 1fr auto; }
           .event-time-col { padding: 14px 10px 14px 14px; }
           .event-img-thumb { width: 48px; height: 48px; }
@@ -318,7 +284,13 @@ export default function EventsList() {
               <svg className="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
               </svg>
-              <input className="search-input" type="text" placeholder="Search events, venues..." value={search} onChange={e => setSearch(e.target.value)} />
+              <input
+                className="search-input"
+                type="text"
+                placeholder="Search events, venues..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
             </div>
           </div>
         </header>
@@ -328,7 +300,13 @@ export default function EventsList() {
         <div className="filters-inner">
           <div className="filter-scroll">
             {EVENT_TYPES.map(type => (
-              <button key={type} className={`filter-chip ${activeType === type ? 'active' : ''}`} onClick={() => setActiveType(type)}>{type}</button>
+              <button
+                key={type}
+                className={`filter-chip ${activeType === type ? 'active' : ''}`}
+                onClick={() => setActiveType(type)}
+              >
+                {type}
+              </button>
             ))}
           </div>
           <DateFilter selectedDate={selectedDate} onSelect={setSelectedDate} />
@@ -337,111 +315,93 @@ export default function EventsList() {
 
       <div className="page">
         {loading ? (
-          <div className="loading"><div className="loading-dots"><span/><span/><span/></div></div>
+          <div className="loading">
+            <div className="loading-dots"><span/><span/><span/></div>
+          </div>
         ) : (
-          <>
-            {featuredEvents.length > 0 && activeType === 'All' && !search && (
-              <section className="featured-section">
-                <div className="section-eyebrow">Featured Events</div>
-                <div className="featured-grid">
-                  {featuredEvents.map(event => {
-                    const href = event.slug ? `/events/${event.slug}` : event.ticket_url || event.learnmore_link || '#'
-                    const isExternal = !event.slug
-                    const d = new Date(event.event_date + 'T12:00:00')
-                    const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-                    return (
-                      <a
-                        key={event.id}
-                        href={href}
-                        target={isExternal ? '_blank' : '_self'}
-                        rel={isExternal ? 'noopener noreferrer' : undefined}
-                        className="featured-card"
-                        onClick={() => handleEventClick(isExternal)}
-                      >
-                        {event.image_url ? <img src={event.image_url} alt={event.title} className="featured-img" /> : <div className="featured-no-img">{event.title[0]}</div>}
-                        <div className="featured-overlay">
-                          {event.event_types?.[0] && <div className="featured-type">{event.event_types[0]}</div>}
-                          <div className="featured-title">{event.title}</div>
-                          <div className="featured-meta">{dateStr}{event.event_start_time && ` · ${formatTime(event.event_start_time)}`}{event.venue && ` · ${event.venue.name}`}</div>
-                        </div>
-                        <div className="star-badge">★ Featured</div>
-                      </a>
-                    )
-                  })}
-                </div>
-              </section>
-            )}
-
-            <section className="calendar">
-              {dayGroups.length === 0 ? (
-                <div className="empty">
-                  <div className="empty-title">No events found</div>
-                  <div className="empty-sub">Try adjusting your filters or check back soon.</div>
-                </div>
-              ) : (
-                dayGroups.map(group => (
-                  <div key={group.dateKey} className="day-group">
-                    <div className="day-header">
-                      <span className={`day-label ${group.label === 'Today' ? 'today' : ''}`}>{group.label}</span>
-                      <span className="day-sublabel">{group.sublabel}</span>
-                      <span className="day-count">{group.events.length} {group.events.length === 1 ? 'event' : 'events'}</span>
-                    </div>
-                    <div className="events-list">
-                      {group.events.map(event => {
-                        const href = event.slug ? `/events/${event.slug}` : event.ticket_url || event.learnmore_link || '#'
-                        const isExternal = !event.slug
-                        return (
-                          <a
-                            key={event.id}
-                            href={href}
-                            target={isExternal ? '_blank' : '_self'}
-                            rel={isExternal ? 'noopener noreferrer' : undefined}
-                            className={`event-card${event.star ? ' starred' : ''}`}
-                            onClick={() => handleEventClick(isExternal)}
-                          >
-                            <div className="event-time-col">
-                              {event.event_start_time ? (
-                                <>
-                                  <span className="event-time">{formatTime(event.event_start_time)}</span>
-                                  {event.event_end_time && <span className="event-time-end">→ {formatTimeShort(event.event_end_time)}</span>}
-                                </>
-                              ) : <span className="event-time-tba">TBA</span>}
-                            </div>
-                            <div className="event-body">
-                              {event.event_types && event.event_types.length > 0 && (
-                                <div className="event-types-row">{event.event_types.slice(0, 2).map(t => <span key={t} className="event-type-tag">{t}</span>)}</div>
-                              )}
-                              <div className="event-title">{event.title}</div>
-                              {event.venue && (
-                                <div className="event-venue">
-                                  <span className="event-venue-name">{event.venue.name}</span>
-                                  {(event.venue.neighborhood || event.venue.city) && (
-                                    <span className="event-venue-neighborhood"> · {event.venue.neighborhood || event.venue.city}</span>
-                                  )}
-                                </div>
-                              )}
-                              {event.description && <div className="event-description">{event.description}</div>}
-                            </div>
-                            <div className="event-right">
-                              {event.image_url && <img src={event.image_url} alt={event.title} className="event-img-thumb" />}
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                                {event.ticket_price !== null && (
-                                  <span className={`event-price ${event.ticket_price === 0 ? 'free' : ''}`}>
-                                    {event.ticket_price === 0 ? 'Free' : `$${event.ticket_price}`}
+          <section className="calendar">
+            {dayGroups.length === 0 ? (
+              <div className="empty">
+                <div className="empty-title">No events found</div>
+                <div className="empty-sub">Try adjusting your filters or check back soon.</div>
+              </div>
+            ) : (
+              dayGroups.map(group => (
+                <div key={group.dateKey} className="day-group">
+                  <div className="day-header">
+                    <span className={`day-label ${group.label === 'Today' ? 'today' : ''}`}>{group.label}</span>
+                    <span className="day-sublabel">{group.sublabel}</span>
+                    <span className="day-count">{group.events.length} {group.events.length === 1 ? 'event' : 'events'}</span>
+                  </div>
+                  <div className="events-list">
+                    {group.events.map(event => {
+                      const href = event.slug ? `/events/${event.slug}` : event.ticket_url || event.learnmore_link || '#'
+                      const isExternal = !event.slug
+                      return (
+                        
+                          key={event.id}
+                          href={href}
+                          target={isExternal ? '_blank' : '_self'}
+                          rel={isExternal ? 'noopener noreferrer' : undefined}
+                          className={`event-card${event.star ? ' starred' : ''}`}
+                          onClick={() => handleEventClick(isExternal)}
+                        >
+                          <div className="event-time-col">
+                            {event.event_start_time ? (
+                              <>
+                                <span className="event-time">{formatTime(event.event_start_time)}</span>
+                                {event.event_end_time && (
+                                  <span className="event-time-end">→ {formatTimeShort(event.event_end_time)}</span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="event-time-tba">TBA</span>
+                            )}
+                          </div>
+                          <div className="event-body">
+                            {event.event_types && event.event_types.length > 0 && (
+                              <div className="event-types-row">
+                                {event.event_types.slice(0, 2).map(t => (
+                                  <span key={t} className="event-type-tag">{t}</span>
+                                ))}
+                              </div>
+                            )}
+                            <div className="event-title">{event.title}</div>
+                            {event.venue && (
+                              <div className="event-venue">
+                                <span className="event-venue-name">{event.venue.name}</span>
+                                {(event.venue.neighborhood || event.venue.city) && (
+                                  <span className="event-venue-neighborhood">
+                                    {' · '}{event.venue.neighborhood || event.venue.city}
                                   </span>
                                 )}
-                                <span className="event-arrow">→</span>
                               </div>
+                            )}
+                            {event.description && (
+                              <div className="event-description">{event.description}</div>
+                            )}
+                          </div>
+                          <div className="event-right">
+                            {event.image_url && (
+                              <img src={event.image_url} alt={event.title} className="event-img-thumb" />
+                            )}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                              {event.ticket_price !== null && (
+                                <span className={`event-price ${event.ticket_price === 0 ? 'free' : ''}`}>
+                                  {event.ticket_price === 0 ? 'Free' : `$${event.ticket_price}`}
+                                </span>
+                              )}
+                              <span className="event-arrow">→</span>
                             </div>
-                          </a>
-                        )
-                      })}
-                    </div>
+                          </div>
+                        </a>
+                      )
+                    })}
                   </div>
-                ))
-              )}
-            </section>
-          </>
+                </div>
+              ))
+            )}
+          </section>
         )}
       </div>
       <FilloutEmbed />

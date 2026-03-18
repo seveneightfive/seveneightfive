@@ -238,7 +238,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         :root {
           --ink: #1a1814; --ink-soft: #6b6560; --ink-faint: #b8b3ad;
           --white: #ffffff; --off: #f7f6f4; --warm: #f2ede6;
-          --accent: #c8502a; --accent-light: #fdf1ec; --border: #ece8e2;
+          --accent: #c80650; --accent-light: #fdf1ec; --border: #ece8e2;
           --serif: 'Oswald', sans-serif; --sans: 'DM Sans', system-ui, sans-serif;
         }
         html, body { background: var(--white); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
@@ -291,7 +291,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         .cta-row { display: flex; gap: 10px; margin: 24px 0; flex-wrap: wrap; }
         .cta-btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 24px; border-radius: 8px; font-family: var(--serif); font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; text-decoration: none; transition: all 0.15s; cursor: pointer; }
         .cta-primary { background: var(--accent); color: white; border: 2px solid var(--accent); }
-        .cta-primary:hover { background: #a8411f; border-color: #a8411f; }
+        .cta-primary:hover { background: #c80650; border-color: #c80650; }
         .cta-secondary { background: transparent; color: var(--ink); border: 2px solid var(--border); }
         .cta-secondary:hover { border-color: var(--ink); }
 
