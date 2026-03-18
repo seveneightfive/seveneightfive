@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import styles from './home.module.css'
 import FeaturedSlider, { type FeaturedEvent } from './FeaturedSlider'
-import FilloutEmbed from './components/FilloutEmbed'
 
 type Event = {
   id: string
@@ -225,7 +224,6 @@ export default function HomeClient({
         </div>
         */}
 
-        <FilloutEmbed />
         <div className={styles.footerRule} />
         <p className={styles.footerText}>© seveneightfive magazine — Events & times subject to change</p>
 
