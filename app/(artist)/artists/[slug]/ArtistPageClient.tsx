@@ -1217,12 +1217,7 @@ export default function ArtistPageClient({
         {hasWork && (
           <section id="work" className="section">
             <div className="eyebrow">Works</div>
-            {mp?.visual_profile?.works && (
-              mp.visual_profile.works.startsWith('http')
-                ? <img src={mp.visual_profile.works} alt={`${artist.name} — Works`} className="works-image" style={{ marginBottom: portfolioImages.length > 0 ? 20 : 0 }} />
-                : <p className="works-text" style={{ marginBottom: portfolioImages.length > 0 ? 20 : 0 }}>{mp.visual_profile.works}</p>
-            )}
-            {artist.visual_profile?.works && !mp?.visual_profile?.works && (
+            {artist.visual_profile?.works && (
               artist.visual_profile.works.startsWith('http')
                 ? <img src={artist.visual_profile.works} alt={`${artist.name} — Works`} className="works-image" style={{ marginBottom: portfolioImages.length > 0 ? 20 : 0 }} />
                 : <p className="works-text" style={{ marginBottom: portfolioImages.length > 0 ? 20 : 0 }}>{artist.visual_profile.works}</p>
