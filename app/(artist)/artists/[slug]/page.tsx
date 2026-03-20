@@ -15,6 +15,7 @@ type MusicianProfile = {
   artist_spotify: string | null
   artist_youtube: string | null
   purchase_link: string | null
+  bio_written_by_785: boolean | null
 }
 
 type VisualProfile = {
@@ -45,6 +46,7 @@ type Artist = {
   same_as: string[] | null
   musician_profile: MusicianProfile | null
   visual_profile: VisualProfile | null
+  bio_written_by_785: boolean | null
 }
 
 type Event = {
@@ -90,7 +92,7 @@ async function getArtist(slug: string): Promise<Artist | null> {
   const { data, error } = await supabase
     .from('artists')
     .select(`
-      id, name, slug, bio, tagline, image_url, avatar_url,
+      id, name, slug, bio, tagline, bio_written_by_785, image_url, avatar_url,
       artist_type, verified, location_city, location_state,
       birth_place, awards, artist_website, social_facebook,
       artist_email, given_name, family_name, url, same_as,

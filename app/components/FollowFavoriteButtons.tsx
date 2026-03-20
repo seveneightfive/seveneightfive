@@ -10,6 +10,7 @@ type Props = {
   entityId: string
   showFavorite?: boolean
   showFollow?: boolean
+  heartOnly?: boolean   // NEW — renders a single circular heart that toggles follow
   className?: string
 }
 
@@ -18,6 +19,7 @@ export default function FollowFavoriteButtons({
   entityId,
   showFavorite = true,
   showFollow = true,
+  heartOnly = false,
   className = '',
 }: Props) {
   const [isFollowing, setIsFollowing] = useState(false)
@@ -26,6 +28,10 @@ export default function FollowFavoriteButtons({
   const [loading, setLoading] = useState(true)
   const [followPending, setFollowPending] = useState(false)
   const [favPending, setFavPending] = useState(false)
+
+  // heartOnly mode only ever needs the follow state
+  const needsFollow = showFollow || heartOnly
+  const needsFavorite = showFavorite && !heartOnly
 
   useEffect(() => {
     const supabase = createClient()
@@ -39,7 +45,7 @@ export default function FollowFavoriteButtons({
       setUserId(user.id)
 
       const [followRes, favRes] = await Promise.all([
-        showFollow
+        needsFollow
           ? supabase
               .from('follows')
               .select('id')
@@ -48,7 +54,7 @@ export default function FollowFavoriteButtons({
               .eq('entity_id', entityId)
               .maybeSingle()
           : Promise.resolve({ data: null }),
-        showFavorite
+        needsFavorite
           ? supabase
               .from('user_favorites')
               .select('id')
@@ -67,7 +73,7 @@ export default function FollowFavoriteButtons({
 
     load()
     return () => { mounted = false }
-  }, [entityType, entityId, showFollow, showFavorite])
+  }, [entityType, entityId, needsFollow, needsFavorite])
 
   const handleFollow = async () => {
     if (!userId) { window.location.href = '/login'; return }
@@ -113,6 +119,37 @@ export default function FollowFavoriteButtons({
     setFavPending(false)
   }
 
+  // ── HEART ONLY MODE ────────────────────────────────────────────────────────
+  // Single circular button, sits in the hero actions row.
+  // Unfollowed: ghost circle, white outline heart
+  // Following:  crimson tint circle, filled crimson heart
+  // Loading:    ghost circle, dimmed
+  if (heartOnly) {
+    return (
+      <>
+        <style>{HEART_ONLY_STYLES}</style>
+        <button
+          className={`ffb-heart-btn${isFollowing ? ' active' : ''}${loading ? ' loading' : ''} ${className}`}
+          onClick={handleFollow}
+          disabled={followPending || loading}
+          title={isFollowing ? 'Unfollow artist' : 'Follow artist'}
+          aria-label={isFollowing ? 'Unfollow artist' : 'Follow artist'}
+        >
+          {followPending ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" strokeDasharray="40" strokeDashoffset="20" opacity="0.4"/>
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" strokeWidth="2">
+              <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+            </svg>
+          )}
+        </button>
+      </>
+    )
+  }
+
+  // ── STANDARD MODE (unchanged behaviour) ───────────────────────────────────
   if (loading) {
     return (
       <div className={`ffb-wrap ${className}`}>
@@ -151,6 +188,68 @@ export default function FollowFavoriteButtons({
   )
 }
 
+// ─── Heart-only button styles ─────────────────────────────────────────────────
+
+const HEART_ONLY_STYLES = `
+  .ffb-heart-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.22);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s, border-color 0.15s, transform 0.12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .ffb-heart-btn svg {
+    fill: none;
+    stroke: rgba(255,255,255,0.85);
+    transition: fill 0.15s, stroke 0.15s;
+  }
+  .ffb-heart-btn:hover {
+    background: rgba(200,6,80,0.22);
+    border-color: #C80650;
+  }
+  .ffb-heart-btn:hover svg {
+    stroke: #C80650;
+  }
+  .ffb-heart-btn:active {
+    transform: scale(0.88);
+  }
+  .ffb-heart-btn.active {
+    background: rgba(200,6,80,0.25);
+    border-color: #C80650;
+  }
+  .ffb-heart-btn.active svg {
+    fill: #C80650;
+    stroke: #C80650;
+  }
+  .ffb-heart-btn.loading {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .ffb-heart-btn:disabled {
+    cursor: not-allowed;
+  }
+
+  /* Satisfying pop animation when toggling */
+  .ffb-heart-btn.active svg {
+    animation: heartPop 0.3s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  }
+  @keyframes heartPop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.35); }
+    70%  { transform: scale(0.9); }
+    100% { transform: scale(1); }
+  }
+`
+
+// ─── Standard button styles (unchanged) ──────────────────────────────────────
+
 const BTN_STYLES = `
   .ffb-wrap { display: flex; gap: 8px; align-items: center; }
   .ffb-btn {
@@ -166,7 +265,6 @@ const BTN_STYLES = `
   .ffb-btn.ffb-icon { padding: 9px 14px; font-size: 1rem; letter-spacing: 0; text-transform: none; }
   .ffb-skeleton { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); color: transparent; }
 
-  /* Dark variant (artist/venue pages have dark bg) */
   .ffb-btn.ffb-follow {
     background: transparent;
     border-color: rgba(255,255,255,0.25);
@@ -190,7 +288,6 @@ const BTN_STYLES = `
     color: #C80650;
   }
 
-  /* Light variant — add class ffb-light to the wrapper */
   .ffb-light .ffb-btn.ffb-follow {
     border-color: rgba(0,0,0,0.2); color: rgba(0,0,0,0.6);
   }

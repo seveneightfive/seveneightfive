@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import FollowFavoriteButtons from '@/app/components/FollowFavoriteButtons'
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type MusicianProfile = {
@@ -27,6 +28,7 @@ type Artist = {
   slug: string
   bio: string | null
   tagline: string | null
+  bio_written_by_785: boolean | null   // NEW — checkbox from admin
   image_url: string | null
   avatar_url: string | null
   artist_type: string | null
@@ -83,6 +85,87 @@ type Props = {
   jsonLd: object
 }
 
+// ─── SVG Icons (inline, no emoji) ────────────────────────────────────────────
+
+const IconWebsite = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke-width="1.6">
+    <circle cx="12" cy="12" r="10"/>
+    <line x1="2" y1="12" x2="22" y2="12"/>
+    <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+  </svg>
+)
+const IconEmail = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke-width="1.6">
+    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+    <polyline points="22,6 12,13 2,6"/>
+  </svg>
+)
+const IconYouTube = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24">
+    <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+  </svg>
+)
+const IconSpotify = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24">
+    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+  </svg>
+)
+const IconInstagram = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24">
+    <rect x="2" y="2" width="20" height="20" rx="5" className="icon-outline"/>
+    <circle cx="12" cy="12" r="4" className="icon-outline"/>
+    <circle cx="17.5" cy="6.5" r="1.2" className="icon-dot"/>
+  </svg>
+)
+const IconFacebook = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24">
+    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+  </svg>
+)
+const IconX = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.259 5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+  </svg>
+)
+const IconSoundCloud = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24">
+    <path d="M1.175 12.225c-.017.128-.027.257-.027.39 0 .13.01.26.027.388-.017-.128-.027-.258-.027-.389 0-.132.01-.261.027-.389zM.608 11.81c-.026.131-.04.265-.04.4 0 .135.014.27.04.4C.582 12.48.568 12.345.568 12.21c0-.135.014-.269.04-.4zm.567-.365c-.01.053-.015.106-.015.16 0 .053.005.106.015.159-.01-.053-.015-.106-.015-.16 0-.053.005-.106.015-.159z"/>
+    <path d="M11.5 8.5c-.7 0-1.36.15-1.95.42C9.17 6.1 7.05 4 4.5 4 1.91 4 0 6.09 0 8.5c0 .17.01.34.03.5H0v7h15.5c1.93 0 3.5-1.57 3.5-3.5S17.43 9 15.5 9c-.17 0-.34.01-.5.03C14.47 8.77 13.04 8.5 11.5 8.5z"/>
+  </svg>
+)
+const IconAppleMusic = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24">
+    <path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.769-.73 7.7 7.7 0 00-1.996-.16c-.693.02-1.39.04-2.08.06l-5.55.15c-.7.02-1.4.04-2.1.06A8.765 8.765 0 005.9.27C4.91.51 4.07 1.04 3.43 1.8c-.62.73-1.04 1.6-1.25 2.56-.16.73-.19 1.47-.17 2.22V19.26c.02.75.07 1.5.27 2.24.36 1.38 1.2 2.46 2.46 3.14.65.35 1.35.54 2.07.62.82.09 1.64.1 2.46.1h9.3c.8 0 1.6-.01 2.4-.1.78-.08 1.52-.3 2.2-.69 1.27-.72 2.1-1.82 2.47-3.25.18-.7.22-1.42.23-2.14V12c0-1.96-.01-3.92-.01-5.876zM15.5 5.83l-6 1.67v7.1c-.32-.12-.67-.18-1.03-.18C7.06 14.42 6 15.45 6 16.71s1.06 2.29 2.47 2.29c1.41 0 2.53-1.03 2.53-2.29V9.48l4-1.12v5.76c-.32-.12-.67-.18-1.03-.18-1.41 0-2.47 1.03-2.47 2.29s1.06 2.29 2.47 2.29c1.41 0 2.53-1.03 2.53-2.29V5.83z"/>
+  </svg>
+)
+const IconTikTok = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24">
+    <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.18 8.18 0 004.79 1.54V6.78a4.85 4.85 0 01-1.02-.09z"/>
+  </svg>
+)
+const IconLink = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke-width="1.6">
+    <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
+    <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+  </svg>
+)
+
+// Map label → icon component + render type
+function getSvgIcon(label: string) {
+  const l = label.toLowerCase()
+  if (l.includes('instagram')) return { component: <IconInstagram />, type: 'mixed' }
+  if (l.includes('youtube')) return { component: <IconYouTube />, type: 'fill' }
+  if (l.includes('spotify')) return { component: <IconSpotify />, type: 'fill' }
+  if (l.includes('facebook')) return { component: <IconFacebook />, type: 'fill' }
+  if (l.includes('tiktok')) return { component: <IconTikTok />, type: 'fill' }
+  if (l.includes('twitter') || l.includes(' x ') || l === 'x') return { component: <IconX />, type: 'fill' }
+  if (l.includes('soundcloud')) return { component: <IconSoundCloud />, type: 'fill' }
+  if (l.includes('apple')) return { component: <IconAppleMusic />, type: 'fill' }
+  if (l.includes('email') || l.includes('mail')) return { component: <IconEmail />, type: 'stroke' }
+  if (l.includes('website') || l.includes('web')) return { component: <IconWebsite />, type: 'stroke' }
+  return { component: <IconLink />, type: 'stroke' }
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function ArtistPageClient({
@@ -98,35 +181,56 @@ export default function ArtistPageClient({
   jsonLd,
 }: Props) {
   const [shareOpen, setShareOpen] = useState(false)
-  const [saveOpen, setSaveOpen] = useState(false)
   const [lightboxImage, setLightboxImage] = useState<PortfolioImage | null>(null)
   const [activeSection, setActiveSection] = useState<string>('')
-  const [saveEmail, setSaveEmail] = useState('')
   const [copied, setCopied] = useState(false)
+  const [tabsHidden, setTabsHidden] = useState(false)
+  const lastScrollY = useRef(0)
+
+  // Intro animation state
+  const [introPhase, setIntroPhase] = useState<'intro' | 'transitioning' | 'done'>('intro')
 
   const mp = artist.musician_profile
-  const vp = artist.visual_profile
-  const heroImage = artist.image_url || artist.avatar_url
 
   const TYPE_LABEL: Record<string, string> = {
-    Musician: 'Musician', Visual: 'Visual Artist', Performance: 'Performer', Literary: 'Literary Artist',
+    Musician: 'Musician',
+    Visual: 'Visual Artist',
+    Performance: 'Performer',
+    Literary: 'Literary Artist',
   }
 
-  // IntersectionObserver — track active section
+  // Scrollspy — IntersectionObserver
   useEffect(() => {
+    if (introPhase !== 'done') return
     const observers: IntersectionObserver[] = []
     navItems.forEach(({ id }) => {
       const el = document.getElementById(id)
       if (!el) return
       const obs = new IntersectionObserver(
         ([entry]) => { if (entry.isIntersecting) setActiveSection(id) },
-        { threshold: 0.4 }
+        { threshold: 0.3 }
       )
       obs.observe(el)
       observers.push(obs)
     })
     return () => observers.forEach(o => o.disconnect())
-  }, [navItems])
+  }, [navItems, introPhase])
+
+  // Hide/show sticky tabs on scroll direction
+  useEffect(() => {
+    if (introPhase !== 'done') return
+    const onScroll = () => {
+      const y = window.scrollY
+      if (y > lastScrollY.current + 8) {
+        setTabsHidden(true)
+      } else if (y < lastScrollY.current - 8) {
+        setTabsHidden(false)
+      }
+      lastScrollY.current = y
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [introPhase])
 
   // Escape closes lightbox
   useEffect(() => {
@@ -141,7 +245,21 @@ export default function ArtistPageClient({
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const handleIntroAdvance = () => {
+    setIntroPhase('transitioning')
+    setTimeout(() => setIntroPhase('done'), 600)
+  }
+
+  const scrollToSection = (id: string) => {
+    const el = document.getElementById(id)
+    if (!el) return
+    const offset = 57 // sticky tab height
+    const top = el.getBoundingClientRect().top + window.scrollY - offset
+    window.scrollTo({ top, behavior: 'smooth' })
+  }
+
   const pageUrl = typeof window !== 'undefined' ? window.location.href : ''
+  const heroImage = artist.image_url || artist.avatar_url
 
   return (
     <>
@@ -161,11 +279,10 @@ export default function ArtistPageClient({
           --accent: #C80650;
           --accent-light: #fdeef3;
           --border: #ece8e2;
-          --gold: #FFCE0A;
+          --gold: #FFCE03;
           --serif: 'Oswald', sans-serif;
           --sans: 'DM Sans', system-ui, sans-serif;
-          --nav-h: 56px;
-          --bottom-nav-h: 64px;
+          --nav-h: 57px;
         }
 
         html { scroll-behavior: smooth; background: var(--white); }
@@ -174,10 +291,98 @@ export default function ArtistPageClient({
           color: var(--ink);
           font-family: var(--sans);
           -webkit-font-smoothing: antialiased;
-          padding-bottom: 0;
         }
 
-        /* ── HERO ─────────────────────────────────────── */
+        /* ─── INTRO SCREEN ─────────────────────────────── */
+        .intro-screen {
+          position: fixed;
+          inset: 0;
+          background: #0d0d0d;
+          z-index: 999;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 40px 32px;
+          cursor: pointer;
+          transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.16,1,0.3,1);
+        }
+        .intro-screen.transitioning {
+          opacity: 0;
+          transform: scale(0.97);
+          pointer-events: none;
+        }
+        .intro-eyebrow {
+          font-size: 0.62rem;
+          letter-spacing: 0.28em;
+          text-transform: uppercase;
+          color: var(--accent);
+          font-weight: 700;
+          margin-bottom: 28px;
+          opacity: 0;
+          animation: fadeUp 0.4s 0.3s ease both;
+        }
+        .intro-tagline {
+          text-align: center;
+          max-width: 340px;
+        }
+        .intro-word {
+          display: inline-block;
+          font-family: var(--serif);
+          font-weight: 600;
+          font-size: clamp(1.6rem, 6vw, 2.4rem);
+          color: #fff;
+          line-height: 1.2;
+          opacity: 0;
+          transform: translateY(18px);
+        }
+        .intro-word.italic {
+          font-style: italic;
+          font-weight: 300;
+          color: rgba(255,255,255,0.5);
+          font-size: clamp(1.3rem, 5vw, 2rem);
+        }
+        .intro-word.risen {
+          animation: wordRise 0.5s cubic-bezier(0.16,1,0.3,1) forwards;
+        }
+        @keyframes wordRise {
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .intro-cta {
+          margin-top: 40px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+          opacity: 0;
+          animation: fadeUp 0.5s 2.4s ease both;
+        }
+        .intro-cta-label {
+          font-size: 0.68rem;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          color: rgba(255,255,255,0.3);
+        }
+        .intro-cta-arrow {
+          width: 32px;
+          height: 32px;
+          border: 1px solid rgba(255,255,255,0.2);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          animation: bounceUp 1s 2.6s ease-in-out infinite;
+        }
+        @keyframes bounceUp {
+          0%,100% { transform: translateY(0); }
+          50% { transform: translateY(-5px); }
+        }
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ─── HERO ─────────────────────────────────────── */
         .hero {
           position: relative;
           width: 100%;
@@ -196,7 +401,7 @@ export default function ArtistPageClient({
           width: 100%;
           height: 100%;
           object-fit: cover;
-          object-position: center 20%;
+          object-position: center top;
         }
         .hero-scrim {
           position: absolute;
@@ -204,8 +409,8 @@ export default function ArtistPageClient({
           background: linear-gradient(
             180deg,
             rgba(0,0,0,0.08) 0%,
-            rgba(0,0,0,0.15) 40%,
-            rgba(0,0,0,0.72) 75%,
+            rgba(0,0,0,0.0) 25%,
+            rgba(0,0,0,0.55) 65%,
             rgba(0,0,0,0.92) 100%
           );
         }
@@ -220,7 +425,6 @@ export default function ArtistPageClient({
           font-weight: 700;
           color: rgba(255,255,255,0.04);
           text-transform: uppercase;
-          letter-spacing: -0.04em;
           user-select: none;
         }
         .hero-body {
@@ -258,22 +462,17 @@ export default function ArtistPageClient({
           font-weight: 700;
           color: #fff;
           line-height: 0.95;
-          letter-spacing: -0.01em;
           text-transform: uppercase;
-          margin-bottom: 12px;
+          margin-bottom: 10px;
           animation: fadeUp 0.6s cubic-bezier(0.22,1,0.36,1) both;
-        }
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
         }
         .hero-tagline {
           font-size: clamp(0.88rem, 2vw, 1rem);
           font-weight: 300;
           font-style: italic;
-          color: rgba(255,255,255,0.65);
+          color: rgba(255,255,255,0.6);
           line-height: 1.5;
-          margin-bottom: 16px;
+          margin-bottom: 14px;
           max-width: 480px;
           animation: fadeUp 0.6s 0.08s cubic-bezier(0.22,1,0.36,1) both;
         }
@@ -281,6 +480,7 @@ export default function ArtistPageClient({
           display: flex;
           flex-wrap: wrap;
           gap: 6px;
+          margin-bottom: 18px;
           animation: fadeUp 0.6s 0.16s cubic-bezier(0.22,1,0.36,1) both;
         }
         .hero-pill {
@@ -292,7 +492,6 @@ export default function ArtistPageClient({
           border: 1px solid rgba(255,255,255,0.18);
           padding: 4px 10px;
           border-radius: 100px;
-          backdrop-filter: blur(4px);
         }
         .hero-pill.location {
           display: flex;
@@ -302,19 +501,39 @@ export default function ArtistPageClient({
           border-color: transparent;
           padding-left: 0;
         }
-
-        /* ── HERO ACTION BUTTONS ──────────────────────── */
         .hero-actions {
           display: flex;
           gap: 10px;
-          margin-top: 16px;
+          align-items: center;
           animation: fadeUp 0.6s 0.24s cubic-bezier(0.22,1,0.36,1) both;
         }
-        .hero-btn {
+
+        /* Follow = heart icon button */
+        .btn-follow-heart {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          background: rgba(255,255,255,0.1);
+          border: 1px solid rgba(255,255,255,0.22);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: background 0.15s, border-color 0.15s, transform 0.12s;
+          -webkit-tap-highlight-color: transparent;
+          flex-shrink: 0;
+        }
+        .btn-follow-heart:hover { background: rgba(200,6,80,0.25); border-color: var(--accent); }
+        .btn-follow-heart.active { background: rgba(200,6,80,0.3); border-color: var(--accent); }
+        .btn-follow-heart:active { transform: scale(0.9); }
+        .btn-follow-heart svg { transition: fill 0.15s, stroke 0.15s; }
+        .btn-follow-heart.active svg { fill: var(--accent); stroke: var(--accent); }
+
+        .hero-btn-share {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          padding: 9px 18px;
+          padding: 9px 20px;
           border-radius: 100px;
           font-family: var(--sans);
           font-size: 0.75rem;
@@ -322,23 +541,15 @@ export default function ArtistPageClient({
           letter-spacing: 0.06em;
           text-transform: uppercase;
           cursor: pointer;
-          border: none;
+          border: 1px solid rgba(255,255,255,0.22);
+          background: rgba(255,255,255,0.1);
+          color: rgba(255,255,255,0.85);
           transition: opacity 0.15s;
           -webkit-tap-highlight-color: transparent;
         }
-        .hero-btn-share {
-          background: rgba(255,255,255,0.12);
-          color: rgba(255,255,255,0.85);
-          backdrop-filter: blur(8px);
-          border: 1px solid rgba(255,255,255,0.18);
-        }
-        .hero-btn-save {
-          background: var(--gold);
-          color: var(--ink);
-        }
-        .hero-btn:hover { opacity: 0.8; }
+        .hero-btn-share:hover { opacity: 0.8; }
 
-        /* ── DESKTOP TOP NAV ──────────────────────────── */
+        /* ─── STICKY TABS ──────────────────────────────── */
         .top-nav {
           position: sticky;
           top: 0;
@@ -348,12 +559,14 @@ export default function ArtistPageClient({
           display: flex;
           align-items: center;
           height: var(--nav-h);
-          padding: 0 24px;
-          gap: 0;
+          padding: 0 16px;
           overflow-x: auto;
           scrollbar-width: none;
+          transition: transform 0.25s ease;
         }
+        .top-nav.hidden { transform: translateY(-100%); }
         .top-nav::-webkit-scrollbar { display: none; }
+
         .top-nav-back {
           display: flex;
           align-items: center;
@@ -364,7 +577,7 @@ export default function ArtistPageClient({
           text-transform: uppercase;
           color: var(--ink-soft);
           text-decoration: none;
-          padding-right: 20px;
+          padding-right: 16px;
           margin-right: 4px;
           border-right: 1px solid var(--border);
           white-space: nowrap;
@@ -372,6 +585,7 @@ export default function ArtistPageClient({
           transition: color 0.15s;
         }
         .top-nav-back:hover { color: var(--ink); }
+
         .top-nav-link {
           font-size: 0.72rem;
           font-weight: 600;
@@ -379,7 +593,7 @@ export default function ArtistPageClient({
           text-transform: uppercase;
           color: var(--ink-soft);
           text-decoration: none;
-          padding: 0 16px;
+          padding: 0 14px;
           height: 100%;
           display: flex;
           align-items: center;
@@ -387,94 +601,81 @@ export default function ArtistPageClient({
           white-space: nowrap;
           flex-shrink: 0;
           transition: all 0.15s;
+          cursor: pointer;
+          background: none;
+          border-left: none;
+          border-top: none;
+          border-right: none;
+          font-family: var(--sans);
         }
-        .top-nav-link:hover { color: var(--ink); border-bottom-color: var(--ink); }
-.top-nav-link.active { color: var(--ink); border-bottom-color: var(--accent); }
+        .top-nav-link:hover { color: var(--ink); }
+        .top-nav-link.active { color: var(--ink); border-bottom-color: var(--accent); }
 
-        /* ── MOBILE BOTTOM NAV ────────────────────────── */
-        .bottom-nav {
+        /* Mobile: inline tabs (no bottom nav) */
+        .mobile-tabs {
           display: none;
-          position: fixed;
-          bottom: 0;
-          left: 0;
-          right: 0;
+          position: sticky;
+          top: 0;
           z-index: 200;
           background: var(--white);
-          border-top: 2px solid var(--gold);
-          height: var(--bottom-nav-h);
-          padding: 0;
-          padding-bottom: env(safe-area-inset-bottom);
+          border-bottom: 1px solid var(--border);
+          height: var(--nav-h);
+          overflow-x: auto;
+          scrollbar-width: none;
+          transition: transform 0.25s ease;
         }
-        .bottom-nav-inner {
+        .mobile-tabs.hidden { transform: translateY(-100%); }
+        .mobile-tabs::-webkit-scrollbar { display: none; }
+        .mobile-tabs-inner {
           display: flex;
-          height: 100%;
           align-items: stretch;
-          padding: 0 4px;
-          width: 100%
+          height: 100%;
+          padding: 0 12px;
         }
-        .bottom-nav-item {
-          flex: 1;
+        .mobile-tab-back {
           display: flex;
-          flex-direction: column;
           align-items: center;
-          justify-content: center;
-          gap: 3px;
-          text-decoration: none;
-          color: #7a7570;
-          transition: color 0.15s;
-          padding: 8px 2px;
-          min-width: 0;
-          position: relative;
-        }
-        .bottom-nav-item:hover, .bottom-nav-item:active { color: var(--accent); }
-        .bottom-nav-item.active { color: var(--accent); }
-        .bottom-nav-item.active::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 8px;
-          right: 8px;
-          height: 2px;
-          background: var(--gold);
-          border-radius: 0 0 2px 2px;
-        }
-        .bottom-nav-icon {
-          font-size: 1rem;
-          line-height: 1;
-        }
-        .bottom-nav-label {
-          font-size: 0.58rem;
+          gap: 4px;
+          font-size: 0.7rem;
           font-weight: 500;
           letter-spacing: 0.06em;
           text-transform: uppercase;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          max-width: 100%;
-        }
-        .bottom-nav-back {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 3px;
+          color: var(--ink-soft);
           text-decoration: none;
-          color: #7a7570;
-          transition: color 0.15s;
-          padding: 8px 2px;
-          border-right: 1px solid var(--border);
+          padding-right: 14px;
           margin-right: 4px;
+          border-right: 1px solid var(--border);
+          white-space: nowrap;
+          flex-shrink: 0;
         }
-        .bottom-nav-back:hover { color: var(--ink); }
+        .mobile-tab-item {
+          padding: 0 12px;
+          font-size: 0.7rem;
+          font-weight: 600;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: var(--ink-soft);
+          display: flex;
+          align-items: center;
+          border-bottom: 2px solid transparent;
+          white-space: nowrap;
+          flex-shrink: 0;
+          cursor: pointer;
+          background: none;
+          border-left: none;
+          border-top: none;
+          border-right: none;
+          font-family: var(--sans);
+          transition: all 0.15s;
+        }
+        .mobile-tab-item.active { color: var(--ink); border-bottom-color: var(--accent); }
 
-        /* ── MAIN CONTENT ────────────────────────────── */
+        /* ─── MAIN CONTENT ─────────────────────────────── */
         .artist-main {
           max-width: 680px;
           margin: 0 auto;
           padding: 0 24px;
         }
-
         .section {
           padding: 52px 0;
           border-bottom: 1px solid var(--border);
@@ -500,7 +701,27 @@ export default function ArtistPageClient({
           max-width: 48px;
         }
 
-        /* ── BIO ── */
+        /* ─── ABOUT ──── */
+        .words-by {
+          font-size: 0.65rem;
+          font-weight: 600;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: var(--ink-faint);
+          margin-bottom: 14px;
+        }
+        .words-by span { color: var(--accent); }
+
+        .pull-quote {
+          border-left: 3px solid var(--accent);
+          padding: 8px 16px;
+          margin-bottom: 18px;
+          font-size: 1rem;
+          font-style: italic;
+          color: var(--ink);
+          line-height: 1.55;
+        }
+
         .bio-text {
           font-size: 1.02rem;
           font-weight: 300;
@@ -528,13 +749,9 @@ export default function ArtistPageClient({
           color: var(--accent);
           margin-bottom: 6px;
         }
-        .awards-text {
-          font-size: 0.9rem;
-          color: var(--ink-soft);
-          line-height: 1.55;
-        }
+        .awards-text { font-size: 0.9rem; color: var(--ink-soft); line-height: 1.55; }
 
-        /* ── AUDIO ── */
+        /* ─── AUDIO / VIDEO ──── */
         .audio-block {
           background: var(--ink);
           border-radius: 10px;
@@ -551,8 +768,6 @@ export default function ArtistPageClient({
           margin-bottom: 14px;
         }
         audio { width: 100%; height: 32px; }
-
-        /* ── VIDEO ── */
         .video-container {
           border-radius: 10px;
           overflow: hidden;
@@ -567,28 +782,12 @@ export default function ArtistPageClient({
           height: 100%;
           border: none;
         }
-        .video-meta {
-          margin-top: 12px;
-          font-size: 0.82rem;
-          color: var(--ink-faint);
-          font-style: italic;
-          line-height: 1.5;
-        }
+        .video-meta { margin-top: 12px; font-size: 0.82rem; color: var(--ink-faint); font-style: italic; line-height: 1.5; }
         .video-meta strong { color: var(--ink-soft); font-style: normal; }
 
-        /* ── WORKS IMAGE ── */
-        .works-image {
-          width: 100%;
-          border-radius: 10px;
-          display: block;
-        }
-        .works-text {
-          font-size: 0.95rem;
-          line-height: 1.7;
-          color: var(--ink-soft);
-        }
-
-        /* ── PORTFOLIO GRID ── */
+        /* ─── WORKS / PORTFOLIO ──── */
+        .works-image { width: 100%; border-radius: 10px; display: block; }
+        .works-text { font-size: 0.95rem; line-height: 1.7; color: var(--ink-soft); }
         .portfolio-grid {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
@@ -600,112 +799,101 @@ export default function ArtistPageClient({
         .portfolio-img {
           width: 100%; aspect-ratio: 4/3; object-fit: cover;
           border-radius: 8px; display: block; background: var(--off);
-          cursor: zoom-in;
-          transition: opacity 0.15s;
+          cursor: zoom-in; transition: opacity 0.15s;
         }
         .portfolio-img:hover { opacity: 0.85; }
-        .portfolio-caption {
-          font-size: 0.75rem; color: var(--ink-faint);
-          font-style: italic; line-height: 1.4;
-        }
+        .portfolio-caption { font-size: 0.75rem; color: var(--ink-faint); font-style: italic; line-height: 1.4; }
 
-        /* ── EVENTS ── */
-        .events-empty {
+        /* ─── EVENTS ──── */
+        .event-item {
           display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 8px;
-          padding: 40px 0;
-          text-align: center;
-        }
-        .events-empty-icon { font-size: 2rem; }
-        .events-empty-title {
-          font-family: var(--serif);
-          font-size: 1rem;
-          font-weight: 500;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          color: var(--ink-soft);
-        }
-        .events-empty-sub {
-          font-size: 0.85rem;
-          color: var(--ink-faint);
-        }
-
-        /* ── LINKS ── */
-        .links-stack { display: flex; flex-direction: column; gap: 10px; }
-        .link-row {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          padding: 15px 18px;
-          background: var(--white);
-          border: 1.5px solid var(--border);
-          border-radius: 10px;
+          gap: 16px;
+          align-items: flex-start;
+          padding: 16px 0;
+          border-bottom: 1px solid var(--border);
           text-decoration: none;
-          color: var(--ink);
-          transition: border-color 0.15s, box-shadow 0.15s;
+          color: inherit;
+          cursor: pointer;
+          transition: background 0.12s;
           -webkit-tap-highlight-color: transparent;
         }
-        .link-row:hover, .link-row:active {
-          border-color: var(--ink);
-          box-shadow: -3px 0 0 var(--accent);
+        .event-item:last-child { border-bottom: none; }
+        .event-item:active { background: rgba(200,6,80,0.03); margin: 0 -24px; padding-left: 24px; padding-right: 24px; }
+        .ev-date { width: 40px; flex-shrink: 0; text-align: center; }
+        .ev-mo { font-size: 0.62rem; font-weight: 700; color: var(--accent); letter-spacing: 0.12em; text-transform: uppercase; }
+        .ev-day { font-family: var(--serif); font-size: 1.8rem; font-weight: 700; color: var(--ink); line-height: 1; }
+        .ev-info { flex: 1; }
+        .ev-name { font-size: 0.95rem; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+        .ev-venue { font-size: 0.8rem; color: var(--ink-soft); }
+        .ev-price { font-size: 0.8rem; font-weight: 500; color: var(--ink-soft); flex-shrink: 0; align-self: center; }
+        .ev-price.free { color: var(--accent); }
+        .ev-arrow { color: var(--ink-faint); font-size: 1.1rem; align-self: center; flex-shrink: 0; }
+        .events-empty {
+          display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 0; text-align: center;
         }
-        .link-icon-wrap {
-          width: 38px;
-          height: 38px;
-          border-radius: 8px;
+        .events-empty-title { font-family: var(--serif); font-size: 1rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); }
+        .events-empty-sub { font-size: 0.85rem; color: var(--ink-faint); }
+
+        /* ─── LINKS — icon grid ──── */
+        .links-icon-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 12px;
+        }
+        @media (min-width: 520px) {
+          .links-icon-grid { grid-template-columns: repeat(5, 1fr); }
+        }
+
+        /* tile base */
+        .link-tile {
+          aspect-ratio: 1;
+          border-radius: 14px;
+          background: var(--accent);
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 1rem;
-          flex-shrink: 0;
+          cursor: pointer;
+          text-decoration: none;
+          border: none;
+          transition: background 0.18s, transform 0.12s;
+          -webkit-tap-highlight-color: transparent;
+          overflow: hidden;
         }
-        .link-name {
-          font-family: var(--serif);
-          font-size: 0.95rem;
-          font-weight: 500;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          flex: 1;
-        }
-        .link-chevron {
-          color: var(--ink-faint);
-          font-size: 1rem;
-          flex-shrink: 0;
-          transition: transform 0.15s;
-        }
-        .link-row:hover .link-chevron { transform: translateX(3px); }
+        .link-tile:active { transform: scale(0.91); }
+        .link-tile:hover { background: var(--gold); }
 
-        /* ── CONTACT GRID ── */
-        .contact-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
+        /* stroke-based icons */
+        .link-tile.stroke-icon svg {
+          fill: none;
+          stroke: white;
+          stroke-width: 1.6px;
+          transition: stroke 0.18s;
         }
-        .contact-cell {
-          padding: 16px;
-          background: var(--off);
-          border-radius: 8px;
-        }
-        .contact-cell-label {
-          font-size: 0.62rem;
-          font-weight: 600;
-          letter-spacing: 0.16em;
-          text-transform: uppercase;
-          color: var(--ink-faint);
-          margin-bottom: 5px;
-        }
-        .contact-cell-value {
-          font-size: 0.88rem;
-          color: var(--ink);
-          line-height: 1.4;
-          word-break: break-word;
-        }
-        .contact-cell-value a { color: var(--accent); text-decoration: none; }
-        .contact-cell-value a:hover { text-decoration: underline; }
+        .link-tile.stroke-icon:hover svg { stroke: #5a2000; }
 
-        /* ── FOOTER ── */
+        /* fill-based icons */
+        .link-tile.fill-icon svg {
+          fill: white;
+          transition: fill 0.18s;
+        }
+        .link-tile.fill-icon:hover svg { fill: #5a2000; }
+
+        /* mixed icons (instagram) */
+        .link-tile.mixed-icon svg .icon-outline {
+          fill: none;
+          stroke: white;
+          stroke-width: 1.6px;
+          transition: stroke 0.18s;
+        }
+        .link-tile.mixed-icon svg .icon-dot {
+          fill: white;
+          stroke: none;
+          transition: fill 0.18s;
+        }
+        .link-tile.mixed-icon:hover svg .icon-outline { stroke: #5a2000; }
+        .link-tile.mixed-icon:hover svg .icon-dot { fill: #5a2000; }
+
+        /* ─── FOOTER ──── */
         .artist-footer {
           padding: 28px 24px 40px;
           text-align: center;
@@ -724,7 +912,7 @@ export default function ArtistPageClient({
         .footer-wordmark em { font-style: normal; color: var(--accent); font-weight: 600; }
         .footer-wordmark:hover { color: var(--ink); }
 
-        /* ── BOTTOM SHEET ─────────────────────────────── */
+        /* ─── SHARE SHEET ──── */
         .sheet-overlay {
           position: fixed;
           inset: 0;
@@ -742,199 +930,133 @@ export default function ArtistPageClient({
           overflow-y: auto;
         }
         .sheet-handle {
-          width: 36px;
-          height: 4px;
-          background: var(--border);
-          border-radius: 2px;
-          margin: 12px auto 0;
+          width: 36px; height: 4px; background: var(--border);
+          border-radius: 2px; margin: 12px auto 0;
         }
         .sheet-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 16px 20px 12px;
-          border-bottom: 1px solid var(--border);
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 16px 20px 12px; border-bottom: 1px solid var(--border);
         }
         .sheet-title {
-          font-family: var(--serif);
-          font-size: 1rem;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
+          font-family: var(--serif); font-size: 1rem;
+          font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
         }
         .sheet-close {
-          background: none;
-          border: none;
-          cursor: pointer;
-          font-size: 1.2rem;
-          color: var(--ink-soft);
-          padding: 4px;
-          line-height: 1;
+          background: none; border: none; cursor: pointer;
+          font-size: 1.2rem; color: var(--ink-soft); padding: 4px; line-height: 1;
         }
-        .sheet-row {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          padding: 16px 20px;
-          border-bottom: 1px solid var(--border);
-          cursor: pointer;
-          text-decoration: none;
-          color: var(--ink);
-          background: none;
-          border-left: none;
-          border-right: none;
-          border-top: none;
-          width: 100%;
-          font-family: var(--sans);
-          font-size: 0.9rem;
-          text-align: left;
-          transition: background 0.1s;
+        .sheet-share-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 16px;
+          padding: 20px 20px 0;
+        }
+        .sheet-share-item {
+          display: flex; flex-direction: column; align-items: center; gap: 8px;
+          cursor: pointer; text-decoration: none; color: inherit; border: none; background: none;
           -webkit-tap-highlight-color: transparent;
         }
-        .sheet-row:last-child { border-bottom: none; }
-        .sheet-row:hover { background: var(--off); }
-        .sheet-icon {
-          width: 38px;
-          height: 38px;
+        .sheet-share-icon {
+          width: 52px; height: 52px; border-radius: 14px;
+          display: flex; align-items: center; justify-content: center;
+          transition: transform 0.15s;
+        }
+        .sheet-share-item:active .sheet-share-icon { transform: scale(0.9); }
+        .sheet-share-label {
+          font-size: 0.68rem; color: var(--ink-soft); text-align: center;
+          font-weight: 500;
+        }
+        .sheet-link-row {
+          margin: 20px 20px 20px;
+          background: var(--off);
           border-radius: 10px;
+          padding: 12px 14px;
           display: flex;
           align-items: center;
-          justify-content: center;
-          font-size: 1.1rem;
-          flex-shrink: 0;
+          gap: 10px;
         }
-        .sheet-input-wrap {
-          padding: 20px;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
+        .sheet-link-url {
+          flex: 1; font-size: 0.78rem; color: var(--ink-faint);
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        .sheet-input {
-          width: 100%;
-          padding: 13px 16px;
-          border: 1.5px solid var(--border);
-          border-radius: 10px;
-          font-family: var(--sans);
-          font-size: 0.95rem;
-          color: var(--ink);
-          outline: none;
-        }
-        .sheet-input:focus { border-color: var(--ink); }
-        .sheet-submit {
-          width: 100%;
-          padding: 14px;
-          background: var(--ink);
-          color: var(--white);
-          border: none;
-          border-radius: 10px;
-          font-family: var(--serif);
-          font-size: 0.9rem;
-          font-weight: 600;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          cursor: pointer;
+        .sheet-copy-btn {
+          padding: 7px 14px; background: var(--accent); color: white;
+          border-radius: 8px; font-size: 0.75rem; font-weight: 700;
+          border: none; cursor: pointer; flex-shrink: 0; font-family: var(--sans);
           transition: background 0.15s;
         }
-        .sheet-submit:hover { background: var(--accent); }
+        .sheet-copy-btn:hover { background: #a00440; }
 
-        /* ── COPY TOAST ───────────────────────────────── */
-        .copy-toast {
-          position: fixed;
-          bottom: 100px;
-          left: 50%;
-          transform: translateX(-50%);
-          background: var(--ink);
-          color: var(--white);
-          padding: 10px 20px;
-          border-radius: 100px;
-          font-size: 0.8rem;
-          font-weight: 500;
-          z-index: 500;
-          pointer-events: none;
-          animation: fadeUp 0.25s ease both;
-        }
-
-        /* ── LIGHTBOX ─────────────────────────────────── */
+        /* ─── LIGHTBOX ──── */
         .lightbox-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0,0,0,0.95);
-          z-index: 500;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 24px;
+          position: fixed; inset: 0; background: rgba(0,0,0,0.95);
+          z-index: 500; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; padding: 24px;
         }
-        .lightbox-img {
-          max-height: 80vh;
-          max-width: 90vw;
-          object-fit: contain;
-          border-radius: 4px;
-        }
-        .lightbox-caption {
-          color: rgba(255,255,255,0.6);
-          font-size: 0.82rem;
-          font-style: italic;
-          margin-top: 14px;
-          text-align: center;
-          max-width: 480px;
-        }
+        .lightbox-img { max-height: 80vh; max-width: 90vw; object-fit: contain; border-radius: 4px; }
+        .lightbox-caption { color: rgba(255,255,255,0.6); font-size: 0.82rem; font-style: italic; margin-top: 14px; text-align: center; max-width: 480px; }
         .lightbox-close {
-          position: fixed;
-          top: 20px;
-          right: 20px;
-          background: rgba(255,255,255,0.1);
-          color: white;
-          border: none;
-          border-radius: 100px;
-          width: 40px;
-          height: 40px;
-          font-size: 1.2rem;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          position: fixed; top: 20px; right: 20px;
+          background: rgba(255,255,255,0.1); color: white; border: none;
+          border-radius: 100px; width: 40px; height: 40px; font-size: 1.2rem;
+          cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
 
-        /* ── RESPONSIVE ──────────────────────────────── */
+        /* ─── COPY TOAST ──── */
+        .copy-toast {
+          position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+          background: var(--ink); color: white; padding: 10px 20px;
+          border-radius: 100px; font-size: 0.8rem; font-weight: 500;
+          z-index: 500; pointer-events: none; animation: fadeUp 0.25s ease both;
+        }
 
+        /* ─── RESPONSIVE ─────────────────────────────── */
         @media (min-width: 641px) {
-          .bottom-nav { display: none !important; }
+          .mobile-tabs { display: none !important; }
           .top-nav { display: flex; }
-          body { padding-bottom: 0; }
         }
-
         @media (max-width: 640px) {
           .top-nav { display: none !important; }
-          .bottom-nav { display: flex; }
-
-          body { padding-bottom: var(--bottom-nav-h); }
-
-          .hero {
-            height: 100svh;
-            max-height: 100svh;
-            min-height: 0;
-          }
+          .mobile-tabs { display: flex; }
+          .hero { height: 100svh; max-height: 100svh; min-height: 0; }
           .hero-body { padding: 20px 20px 28px; }
           .artist-main { padding: 0 20px; }
           .section { padding: 40px 0; }
-          .contact-grid { grid-template-columns: 1fr; }
-          .artist-footer { padding-bottom: 20px; }
-        }
-
-        @supports (padding-bottom: env(safe-area-inset-bottom)) {
-          .bottom-nav {
-            padding-bottom: calc(env(safe-area-inset-bottom) + 4px);
-            height: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
-          }
-          @media (max-width: 640px) {
-            body {
-              padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
-            }
-          }
+          .links-icon-grid { grid-template-columns: repeat(4, 1fr); }
         }
       `}</style>
+
+      {/* ── INTRO SCREEN ── */}
+      {introPhase !== 'done' && artist.tagline && (
+        <div
+          className={`intro-screen${introPhase === 'transitioning' ? ' transitioning' : ''}`}
+          onClick={handleIntroAdvance}
+        >
+          <div className="intro-eyebrow">785 Magazine</div>
+          <div className="intro-tagline">
+            {artist.tagline.split(' ').map((word, i) => {
+              const isItalic = i > Math.floor(artist.tagline!.split(' ').length * 0.5)
+              return (
+                <span
+                  key={i}
+                  className={`intro-word${isItalic ? ' italic' : ''} risen`}
+                  style={{ animationDelay: `${0.5 + i * 0.15}s`, marginRight: '0.3em' }}
+                >
+                  {word}
+                </span>
+              )
+            })}
+          </div>
+          <div className="intro-cta">
+            <div className="intro-cta-label">Tap to continue</div>
+            <div className="intro-cta-arrow">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+                <path d="M5 15l7-7 7 7"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── HERO ── */}
       <section className="hero">
@@ -954,7 +1076,9 @@ export default function ArtistPageClient({
             {artist.verified && <span className="hero-verified">✓ Featured</span>}
           </div>
           <h1 className="hero-name">{artist.name}</h1>
-          {artist.tagline && <p className="hero-tagline">&ldquo;{artist.tagline}&rdquo;</p>}
+          {artist.tagline && (
+            <p className="hero-tagline">&ldquo;{artist.tagline}&rdquo;</p>
+          )}
           <div className="hero-pills">
             {(artist.location_city || artist.location_state) && (
               <span className="hero-pill location">
@@ -964,24 +1088,28 @@ export default function ArtistPageClient({
                 {[artist.location_city, artist.location_state].filter(Boolean).join(', ')}
               </span>
             )}
-            {genres.slice(0, 3).map(g => <span key={g} className="hero-pill">{g}</span>)}
+            {genres.slice(0, 3).map(g => (
+              <span key={g} className="hero-pill">{g}</span>
+            ))}
           </div>
           <div className="hero-actions">
-            <button className="hero-btn hero-btn-share" onClick={() => setShareOpen(true)}>
-              ↑ Share
-            </button>
+            {/* Heart / Follow button replaces old Follow+Favourite combo */}
             <FollowFavoriteButtons
               entityType="artist"
               entityId={artist.id}
               showFollow={true}
-              showFavorite={true}
+              showFavorite={false}
+              heartOnly={true}
             />
+            <button className="hero-btn-share" onClick={() => setShareOpen(true)}>
+              ↑ Share
+            </button>
           </div>
         </div>
       </section>
 
-      {/* ── DESKTOP: STICKY TOP NAV ── */}
-      <nav className="top-nav">
+      {/* ── DESKTOP: STICKY TOP NAV (hides on scroll down) ── */}
+      <nav className={`top-nav${tabsHidden ? ' hidden' : ''}`}>
         <a href="/artists" className="top-nav-back">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M19 12H5M12 5l-7 7 7 7"/>
@@ -989,28 +1117,33 @@ export default function ArtistPageClient({
           Directory
         </a>
         {navItems.map(n => (
-          <a key={n.id} href={`#${n.id}`} className="top-nav-link">{n.label}</a>
+          <button
+            key={n.id}
+            className={`top-nav-link${activeSection === n.id ? ' active' : ''}`}
+            onClick={() => scrollToSection(n.id)}
+          >
+            {n.label}
+          </button>
         ))}
       </nav>
 
-      {/* ── MOBILE: FIXED BOTTOM NAV ── */}
-      <nav className="bottom-nav">
-        <div className="bottom-nav-inner">
-          <a href="/artists" className="bottom-nav-back">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      {/* ── MOBILE: INLINE STICKY TABS (replaces bottom nav) ── */}
+      <nav className={`mobile-tabs${tabsHidden ? ' hidden' : ''}`}>
+        <div className="mobile-tabs-inner">
+          <a href="/artists" className="mobile-tab-back">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M19 12H5M12 5l-7 7 7 7"/>
             </svg>
-            <span className="bottom-nav-label">Back</span>
+            Back
           </a>
           {navItems.map(n => (
-            <a
+            <button
               key={n.id}
-              href={`#${n.id}`}
-              className={`bottom-nav-item${activeSection === n.id ? ' active' : ''}`}
+              className={`mobile-tab-item${activeSection === n.id ? ' active' : ''}`}
+              onClick={() => scrollToSection(n.id)}
             >
-              <span className="bottom-nav-icon">{n.icon}</span>
-              <span className="bottom-nav-label">{n.label}</span>
-            </a>
+              {n.label}
+            </button>
           ))}
         </div>
       </nav>
@@ -1018,13 +1151,27 @@ export default function ArtistPageClient({
       {/* ── CONTENT ── */}
       <main className="artist-main">
 
+        {/* ABOUT */}
         <section id="about" className="section">
           <div className="eyebrow">About</div>
+
+          {/* "Words by 785 Staff" — only renders if checkbox is true in DB */}
+          {artist.bio_written_by_785 && (
+            <div className="words-by">Words by <span>785 Staff</span></div>
+          )}
+
+          {/* Pull quote from tagline when bio exists */}
+          {artist.tagline && artist.bio && (
+            <div className="pull-quote">&ldquo;{artist.tagline}&rdquo;</div>
+          )}
+
           {artist.bio
-            ? artist.bio.split('\n').filter(Boolean).map((p, i) => <p key={i} className="bio-text">{p}</p>)
+            ? artist.bio.split('\n').filter(Boolean).map((p, i) => (
+                <p key={i} className="bio-text">{p}</p>
+              ))
             : <p className="bio-empty">Bio coming soon.</p>
           }
-          {artist.awards && artist.awards.trim() && (
+          {artist.awards?.trim() && (
             <div className="awards-block">
               <div className="awards-label">Awards &amp; Recognition</div>
               <div className="awards-text">{artist.awards}</div>
@@ -1032,11 +1179,14 @@ export default function ArtistPageClient({
           )}
         </section>
 
+        {/* MUSIC / MEDIA — hidden for Visual and Literary */}
         {hasMusic && (
           <section id="music" className="section">
-            <div className="eyebrow">{artist.artist_type === 'Musician' ? 'Music' : 'Media'}</div>
+            <div className="eyebrow">
+              {artist.artist_type === 'Musician' ? 'Music' : 'Media'}
+            </div>
             {mp?.audio_file_url && (
-              <div className="audio-block" style={{ marginBottom: videoId ? '20px' : 0 }}>
+              <div className="audio-block" style={{ marginBottom: videoId ? 20 : 0 }}>
                 <div className="audio-track-name">{mp.audio_title || 'Listen'}</div>
                 <audio controls src={mp.audio_file_url} />
               </div>
@@ -1063,13 +1213,19 @@ export default function ArtistPageClient({
           </section>
         )}
 
+        {/* WORK */}
         {hasWork && (
           <section id="work" className="section">
             <div className="eyebrow">Works</div>
-            {vp?.works && (
-              vp.works.startsWith('http')
-                ? <img src={vp.works} alt={`${artist.name} — Works`} className="works-image" style={{ marginBottom: portfolioImages.length > 0 ? 20 : 0 }} />
-                : <p className="works-text" style={{ marginBottom: portfolioImages.length > 0 ? 20 : 0 }}>{vp.works}</p>
+            {mp?.visual_profile?.works && (
+              mp.visual_profile.works.startsWith('http')
+                ? <img src={mp.visual_profile.works} alt={`${artist.name} — Works`} className="works-image" style={{ marginBottom: portfolioImages.length > 0 ? 20 : 0 }} />
+                : <p className="works-text" style={{ marginBottom: portfolioImages.length > 0 ? 20 : 0 }}>{mp.visual_profile.works}</p>
+            )}
+            {artist.visual_profile?.works && !mp?.visual_profile?.works && (
+              artist.visual_profile.works.startsWith('http')
+                ? <img src={artist.visual_profile.works} alt={`${artist.name} — Works`} className="works-image" style={{ marginBottom: portfolioImages.length > 0 ? 20 : 0 }} />
+                : <p className="works-text" style={{ marginBottom: portfolioImages.length > 0 ? 20 : 0 }}>{artist.visual_profile.works}</p>
             )}
             {portfolioImages.length > 0 && (
               <div className="portfolio-grid">
@@ -1089,78 +1245,84 @@ export default function ArtistPageClient({
           </section>
         )}
 
+        {/* EVENTS */}
         <section id="events" className="section">
           <div className="eyebrow">Upcoming Events</div>
           {events.length === 0 ? (
             <div className="events-empty">
-              <div className="events-empty-icon">📅</div>
               <div className="events-empty-title">No upcoming events</div>
               <div className="events-empty-sub">Check back soon or follow on social media</div>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {events.map(event => (
-                <a
-                  key={event.id}
-                  href={event.slug ? `/events/${event.slug}` : event.ticket_url || '#'}
-                  target={event.slug ? '_self' : '_blank'}
-                  rel="noopener noreferrer"
-                  className="link-row"
-                >
-                  {event.image_url && (
-                    <img
-                      src={event.image_url}
-                      alt={event.title}
-                      style={{ width: 80, aspectRatio: '16/9', objectFit: 'cover', borderRadius: 6, flexShrink: 0 }}
-                    />
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: 'var(--serif)', fontSize: '0.95rem', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      {event.title}
+            <div>
+              {events.map(event => {
+                const dateObj = event.event_date
+                  ? new Date(event.event_date + 'T12:00:00')
+                  : null
+                return (
+                  <a
+                    key={event.id}
+                    href={event.slug ? `/events/${event.slug}` : event.ticket_url || '#'}
+                    target={event.slug ? '_self' : '_blank'}
+                    rel="noopener noreferrer"
+                    className="event-item"
+                  >
+                    {dateObj && (
+                      <div className="ev-date">
+                        <div className="ev-mo">
+                          {dateObj.toLocaleDateString('en-US', { month: 'short' })}
+                        </div>
+                        <div className="ev-day">{dateObj.getDate()}</div>
+                      </div>
+                    )}
+                    <div className="ev-info">
+                      <div className="ev-name">{event.title}</div>
+                      {event.event_start_time && (
+                        <div className="ev-venue" style={{ marginBottom: 2 }}>
+                          {event.event_start_time.trim()}
+                        </div>
+                      )}
+                      {event.venue && (
+                        <div className="ev-venue">
+                          {event.venue.name}
+                          {event.venue.neighborhood ? ` · ${event.venue.neighborhood}` : ''}
+                        </div>
+                      )}
                     </div>
-                    {event.event_date && (
-                      <div style={{ fontSize: '0.78rem', color: 'var(--ink-soft)', marginTop: 3 }}>
-                        {new Date(event.event_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                        {event.event_start_time && ` · ${event.event_start_time.trim()}`}
-                      </div>
+                    {event.ticket_price !== null && (
+                      <span className={`ev-price${event.ticket_price === 0 ? ' free' : ''}`}>
+                        {event.ticket_price === 0 ? 'Free' : `$${event.ticket_price}`}
+                      </span>
                     )}
-                    {event.venue && (
-                      <div style={{ fontSize: '0.78rem', color: 'var(--ink-faint)', marginTop: 2 }}>
-                        {event.venue.name}{event.venue.neighborhood ? ` · ${event.venue.neighborhood}` : ''}
-                      </div>
-                    )}
-                  </div>
-                  {event.ticket_price !== null && (
-                    <span style={{ fontSize: '0.8rem', fontWeight: 500, color: event.ticket_price === 0 ? 'var(--accent)' : 'var(--ink-soft)', flexShrink: 0 }}>
-                      {event.ticket_price === 0 ? 'Free' : `$${event.ticket_price}`}
-                    </span>
-                  )}
-                  <span className="link-chevron">→</span>
-                </a>
-              ))}
+                    <span className="ev-arrow">›</span>
+                  </a>
+                )
+              })}
             </div>
           )}
         </section>
 
+        {/* LINKS — icon grid, no labels, crimson → gold on hover */}
         {socialLinks.length > 0 && (
           <section id="links" className="section">
             <div className="eyebrow">Find Me Online</div>
-            <div className="links-stack">
-              {socialLinks.map((link, i) => (
-                <a
-                  key={i}
-                  href={link.url}
-                  target={link.url.startsWith('mailto') ? '_self' : '_blank'}
-                  rel="noopener noreferrer"
-                  className="link-row"
-                >
-                  <span className="link-icon-wrap" style={{ background: link.color + '15', color: link.color }}>
-                    {link.icon}
-                  </span>
-                  <span className="link-name">{link.label}</span>
-                  <span className="link-chevron">→</span>
-                </a>
-              ))}
+            <div className="links-icon-grid">
+              {socialLinks.map((link, i) => {
+                const { component, type } = getSvgIcon(link.label)
+                return (
+                  <a
+                    key={i}
+                    href={link.url}
+                    target={link.url.startsWith('mailto') ? '_self' : '_blank'}
+                    rel="noopener noreferrer"
+                    className={`link-tile ${type}-icon`}
+                    title={link.label}
+                    aria-label={link.label}
+                  >
+                    {component}
+                  </a>
+                )
+              })}
             </div>
           </section>
         )}
@@ -1196,52 +1358,59 @@ export default function ArtistPageClient({
               <span className="sheet-title">Share</span>
               <button className="sheet-close" onClick={() => setShareOpen(false)}>×</button>
             </div>
-            <a className="sheet-row" href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer">
-              <span className="sheet-icon" style={{ background: '#fdf0f5', color: '#E1306C' }}>◎</span>
-              Instagram
-            </a>
-            <a className="sheet-row" href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}`} target="_blank" rel="noopener noreferrer">
-              <span className="sheet-icon" style={{ background: '#eef3fd', color: '#1877F2' }}>f</span>
-              Facebook
-            </a>
-            <a className="sheet-row" href={`sms:?body=${encodeURIComponent(pageUrl)}`}>
-              <span className="sheet-icon" style={{ background: '#edfbf0', color: '#30D158' }}>✉</span>
-              Messages
-            </a>
-            <a className="sheet-row" href={`mailto:?subject=${encodeURIComponent(artist.name)}&body=${encodeURIComponent(pageUrl)}`}>
-              <span className="sheet-icon" style={{ background: '#f5f5f5', color: '#6b6560' }}>@</span>
-              Email
-            </a>
-            <button className="sheet-row" onClick={handleCopyLink}>
-              <span className="sheet-icon" style={{ background: '#f7f6f4', color: '#1a1814' }}>⎘</span>
-              {copied ? 'Copied!' : 'Copy Link'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── SAVE ARTIST SHEET ── */}
-      {saveOpen && (
-        <div className="sheet-overlay" onClick={() => setSaveOpen(false)}>
-          <div className="sheet" onClick={e => e.stopPropagation()}>
-            <div className="sheet-handle" />
-            <div className="sheet-header">
-              <span className="sheet-title">Save Artist</span>
-              <button className="sheet-close" onClick={() => setSaveOpen(false)}>×</button>
+            <div className="sheet-share-grid">
+              <a
+                className="sheet-share-item"
+                href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}`}
+                target="_blank" rel="noopener noreferrer"
+              >
+                <div className="sheet-share-icon" style={{ background: '#1877F2' }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                </div>
+                <span className="sheet-share-label">Facebook</span>
+              </a>
+              <a
+                className="sheet-share-item"
+                href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(pageUrl)}&text=${encodeURIComponent(artist.name)}`}
+                target="_blank" rel="noopener noreferrer"
+              >
+                <div className="sheet-share-icon" style={{ background: '#000' }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.259 5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                  </svg>
+                </div>
+                <span className="sheet-share-label">X / Twitter</span>
+              </a>
+              <a
+                className="sheet-share-item"
+                href={`sms:?body=${encodeURIComponent(artist.name + ' — ' + pageUrl)}`}
+              >
+                <div className="sheet-share-icon" style={{ background: '#30D158' }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                  </svg>
+                </div>
+                <span className="sheet-share-label">Messages</span>
+              </a>
+              <a
+                className="sheet-share-item"
+                href={`mailto:?subject=${encodeURIComponent(artist.name)}&body=${encodeURIComponent(pageUrl)}`}
+              >
+                <div className="sheet-share-icon" style={{ background: '#6b6560' }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
+                  </svg>
+                </div>
+                <span className="sheet-share-label">Email</span>
+              </a>
             </div>
-            <div className="sheet-input-wrap">
-              <p style={{ fontSize: '0.88rem', color: 'var(--ink-soft)', lineHeight: 1.55 }}>
-                Get notified when {artist.name} announces new events or releases.
-              </p>
-              <input
-                className="sheet-input"
-                type="email"
-                placeholder="Your email address"
-                value={saveEmail}
-                onChange={e => setSaveEmail(e.target.value)}
-              />
-              <button className="sheet-submit" onClick={() => setSaveOpen(false)}>
-                Save Artist
+            <div className="sheet-link-row">
+              <div className="sheet-link-url">{pageUrl}</div>
+              <button className="sheet-copy-btn" onClick={handleCopyLink}>
+                {copied ? 'Copied!' : 'Copy'}
               </button>
             </div>
           </div>

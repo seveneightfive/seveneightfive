@@ -1,5 +1,5 @@
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist"
-import { Serwist } from "serwist"
+import { NetworkFirst, StaleWhileRevalidate, Serwist } from "serwist"
 
 declare global {
   interface ServiceWorkerGlobalScope extends SerwistGlobalConfig {
@@ -13,6 +13,34 @@ const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   skipWaiting: true,
   clientsClaim: true,
+  navigationPreload: false,
+  runtimeCaching: [
+    // HTML pages — always try network first so new deployments are picked up
+    {
+      matcher: ({ request }) => request.mode === "navigate",
+      handler: new NetworkFirst({
+        cacheName: "pages-v1",
+        networkTimeoutSeconds: 5,
+        plugins: [],
+      }),
+    },
+    // API routes — stale-while-revalidate so they're fast but always updating
+    {
+      matcher: ({ url }) => url.pathname.startsWith("/api/"),
+      handler: new StaleWhileRevalidate({
+        cacheName: "api-v1",
+      }),
+    },
+    // Static assets not covered by precache (images, fonts, CDN)
+    {
+      matcher: ({ request }) =>
+        request.destination === "image" ||
+        request.destination === "font",
+      handler: new StaleWhileRevalidate({
+        cacheName: "assets-v1",
+      }),
+    },
+  ],
 })
 
 serwist.addEventListeners()
