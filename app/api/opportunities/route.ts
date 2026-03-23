@@ -1,6 +1,5 @@
 // app/api/opportunities/route.ts
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@/lib/supabaseServerAuth'
 import { NextResponse } from 'next/server'
 
 function generateSlug(title: string): string {
@@ -16,7 +15,7 @@ function generateSlug(title: string): string {
 
 export async function POST(request: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const supabase = await createClient()
     const body = await request.json()
 
     // Get current user (optional — form can be submitted anonymously too)
