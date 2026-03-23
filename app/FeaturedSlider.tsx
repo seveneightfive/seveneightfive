@@ -42,25 +42,58 @@ export default function FeaturedSlider({ events }: { events: FeaturedEvent[] }) 
   return (
     <>
       <style>{`
-        .feat-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
+        .feat-track {
+          display: flex;
+          flex-direction: row;
+          overflow-x: auto;
+          scrollbar-width: none;
           gap: 12px;
-          padding: 0 20px;
+          /* Left padding so first card aligns with page content */
+          padding: 0 40px 2px 40px;
+          scroll-snap-type: x mandatory;
+          -webkit-overflow-scrolling: touch;
         }
+        .feat-track::-webkit-scrollbar {
+          display: none;
+        }
+
+        /* Fade-out hint on right edge so users know it scrolls */
+        .feat-track-wrap {
+          position: relative;
+        }
+        .feat-track-wrap::after {
+          content: '';
+          position: absolute;
+          top: 0;
+          right: 0;
+          width: 80px;
+          height: 100%;
+          background: linear-gradient(to right, transparent, #ffffff);
+          pointer-events: none;
+          z-index: 2;
+        }
+
         .feat-card {
           position: relative;
           border-radius: 6px;
           overflow: hidden;
-          aspect-ratio: 4/3;
           text-decoration: none;
           display: block;
           background: #0A0A0A;
+          flex: 0 0 300px;
+          height: 220px;
+          scroll-snap-align: start;
+          transition: box-shadow 0.25s ease;
         }
+        /* First card is wider — hero feel */
         .feat-card:first-child {
-          grid-column: span 2;
-          aspect-ratio: 16/9;
+          flex: 0 0 480px;
+          height: 220px;
         }
+        .feat-card:hover {
+          box-shadow: 0 8px 32px rgba(0,0,0,0.28);
+        }
+
         .feat-img {
           width: 100%;
           height: 100%;
@@ -89,7 +122,6 @@ export default function FeaturedSlider({ events }: { events: FeaturedEvent[] }) 
         .feat-overlay {
           position: absolute;
           inset: 0;
-          /* Stronger gradient — text always readable */
           background: linear-gradient(
             to top,
             rgba(10,10,10,0.95) 0%,
@@ -118,7 +150,6 @@ export default function FeaturedSlider({ events }: { events: FeaturedEvent[] }) 
           line-height: 1.15;
           text-transform: uppercase;
           letter-spacing: 0.01em;
-          /* Text shadow for extra legibility on any image */
           text-shadow: 0 1px 4px rgba(0,0,0,0.8);
         }
         .feat-card:first-child .feat-title {
@@ -145,80 +176,61 @@ export default function FeaturedSlider({ events }: { events: FeaturedEvent[] }) 
           padding: 3px 8px;
         }
 
-        /* Mobile: single column scroll */
+        /* Tighter cards on smaller screens, same scroll behaviour */
         @media (max-width: 640px) {
-          .feat-grid {
-            display: flex;
-            flex-direction: row;
-            overflow-x: auto;
-            scrollbar-width: none;
+          .feat-track {
+            padding: 0 20px 2px 20px;
             gap: 10px;
-            padding: 0 20px;
-            /* Snap scrolling */
-            scroll-snap-type: x mandatory;
           }
-          .feat-grid::-webkit-scrollbar { display: none; }
           .feat-card {
-            flex: 0 0 82vw;
-            aspect-ratio: 4/3;
-            scroll-snap-align: start;
-            border-radius: 6px;
+            flex: 0 0 75vw;
+            height: 200px;
           }
           .feat-card:first-child {
             flex: 0 0 82vw;
-            aspect-ratio: 4/3;
-            grid-column: unset;
+            height: 200px;
           }
-        }
-
-        @media (min-width: 641px) and (max-width: 900px) {
-          .feat-grid {
-            grid-template-columns: repeat(2, 1fr);
-            padding: 0 40px;
-          }
-          .feat-card:first-child {
-            grid-column: span 2;
-          }
-        }
-
-        @media (min-width: 901px) {
-          .feat-grid {
-            padding: 0 40px;
+          .feat-track-wrap::after {
+            display: none;
           }
         }
       `}</style>
 
-      <div className="feat-grid">
-        {events.map(event => {
-          const href = event.slug ? `/events/${event.slug}` : event.ticket_url || '#'
-          const isExternal = !event.slug
-          return (
-            <a
-              key={event.id}
-              href={href}
-              target={isExternal ? '_blank' : '_self'}
-              rel={isExternal ? 'noopener noreferrer' : undefined}
-              className="feat-card"
-            >
-              {event.image_url
-                ? <img src={event.image_url} alt={event.title} className="feat-img" />
-                : <div className="feat-no-img">{event.title[0]}</div>
-              }
-              <div className="feat-overlay">
-                {event.event_types?.[0] && (
-                  <div className="feat-type">{event.event_types[0]}</div>
-                )}
-                <div className="feat-title">{event.title}</div>
-                <div className="feat-meta">
-                  {formatDate(event.event_date)}
-                  {event.event_start_time && ` · ${formatTime(event.event_start_time)}`}
-                  {event.venue && ` · ${event.venue.name}`}
+      <div className="feat-track-wrap">
+        <div className="feat-track">
+          {events.map(event => {
+            const href = event.slug ? `/events/${event.slug}` : event.ticket_url || '#'
+            const isExternal = !event.slug
+            return (
+              <a
+                key={event.id}
+                href={href}
+                target={isExternal ? '_blank' : '_self'}
+                rel={isExternal ? 'noopener noreferrer' : undefined}
+                className="feat-card"
+              >
+                {event.image_url
+                  ? <img src={event.image_url} alt={event.title} className="feat-img" />
+                  : <div className="feat-no-img">{event.title[0]}</div>
+                }
+                <div className="feat-overlay">
+                  {event.event_types?.[0] && (
+                    <div className="feat-type">{event.event_types[0]}</div>
+                  )}
+                  <div className="feat-title">{event.title}</div>
+                  <div className="feat-meta">
+                    {formatDate(event.event_date)}
+                    {event.event_start_time && ` · ${formatTime(event.event_start_time)}`}
+                    {event.venue && ` · ${event.venue.name}`}
+                  </div>
                 </div>
-              </div>
-              <div className="feat-badge">★ Featured</div>
-            </a>
-          )
-        })}
+                <div className="feat-badge">★ Featured</div>
+              </a>
+            )
+          })}
+          {/* Trailing spacer so last card clears the fade */}
+          <div style={{ flex: '0 0 20px' }} />
+        </div>
       </div>
     </>
   )
