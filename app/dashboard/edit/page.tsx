@@ -30,6 +30,7 @@ type ArtistData = {
   avatar_url: string | null
   artist_website: string | null
   social_facebook: string | null
+  social_instagram: string | null
   artist_email: string | null
   same_as: string[] | null
   artist_type: string | null
@@ -111,7 +112,7 @@ function EditPageInner() {
       .select(`
         id, name, slug, tagline, bio, location_city, location_state,
         birth_place, awards, image_url, avatar_url, artist_website,
-        social_facebook, artist_email, same_as, artist_type,
+        social_facebook, social_instagram, artist_email, same_as, artist_type,
         artist_musician_profiles (
           artist_id, artist_spotify, artist_youtube, audio_file_url, audio_title,
           video_url, video_title, artistvideoabout, purchase_link, musical_genres
@@ -148,10 +149,10 @@ function EditPageInner() {
     setAvatarUrl(a.avatar_url || '')
     setWebsite(a.artist_website || '')
     setFacebook(a.social_facebook || '')
+    setInstagram(a.social_instagram || '')
     setArtistEmail(a.artist_email || '')
 
     const sameAs = a.same_as || []
-    setInstagram(sameAs.find(u => u.includes('instagram')) || '')
     setSoundcloud(sameAs.find(u => u.includes('soundcloud')) || '')
     setTiktok(sameAs.find(u => u.includes('tiktok')) || '')
     setAppleMusic(sameAs.find(u => u.includes('apple')) || '')
@@ -193,7 +194,7 @@ function EditPageInner() {
     setSaving(true)
     setError('')
 
-    const sameAs: string[] = [instagram, soundcloud, tiktok, appleMusic].filter(Boolean)
+    const sameAs: string[] = [soundcloud, tiktok, appleMusic].filter(Boolean)
 
     const res = await fetch('/api/artist/update', {
       method: 'PATCH',
@@ -206,6 +207,7 @@ function EditPageInner() {
           birth_place: birthPlace, awards,
           image_url: imageUrl, avatar_url: avatarUrl,
           artist_website: website, social_facebook: facebook,
+          social_instagram: instagram,
           artist_email: artistEmail, same_as: sameAs,
         },
         musician_profile: artist.artist_type === 'Musician' || artist.artist_type === 'Performance' ? {

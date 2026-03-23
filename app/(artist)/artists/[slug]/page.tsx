@@ -39,6 +39,7 @@ type Artist = {
   awards: string | null
   artist_website: string | null
   social_facebook: string | null
+  social_instagram: string | null
   artist_email: string | null
   given_name: string | null
   family_name: string | null
@@ -94,7 +95,7 @@ async function getArtist(slug: string): Promise<Artist | null> {
     .select(`
       id, name, slug, bio, tagline, bio_written_by_785, image_url, avatar_url,
       artist_type, verified, location_city, location_state,
-      birth_place, awards, artist_website, social_facebook,
+      birth_place, awards, artist_website, social_facebook, social_instagram,
       artist_email, given_name, family_name, url, same_as,
       artist_musician_profiles (
         musical_genres, audio_file_url, audio_title,
@@ -182,11 +183,11 @@ function getSocialLinks(artist: Artist) {
   if (mp?.artist_spotify) links.push({ label: 'Spotify', url: mp.artist_spotify, icon: '♫', color: '#1DB954' })
   if (mp?.artist_youtube) links.push({ label: 'YouTube', url: mp.artist_youtube, icon: '▶', color: '#FF0000' })
   if (artist.social_facebook) links.push({ label: 'Facebook', url: artist.social_facebook, icon: 'f', color: '#1877F2' })
+  if (artist.social_instagram) links.push({ label: 'Instagram', url: artist.social_instagram, icon: '◎', color: '#E1306C' })
   if (mp?.purchase_link) links.push({ label: 'Buy / Book', url: mp.purchase_link, icon: '🎟', color: '#C80650' })
   if (artist.artist_email) links.push({ label: 'Email', url: `mailto:${artist.artist_email}`, icon: '✉', color: '#6b6560' })
   artist.same_as?.forEach(url => {
     if (url.includes('soundcloud')) links.push({ label: 'SoundCloud', url, icon: '☁', color: '#FF5500' })
-    if (url.includes('instagram')) links.push({ label: 'Instagram', url, icon: '◎', color: '#E1306C' })
     if (url.includes('apple')) links.push({ label: 'Apple Music', url, icon: '♪', color: '#FA243C' })
     if (url.includes('tiktok')) links.push({ label: 'TikTok', url, icon: '♩', color: '#010101' })
   })
