@@ -32,7 +32,7 @@ type Artist = {
 const STATIC_NEIGHBORHOODS = [
   { large: false, label: 'Nightlife',   name: 'Midtown Strip',     count: '18 bars',    bg: 'linear-gradient(160deg, #1a1a1a, #3d3d3d)' },
   { large: false, label: 'Culture',     name: 'East Side',         count: '9 galleries',bg: 'linear-gradient(160deg, #2a4000, #4a7000)' },
-  { large: false, label: 'Live Music',  name: 'The Docks',         count: '11 stages',  bg: 'linear-gradient(160deg, #003c5a, #006090)' },
+  { large: false, label: 'Visual Galleries', name: 'Art Galleries',  count: '38 galleries', href: '/topeka-art-galleries', bg: 'linear-gradient(160deg, #003c5a, #006090)' },
   { large: false, label: 'Food & Drinks', name: 'La Plaza',        count: '22 spots',   bg: 'linear-gradient(160deg, #FFCE03, #e0a800)' },
 ]
 
@@ -185,7 +185,7 @@ export default function HomeClient({
             {/* Static neighborhood cards */}
             {STATIC_NEIGHBORHOODS.map((nbh) => (
               <Link
-                href="/venues"
+                href={nbh.href ?? '/venues'}
                 key={nbh.name}
                 className={styles.nbhCard}
               >

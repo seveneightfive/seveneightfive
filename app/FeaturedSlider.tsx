@@ -60,6 +60,9 @@ export default function FeaturedSlider({ events }: { events: FeaturedEvent[] }) 
         /* Fade-out hint on right edge so users know it scrolls */
         .feat-track-wrap {
           position: relative;
+          /* Break out of any parent max-width container */
+          width: 100vw;
+          margin-left: calc(50% - 50vw);
         }
         .feat-track-wrap::after {
           content: '';
@@ -80,15 +83,15 @@ export default function FeaturedSlider({ events }: { events: FeaturedEvent[] }) 
           text-decoration: none;
           display: block;
           background: #0A0A0A;
-          flex: 0 0 300px;
-          height: 220px;
+          flex: 0 0 320px;
+          height: 240px;
           scroll-snap-align: start;
           transition: box-shadow 0.25s ease;
         }
         /* First card is wider — hero feel */
         .feat-card:first-child {
-          flex: 0 0 480px;
-          height: 220px;
+          flex: 0 0 520px;
+          height: 240px;
         }
         .feat-card:hover {
           box-shadow: 0 8px 32px rgba(0,0,0,0.28);
