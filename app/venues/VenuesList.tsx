@@ -13,6 +13,7 @@ type Venue = {
   city: string | null
   state: string | null
   image_url: string | null
+  logo: string | null
   website: string | null
   venue_type: string | null
 }
@@ -59,7 +60,7 @@ export default function VenuesList({ initialNeighborhood }: { initialNeighborhoo
     async function fetchVenues() {
       const { data, error } = await supabase
         .from('venues')
-        .select('id, name, slug, address, neighborhood, city, state, image_url, website, venue_type')
+        .select('id, name, slug, address, neighborhood, city, state, image_url, logo, website, venue_type')
         .order('name')
 
       if (error) { console.error('venues error:', error.message, error.details); setLoading(false); return }
@@ -224,8 +225,8 @@ export default function VenuesList({ initialNeighborhood }: { initialNeighborhoo
                   className="venue-card"
                   onClick={handleVenueClick}
                 >
-                  {venue.image_url
-                    ? <img src={venue.image_url} alt={venue.name} className="venue-card-img" />
+                  {venue.image_url || venue.logo
+                    ? <img src={venue.image_url || venue.logo!} alt={venue.name} className="venue-card-img" />
                     : <div className="venue-card-img-placeholder">{venue.name[0]}</div>
                   }
                   <div className="venue-card-body">
