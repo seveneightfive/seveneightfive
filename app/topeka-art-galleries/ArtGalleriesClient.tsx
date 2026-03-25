@@ -12,6 +12,7 @@ type Venue = {
   city: string | null
   state: string | null
   image_url: string | null
+  logo: string | null
   venue_type: string | null
 }
 
@@ -35,7 +36,7 @@ export default function ArtGalleriesClient() {
     async function fetchData() {
       const { data: venueData } = await supabase
         .from('venues')
-        .select('id, name, slug, address, neighborhood, city, state, image_url, venue_type')
+        .select('id, name, slug, address, neighborhood, city, state, image_url, logo, venue_type')
         .in('venue_type', ['Studio / Classes', 'Gallery / Museum'])
         .order('name')
 
@@ -196,8 +197,8 @@ export default function ArtGalleriesClient() {
                       href={venue.slug ? `/venues/${venue.slug}` : '#'}
                       className="venue-card"
                     >
-                      {venue.image_url
-                        ? <img src={venue.image_url} alt={venue.name} className="venue-card-img" />
+                      {venue.image_url || venue.logo
+                        ? <img src={venue.image_url || venue.logo!} alt={venue.name} className="venue-card-img" />
                         : <div className="venue-card-img-placeholder">{venue.name[0]}</div>
                       }
                       <div className="venue-card-body">
