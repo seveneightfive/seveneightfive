@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabaseBrowser'
+import QRCode from 'qrcode'
 
 type Ticket = {
   id: string
@@ -25,6 +26,7 @@ export default function TicketSuccessInner() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
   const [attempts, setAttempts] = useState(0)
+  const [qrDataUrls, setQrDataUrls] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (!sessionId) { setLoading(false); return }
@@ -43,6 +45,12 @@ export default function TicketSuccessInner() {
 
       if (data && data.length > 0) {
         setTickets(data)
+        // Generate QR data URLs for each ticket
+        const urls: Record<string, string> = {}
+        await Promise.all(data.map(async (t: Ticket) => {
+          urls[t.id] = await QRCode.toDataURL(t.qr_token, { width: 200, margin: 2 })
+        }))
+        setQrDataUrls(urls)
         setLoading(false)
       } else if (tries < 8) {
         setAttempts(tries)
@@ -55,7 +63,6 @@ export default function TicketSuccessInner() {
   }, [sessionId])
 
   const STYLES = `
-    @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --ink: #1a1814; --white: #fff; --accent: #C80650;
@@ -76,9 +83,10 @@ export default function TicketSuccessInner() {
     .ticket-event { font-family: var(--serif); font-size: 1.2rem; font-weight: 700; text-transform: uppercase; margin-bottom: 6px; }
     .ticket-meta { font-size: 0.82rem; color: rgba(255,255,255,0.5); line-height: 1.6; }
     .ticket-tier { display: inline-block; margin-top: 10px; padding: 3px 10px; background: rgba(200,6,80,0.15); border: 1px solid rgba(200,6,80,0.3); border-radius: 100px; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
-    .qr-wrap { padding: 16px 20px; border-top: 1px dashed rgba(255,255,255,0.1); display: flex; align-items: center; gap: 12px; }
-    .qr-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(255,255,255,0.35); margin-bottom: 4px; }
-    .qr-token { font-family: monospace; font-size: 0.72rem; color: rgba(255,255,255,0.5); word-break: break-all; }
+    .qr-wrap { padding: 20px; border-top: 1px dashed rgba(255,255,255,0.1); display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .qr-img { width: 160px; height: 160px; border-radius: 8px; display: block; }
+    .qr-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(255,255,255,0.35); margin-bottom: 4px; text-align: center; }
+    .qr-token { font-family: monospace; font-size: 0.65rem; color: rgba(255,255,255,0.35); word-break: break-all; text-align: center; }
     .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 24px; }
     .btn { display: block; width: 100%; padding: 13px; border-radius: 8px; font-family: var(--sans); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; text-align: center; text-decoration: none; cursor: pointer; transition: opacity 0.15s; border: none; }
     .btn-primary { background: var(--accent); color: #fff; }
@@ -160,10 +168,12 @@ export default function TicketSuccessInner() {
                 <span className="ticket-tier">{ticket.tier_name}</span>
               </div>
               <div className="qr-wrap">
-                <div style={{ flex: 1 }}>
-                  <div className="qr-label">Ticket ID</div>
-                  <div className="qr-token">{ticket.qr_token}</div>
-                </div>
+                {qrDataUrls[ticket.id] && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={qrDataUrls[ticket.id]} alt="Ticket QR code" className="qr-img" />
+                )}
+                <div className="qr-label">Show this at the door</div>
+                <div className="qr-token">{ticket.qr_token}</div>
               </div>
             </div>
           ))}

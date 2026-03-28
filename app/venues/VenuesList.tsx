@@ -18,10 +18,10 @@ type Venue = {
   venue_type: string | null
 }
 
-export default function VenuesList({ initialNeighborhood }: { initialNeighborhood?: string }) {
-  const [venues, setVenues] = useState<Venue[]>([])
-  const [filtered, setFiltered] = useState<Venue[]>([])
-  const [loading, setLoading] = useState(true)
+export default function VenuesList({ initialNeighborhood, initialVenues = [] }: { initialNeighborhood?: string; initialVenues?: Venue[] }) {
+  const [venues, setVenues] = useState<Venue[]>(initialVenues)
+  const [filtered, setFiltered] = useState<Venue[]>(initialVenues)
+  const [loading, setLoading] = useState(initialVenues.length === 0)
   const [search, setSearch] = useState('')
   const [activeNeighborhood, setActiveNeighborhood] = useState(initialNeighborhood || 'All')
   const [activeType, setActiveType] = useState('All')
@@ -57,6 +57,7 @@ export default function VenuesList({ initialNeighborhood }: { initialNeighborhoo
   }, [])
 
   useEffect(() => {
+    if (initialVenues.length > 0) return // already have server-fetched data
     async function fetchVenues() {
       const { data, error } = await supabase
         .from('venues')
@@ -69,7 +70,7 @@ export default function VenuesList({ initialNeighborhood }: { initialNeighborhoo
       setLoading(false)
     }
     fetchVenues()
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const neighborhoods = ['All', ...Array.from(new Set(venues.map(v => v.neighborhood).filter(Boolean) as string[])).sort()]
   const venueTypes = ['All', ...Array.from(new Set(venues.map(v => v.venue_type).filter(Boolean) as string[])).sort()]
@@ -94,7 +95,6 @@ export default function VenuesList({ initialNeighborhood }: { initialNeighborhoo
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
           --ink: #1a1814; --ink-soft: #6b6560; --ink-faint: #b8b3ad;

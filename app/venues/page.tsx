@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import VenuesList from './VenuesList'
+import { createClient } from '@/lib/supabaseServer'
 
 export const metadata: Metadata = {
   title: 'Venues in Topeka, KS | seveneightfive',
@@ -18,5 +19,10 @@ export const metadata: Metadata = {
 
 export default async function VenuesPage({ searchParams }: { searchParams: Promise<{ neighborhood?: string }> }) {
   const params = await searchParams
-  return <VenuesList initialNeighborhood={params.neighborhood} />
+  const supabase = createClient()
+  const { data: venues } = await supabase
+    .from('venues')
+    .select('id, name, slug, address, neighborhood, city, state, image_url, logo, website, venue_type')
+    .order('name')
+  return <VenuesList initialNeighborhood={params.neighborhood} initialVenues={venues || []} />
 }

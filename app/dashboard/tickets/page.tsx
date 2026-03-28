@@ -26,7 +26,6 @@ export default async function DashboardTicketsPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
           --ink: #1a1814; --ink2: #221f1b; --white: #fff;
@@ -87,7 +86,7 @@ export default async function DashboardTicketsPage() {
             {upcoming.map(ticket => (
               <a
                 key={ticket.id}
-                href={`/events/${ticket.event_slug}`}
+                href={`/dashboard/tickets/${ticket.id}`}
                 className="ticket-card"
               >
                 <div className="ticket-date">
@@ -122,7 +121,7 @@ export default async function DashboardTicketsPage() {
               {past.map(ticket => (
                 <a
                   key={ticket.id}
-                  href={`/events/${ticket.event_slug}`}
+                  href={`/dashboard/tickets/${ticket.id}`}
                   className="ticket-card past"
                 >
                   <div className="ticket-date">

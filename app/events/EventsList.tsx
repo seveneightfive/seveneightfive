@@ -187,7 +187,6 @@ export default function EventsList() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
           --ink: #1a1814; --ink-soft: #6b6560; --ink-faint: #b8b3ad;

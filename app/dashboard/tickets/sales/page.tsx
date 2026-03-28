@@ -35,7 +35,6 @@ export default async function TicketSalesPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
           --ink: #1a1814; --white: #fff; --accent: #C80650;
@@ -85,7 +84,9 @@ export default async function TicketSalesPage() {
       <div className="topbar">
         <a href="/dashboard" className="back-link">← Dashboard</a>
         <span className="page-title">Ticket Sales</span>
-        <div style={{ width: 80 }} />
+        <a href="/dashboard/scan" style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--accent)', textDecoration: 'none' }}>
+          Scan ↗
+        </a>
       </div>
 
       <div className="content">

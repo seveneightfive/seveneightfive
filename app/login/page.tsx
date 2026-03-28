@@ -8,7 +8,6 @@ type Step = 'choice' | 'phone' | 'otp' | 'magic' | 'magic_sent' | 'profile' | 's
 type Mode = 'signin' | 'signup'
 
 const STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap');
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
     --ink: #1a1814;
