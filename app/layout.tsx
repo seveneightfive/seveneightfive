@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import InstallButton from "./components/InstallButton"
-import PushNotificationButton from "./components/PushNotificationButton"
 import NavWrapper from "./components/NavWrapper"
 import { NavProvider } from "./components/NavContext"
 import { SpeedInsights } from '@vercel/speed-insights/next'
@@ -54,7 +53,6 @@ export default function RootLayout({
           <NavWrapper />
           {children}
           <InstallButton />
-          <PushNotificationButton />
           <SpeedInsights />
           <Analytics />
         </NavProvider>
