@@ -176,7 +176,7 @@ export default function OpportunitiesList() {
 
                 <div style={{ flex: 1 }}>
                   {opportunity.opportunity_type && (
-                    <div style={{ fontSize: 12, color: '#c8502a', marginBottom: 6 }}>
+                    <div style={{ fontSize: 12, color: '#C80650', marginBottom: 6 }}>
                       {opportunity.opportunity_type}
                     </div>
                   )}

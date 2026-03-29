@@ -99,7 +99,7 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
         :root {
           --ink: #1a1814; --ink-soft: #6b6560; --ink-faint: #b8b3ad;
           --white: #ffffff; --off: #f7f6f4; --warm: #f2ede6;
-          --accent: #c8502a; --accent-light: #fdf1ec; --border: #ece8e2;
+          --accent: #C80650; --accent-light: #fdf1ec; --border: #ece8e2;
           --serif: 'Oswald', sans-serif; --sans: 'DM Sans', system-ui, sans-serif;
         }
         html, body { overflow-x: hidden; max-width: 100vw; background: var(--white); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }

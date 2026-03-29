@@ -133,7 +133,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
           --ink: #1a1814; --ink-soft: #6b6560; --ink-faint: #c0bab3;
-          --white: #ffffff; --off: #f7f6f4; --accent: #c8502a; --accent-light: #fdf1ec;
+          --white: #ffffff; --off: #f7f6f4; --accent: #C80650; --accent-light: #fdf1ec; --gold: #FFCE03;
           --border: #ece8e2; --serif: 'Oswald', sans-serif; --sans: 'DM Sans', system-ui, sans-serif;
           --nav-h: 56px; --bottom-nav-h: 64px;
         }
@@ -147,7 +147,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
         .hero-monogram { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: clamp(8rem, 30vw, 20rem); font-weight: 700; color: rgba(255,255,255,0.04); text-transform: uppercase; letter-spacing: -0.04em; user-select: none; }
         .hero-body { position: relative; z-index: 2; padding: 24px 24px 32px; }
         .hero-eyebrow { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-        .hero-type-label { font-size: 0.65rem; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); }
+        .hero-type-label { font-size: 0.65rem; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); }
         .hero-name { font-family: var(--serif); font-size: clamp(2.4rem, 8vw, 5rem); font-weight: 700; color: #fff; line-height: 0.95; letter-spacing: -0.01em; text-transform: uppercase; margin-bottom: 12px; animation: fadeUp 0.6s cubic-bezier(0.22,1,0.36,1) both; }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .hero-pills { display: flex; flex-wrap: wrap; gap: 6px; animation: fadeUp 0.6s 0.12s cubic-bezier(0.22,1,0.36,1) both; }
@@ -173,7 +173,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
         .venue-main { max-width: 680px; margin: 0 auto; padding: 0 24px; }
         .section { padding: 52px 0; border-bottom: 1px solid var(--border); }
         .section:last-child { border-bottom: none; padding-bottom: 80px; }
-        .eyebrow { font-size: 0.65rem; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+        .eyebrow { font-size: 0.65rem; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: #374151; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
         .eyebrow::after { content: ''; flex: 1; height: 1px; background: var(--border); max-width: 48px; }
 
         /* ── ABOUT ── */

@@ -250,12 +250,12 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         .hero-no-img { position: absolute; inset: 0; background: linear-gradient(135deg, #2a2620, #1a1814); display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: clamp(6rem, 20vw, 14rem); font-weight: 700; color: rgba(255,255,255,0.04); text-transform: uppercase; }
         .hero-body { position: relative; z-index: 2; padding: 24px 24px 32px; max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; pointer-events: none; }
         .hero-types { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; pointer-events: auto; }
-        .hero-type-tag { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); background: rgba(200,80,42,0.2); border: 1px solid rgba(200,80,42,0.3); padding: 3px 10px; border-radius: 100px; }
+        .hero-type-tag { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #FFCE03; background: rgba(255,206,3,0.18); border: 1px solid rgba(255,206,3,0.4); padding: 3px 10px; border-radius: 100px; }
         .hero-title { font-family: var(--serif); font-size: clamp(1.8rem, 5vw, 3.5rem); font-weight: 700; color: white; text-transform: uppercase; line-height: 1; letter-spacing: -0.01em; margin-bottom: 12px; animation: fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) both; pointer-events: auto; }
         @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
         .hero-date-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; pointer-events: auto; }
         .hero-date { font-size: 0.82rem; font-weight: 500; color: rgba(255,255,255,0.65); letter-spacing: 0.04em; }
-        .hero-today { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); background: rgba(200,80,42,0.2); border: 1px solid rgba(200,80,42,0.3); padding: 3px 8px; border-radius: 100px; }
+        .hero-today { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); background: rgba(200,6,80,0.2); border: 1px solid rgba(200,6,80,0.3); padding: 3px 8px; border-radius: 100px; }
         .hero-star { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: white; background: var(--accent); padding: 3px 8px; border-radius: 100px; }
 
         /* TOP NAV */
@@ -273,7 +273,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         .info-cell:nth-child(even) { border-right: none; }
         .info-cell:nth-last-child(-n+2) { border-bottom: none; }
         .info-cell.full { grid-column: span 2; border-right: none; }
-        .info-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 5px; }
+        .info-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #374151; margin-bottom: 5px; }
         .info-value { font-size: 0.92rem; color: var(--ink); font-weight: 400; line-height: 1.4; }
         .info-value strong { font-weight: 600; }
         .price-free { color: #2d7a2d; font-weight: 600; }
@@ -299,7 +299,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
 
         /* DESCRIPTION */
         .section { padding: 32px 0; border-top: 1px solid var(--border); }
-        .section-eyebrow { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 14px; }
+        .section-eyebrow { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #374151; margin-bottom: 14px; }
         .description-text { font-size: 1rem; font-weight: 300; line-height: 1.8; color: var(--ink); }
         .description-text p + p { margin-top: 14px; }
 

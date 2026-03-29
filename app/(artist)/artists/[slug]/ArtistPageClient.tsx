@@ -442,7 +442,7 @@ export default function ArtistPageClient({
           font-weight: 500;
           letter-spacing: 0.22em;
           text-transform: uppercase;
-          color: var(--accent);
+          color: #FFCE03;
         }
         .hero-verified {
           font-size: 0.62rem;
@@ -686,7 +686,7 @@ export default function ArtistPageClient({
           font-weight: 500;
           letter-spacing: 0.2em;
           text-transform: uppercase;
-          color: var(--ink-faint);
+          color: #374151;
           margin-bottom: 20px;
           display: flex;
           align-items: center;
