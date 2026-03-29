@@ -39,12 +39,13 @@ export default async function DashboardPage() {
   const followedArtistIds = (follows || []).filter(f => f.entity_type === 'artist').map(f => f.entity_id)
   const followedVenueIds = (follows || []).filter(f => f.entity_type === 'venue').map(f => f.entity_id)
 
-  const [{ data: followedArtists }, { data: followedVenues }, { data: tickets }, { data: ads }] = await Promise.all([
+  const [{ data: followedArtists }, { data: followedVenues }, { data: tickets }] = await Promise.all([
     followedArtistIds.length ? supabase.from('artists').select('id, name, slug, avatar_url, artist_type').in('id', followedArtistIds) : Promise.resolve({ data: [] as any[] }),
     followedVenueIds.length ? supabase.from('venues').select('id, name, slug, logo, image_url, venue_type').in('id', followedVenueIds) : Promise.resolve({ data: [] as any[] }),
     supabase.from('my_tickets').select('id, event_title, event_date, event_slug, tier_name, venue_name, status').eq('payment_status', 'paid').gte('event_date', new Date().toISOString().slice(0, 10)).order('event_date', { ascending: true }).limit(1),
-    supabase.from('advertisements').select('id, headline, title, status, views, clicks').eq('user_id', user.id).order('created_at', { ascending: false }).limit(2),
   ])
+
+  const { data: ads } = await supabase.from('advertisements').select('id, headline, title, status, views, clicks').eq('user_id', user.id).order('created_at', { ascending: false }).limit(2).then(r => r).catch(() => ({ data: [] as any[] }))
 
   const firstName = profile?.full_name?.split(' ')[0] || 'There'
   const initials = profile?.full_name
