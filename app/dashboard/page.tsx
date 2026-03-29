@@ -1,22 +1,22 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabaseServerAuth'
 import AvatarMenu from './AvatarMenu'
-import StripeConnectButton from '@/app/components/StripeConnectButton'
 
 export default async function DashboardPage() {
+  try {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const [{ data: artists }, { data: venues }, { data: profile }] = await Promise.all([
-    supabase.from('artists').select('id, name, slug, tagline, image_url, avatar_url, artist_type, verified').eq('auth_user_id', user.id),
-    supabase.from('venues').select('id, name, slug, venue_type, image_url, logo').eq('auth_user_id', user.id),
-    supabase.from('profiles').select('full_name, email, phone_number, role, stripe_account_id, stripe_account_status, avatar_url').eq('id', user.id).maybeSingle(),
+    supabase.from('artists').select('id, name, slug, tagline, image_url, avatar_url, artist_type, verified').eq('auth_user_id', user!.id),
+    supabase.from('venues').select('id, name, slug, venue_type, image_url, logo').eq('auth_user_id', user!.id),
+    supabase.from('profiles').select('full_name, email, phone_number, role, stripe_account_id, stripe_account_status, avatar_url').eq('id', user!.id).maybeSingle(),
   ])
 
   const [{ data: venueUserLinks }, { data: artistUserLinks }] = await Promise.all([
-    supabase.from('venue_users').select('venue_id').eq('user_id', user.id),
-    supabase.from('artist_users').select('artist_id').eq('user_id', user.id),
+    supabase.from('venue_users').select('venue_id').eq('user_id', user!.id),
+    supabase.from('artist_users').select('artist_id').eq('user_id', user!.id),
   ])
 
   const extraVenueIds = (venueUserLinks || []).map((r: any) => r.venue_id).filter((id: string) => !(venues || []).some((v: any) => v.id === id))
@@ -33,19 +33,18 @@ export default async function DashboardPage() {
   const { data: follows } = await supabase
     .from('follows')
     .select('entity_type, entity_id')
-    .eq('follower_id', user.id)
+    .eq('follower_id', user!.id)
     .in('entity_type', ['artist', 'venue'])
 
-  const followedArtistIds = (follows || []).filter(f => f.entity_type === 'artist').map(f => f.entity_id)
-  const followedVenueIds = (follows || []).filter(f => f.entity_type === 'venue').map(f => f.entity_id)
+  const followedArtistIds = (follows || []).filter((f: any) => f.entity_type === 'artist').map((f: any) => f.entity_id)
+  const followedVenueIds = (follows || []).filter((f: any) => f.entity_type === 'venue').map((f: any) => f.entity_id)
 
-  const [{ data: followedArtists }, { data: followedVenues }, { data: tickets }] = await Promise.all([
+  const [{ data: followedArtists }, { data: followedVenues }, { data: tickets }, { data: ads }] = await Promise.all([
     followedArtistIds.length ? supabase.from('artists').select('id, name, slug, avatar_url, artist_type').in('id', followedArtistIds) : Promise.resolve({ data: [] as any[] }),
     followedVenueIds.length ? supabase.from('venues').select('id, name, slug, logo, image_url, venue_type').in('id', followedVenueIds) : Promise.resolve({ data: [] as any[] }),
     supabase.from('my_tickets').select('id, event_title, event_date, event_slug, tier_name, venue_name, status').eq('payment_status', 'paid').gte('event_date', new Date().toISOString().slice(0, 10)).order('event_date', { ascending: true }).limit(1),
+    supabase.from('advertisements').select('id, headline, title, status, views, clicks').eq('user_id', user!.id).order('created_at', { ascending: false }).limit(2),
   ])
-
-  const { data: ads } = await supabase.from('advertisements').select('id, headline, title, status, views, clicks').eq('user_id', user.id).order('created_at', { ascending: false }).limit(2).then(r => r).catch(() => ({ data: [] as any[] }))
 
   const firstName = profile?.full_name?.split(' ')[0] || 'There'
   const initials = profile?.full_name
@@ -350,4 +349,8 @@ export default async function DashboardPage() {
       </div>
     </>
   )
+  } catch (err) {
+    console.error('[dashboard] server error:', err)
+    throw err
+  }
 }
