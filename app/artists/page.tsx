@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabaseServer'
 import ArtistDirectory from './ArtistDirectory'
 
@@ -153,8 +154,10 @@ export default async function ArtistsPage() {
   }))
 
   return (
-    <ArtistDirectory
-      initialData={{ artists, featured, exhibitions, productions, opportunities }}
-    />
+    <Suspense>
+      <ArtistDirectory
+        initialData={{ artists, featured, exhibitions, productions, opportunities }}
+      />
+    </Suspense>
   )
 }

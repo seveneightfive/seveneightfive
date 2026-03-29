@@ -5,6 +5,8 @@ import BackButton from './BackButton'
 import ImageLightbox from './ImageLightbox'
 import TicketPurchaseButton from '@/app/components/TicketPurchaseButton'
 import FollowFavoriteButtons from '@/app/components/FollowFavoriteButtons'
+import AddToCalendar from './AddToCalendar'
+import ShareButtons from './ShareButtons'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Venue = {
@@ -327,6 +329,9 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           .info-cell:nth-last-child(-n+2) { border-bottom: 1px solid var(--border); }
           .info-cell:last-child { border-bottom: none; }
           .cta-btn { width: 100%; justify-content: center; }
+          .cta-row { flex-direction: column; }
+          .cta-row > * { width: 100%; }
+          .cta-row button { width: 100%; justify-content: center; }
         }
       `}</style>
 
@@ -461,6 +466,21 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
               Learn More
             </a>
           )}
+          <AddToCalendar
+            title={event.title}
+            date={event.event_date}
+            startTime={event.event_start_time}
+            endTime={event.event_end_time}
+            endDate={event.end_date}
+            venueName={event.venue?.name ?? null}
+            venueAddress={event.venue?.address ?? null}
+            description={event.description}
+            slug={event.slug ?? event.id}
+          />
+          <ShareButtons
+            title={event.title}
+            description={event.description}
+          />
         </div>
 
         {/* DESCRIPTION */}

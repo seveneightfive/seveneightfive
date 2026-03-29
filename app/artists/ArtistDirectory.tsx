@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useNavState } from '../components/NavContext'
 
@@ -313,6 +314,10 @@ type InitialData = {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function ArtistDirectory({ initialData }: { initialData: InitialData }) {
+  const searchParams = useSearchParams()
+  const typeParam = searchParams.get('type') || 'All'
+  const validType = ['All', 'Musician', 'Visual', 'Performance', 'Literary'].includes(typeParam) ? typeParam : 'All'
+
   const [artists] = useState<Artist[]>(initialData.artists)
   const [filtered, setFiltered] = useState<Artist[]>(initialData.artists)
   const [featured] = useState<Artist[]>(initialData.featured)
@@ -321,7 +326,7 @@ export default function ArtistDirectory({ initialData }: { initialData: InitialD
   const [opportunities] = useState<Opportunity[]>(initialData.opportunities)
   const [myArtistIds, setMyArtistIds] = useState<string[]>([])
   const [search, setSearch] = useState('')
-  const [activeType, setActiveType] = useState('All')
+  const [activeType, setActiveType] = useState(validType)
   const [activeGenre, setActiveGenre] = useState('')
   const [showMine, setShowMine] = useState(false)
   const { setLogoSuffix, setRightText } = useNavState()
