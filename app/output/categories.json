@@ -1,0 +1,970 @@
+[
+  {
+    "_type": "category",
+    "_id": "category-featured",
+    "name": "FEATURED",
+    "slug": {
+      "current": "featured"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-local-flavor",
+    "name": "LOCAL FLAVOR",
+    "slug": {
+      "current": "local-flavor"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-music",
+    "name": "MUSIC",
+    "slug": {
+      "current": "music"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-read-immediately-enjoy",
+    "name": "READ. IMMEDIATELY. ENJOY.",
+    "slug": {
+      "current": "read-now"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-art",
+    "name": "ART",
+    "slug": {
+      "current": "art"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-keith-the-critic",
+    "name": "KEITH THE CRITIC",
+    "slug": {
+      "current": "keith-the-critic"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-artsconnect",
+    "name": "ARTSConnect",
+    "slug": {
+      "current": "artsconnect"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-lifestyle",
+    "name": "LIFESTYLE",
+    "slug": {
+      "current": "lifestyle"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-ksef-db",
+    "name": "KSEF-DB",
+    "slug": {
+      "current": "ksef-db"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-poetry-prose",
+    "name": "POETRY + PROSE",
+    "slug": {
+      "current": "poetry"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-the-burgerstand",
+    "name": "The Burgerstand",
+    "slug": {
+      "current": "the-burgerstand"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-events",
+    "name": "EVENTS",
+    "slug": {
+      "current": "events"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-july",
+    "name": "july",
+    "slug": {
+      "current": "july"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-topekabeer",
+    "name": "@TopekaBeer",
+    "slug": {
+      "current": "topekabeer-2"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-nathan-biester",
+    "name": "Nathan Biester",
+    "slug": {
+      "current": "nathan-biester"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-blind-tiger-brewery",
+    "name": "Blind Tiger Brewery",
+    "slug": {
+      "current": "blind-tiger-brewery"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-downtown-topeka",
+    "name": "downtown Topeka",
+    "slug": {
+      "current": "downtown-topeka"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-ffaw",
+    "name": "FFAW",
+    "slug": {
+      "current": "ffaw"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-crooked-post-winery",
+    "name": "Crooked Post Winery",
+    "slug": {
+      "current": "crooked-post-winery"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-on-tap",
+    "name": "On Tap",
+    "slug": {
+      "current": "on-tap"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-aero-plains-brewing",
+    "name": "Aero Plains Brewing",
+    "slug": {
+      "current": "aero-plains-brewing"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-mugshot",
+    "name": "MugShot",
+    "slug": {
+      "current": "mugshot"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-bob-crutchfield",
+    "name": "Bob Crutchfield",
+    "slug": {
+      "current": "bob-crutchfield"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-happy-basset",
+    "name": "Happy Basset",
+    "slug": {
+      "current": "happy-basset"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-kansas-beer",
+    "name": "Kansas Beer",
+    "slug": {
+      "current": "kansas-beer"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-literary",
+    "name": "LITERARY",
+    "slug": {
+      "current": "lit"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-785-guide",
+    "name": "785 GUIDE",
+    "slug": {
+      "current": "guides"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-brass-rail-tavern",
+    "name": "Brass Rail Tavern",
+    "slug": {
+      "current": "brass-rail-tavern"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-shop-local",
+    "name": "Shop Local",
+    "slug": {
+      "current": "shop-local"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-greek-food-festival",
+    "name": "Greek Food Festival",
+    "slug": {
+      "current": "greek-food-festival"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-ballet-midwest",
+    "name": "Ballet Midwest",
+    "slug": {
+      "current": "ballet-midwest"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-from-785-archives",
+    "name": "From 785 Archives",
+    "slug": {
+      "current": "from-785-archives"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-92",
+    "name": "92",
+    "slug": {
+      "current": "92"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-james-benger",
+    "name": "James Benger",
+    "slug": {
+      "current": "james-benger"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-jason-baloinger",
+    "name": "Jason Baloinger",
+    "slug": {
+      "current": "jason-baloinger"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-kansas-is-lit",
+    "name": "Kansas is Lit",
+    "slug": {
+      "current": "kansas-is-lit"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-lit-crit",
+    "name": "LIT CRIT",
+    "slug": {
+      "current": "lit-crit"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-topeka-zoo",
+    "name": "Topeka Zoo",
+    "slug": {
+      "current": "topeka-zoo"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-women-who-rock",
+    "name": "WOMEN WHO ROCK",
+    "slug": {
+      "current": "women-who-rock"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-91",
+    "name": "91",
+    "slug": {
+      "current": "91"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-thomas-fox-averill",
+    "name": "Thomas Fox Averill",
+    "slug": {
+      "current": "thomas-fox-averill"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-golden-mile",
+    "name": "Golden Mile",
+    "slug": {
+      "current": "golden-mile"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-holliday-park",
+    "name": "Holliday Park",
+    "slug": {
+      "current": "holliday-park"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-la-casita",
+    "name": "La Casita",
+    "slug": {
+      "current": "la-casita"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-topcity-flavorista",
+    "name": "TopCity Flavorista",
+    "slug": {
+      "current": "local-flavorista"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-project-forward",
+    "name": "Project Forward",
+    "slug": {
+      "current": "project-forward"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-sj-hazim",
+    "name": "SJ Hazim",
+    "slug": {
+      "current": "sj-hazim"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-1",
+    "name": "1",
+    "slug": {
+      "current": "poetry-collection"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-denise-low",
+    "name": "Denise Low",
+    "slug": {
+      "current": "denise-low"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-poet-laureate-of-kansas",
+    "name": "Poet Laureate of Kansas",
+    "slug": {
+      "current": "poet-laureate-of-kansas"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-noto-arts-district",
+    "name": "NOTO Arts District",
+    "slug": {
+      "current": "noto-arts-district"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-naacp",
+    "name": "NAACP",
+    "slug": {
+      "current": "naacp"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-temple-beth-sholom",
+    "name": "Temple Beth Sholom",
+    "slug": {
+      "current": "temple-beth-sholom"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-studio-62",
+    "name": "Studio 62",
+    "slug": {
+      "current": "studio-62"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-entertainment",
+    "name": "ENTERTAINMENT",
+    "slug": {
+      "current": "ae"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-tpac",
+    "name": "TPAC",
+    "slug": {
+      "current": "tpac"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-poetry",
+    "name": "Poetry",
+    "slug": {
+      "current": "poetry"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-poetry-kan",
+    "name": "Poetry Kan",
+    "slug": {
+      "current": "poetry-kan"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-topeka-blues-society",
+    "name": "Topeka Blues Society",
+    "slug": {
+      "current": "topeka-blues-society"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-the-vinewood",
+    "name": "The Vinewood",
+    "slug": {
+      "current": "the-vinewood"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-forge",
+    "name": "Forge",
+    "slug": {
+      "current": "forge"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-teens",
+    "name": "Teens",
+    "slug": {
+      "current": "teens"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-the-new-york-times",
+    "name": "The New York Times",
+    "slug": {
+      "current": "the-new-york-times"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-93",
+    "name": "93",
+    "slug": {
+      "current": "93"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-ad-astra-arcade-auctions",
+    "name": "Ad Astra Arcade Auctions",
+    "slug": {
+      "current": "ad-astra-arcade-auctions"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-capital-city-games-amp-music",
+    "name": "Capital City Games &amp; Music",
+    "slug": {
+      "current": "capital-city-games-music"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-clad-astra",
+    "name": "Clad Astra",
+    "slug": {
+      "current": "clad-astra"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-made-maker",
+    "name": "Made Maker",
+    "slug": {
+      "current": "made-maker"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-meadowlark-graphics",
+    "name": "Meadowlark Graphics",
+    "slug": {
+      "current": "meadowlark-graphics"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-pinkadilly",
+    "name": "Pinkadilly",
+    "slug": {
+      "current": "pinkadilly"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-prairie-glass-studios",
+    "name": "Prairie Glass Studios",
+    "slug": {
+      "current": "prairie-glass-studios"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-reliant-apparel",
+    "name": "Reliant Apparel",
+    "slug": {
+      "current": "reliant-apparel"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-topeka-flag-swag",
+    "name": "Topeka Flag Swag",
+    "slug": {
+      "current": "topeka-flag-swag"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-ballots-brews",
+    "name": "Ballots + Brews",
+    "slug": {
+      "current": "ballots-brews"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-brian-daldorph",
+    "name": "Brian Daldorph",
+    "slug": {
+      "current": "brian-daldorph"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-kansas-poems",
+    "name": "Kansas Poems",
+    "slug": {
+      "current": "kansas-poems"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-meadowlark-books",
+    "name": "Meadowlark Books",
+    "slug": {
+      "current": "meadowlark-books"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-meadowlark-press",
+    "name": "Meadowlark Press",
+    "slug": {
+      "current": "meadowlark-press"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-food-ninja",
+    "name": "Food Ninja",
+    "slug": {
+      "current": "food-ninja"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-jayhawk-theatre",
+    "name": "Jayhawk Theatre",
+    "slug": {
+      "current": "jayhawk-theatre"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-nonprofit",
+    "name": "Nonprofit",
+    "slug": {
+      "current": "nonprofit"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-topeka-rescue-mission",
+    "name": "Topeka Rescue Mission",
+    "slug": {
+      "current": "topeka-rescue-mission"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-jong039s-thai-kitchen",
+    "name": "Jong&#039;s Thai Kitchen",
+    "slug": {
+      "current": "jongs-thai-kitchen"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-94",
+    "name": "94",
+    "slug": {
+      "current": "94"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-justin-marable",
+    "name": "Justin Marable",
+    "slug": {
+      "current": "justin-marable"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-porubsky",
+    "name": "Porubsky",
+    "slug": {
+      "current": "porubsky"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-transcendent-deli",
+    "name": "Transcendent Deli",
+    "slug": {
+      "current": "transcendent-deli"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-the-burgerstand-in-brookwood",
+    "name": "The BurgerStand in Brookwood",
+    "slug": {
+      "current": "the-burgerstand-in-brookwood"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-tscpl",
+    "name": "TSCPL",
+    "slug": {
+      "current": "tscpl"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-lady-shakes",
+    "name": "Lady Shakes",
+    "slug": {
+      "current": "lady-shakes"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-video",
+    "name": "Video",
+    "slug": {
+      "current": "post-format-video"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-ksef-podcast",
+    "name": "KSEF Podcast",
+    "slug": {
+      "current": "podcast"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-nate-dingman",
+    "name": "Nate Dingman",
+    "slug": {
+      "current": "nate-dingman"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-two-wolves-gallery-artist-collective",
+    "name": "Two Wolves Gallery + Artist Collective",
+    "slug": {
+      "current": "two-wolves-gallery-artist-collective"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-spencer-art-museum",
+    "name": "Spencer Art Museum",
+    "slug": {
+      "current": "spencer-art-museum"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-the-historic-vinewood",
+    "name": "The Historic Vinewood",
+    "slug": {
+      "current": "the-historic-vinewood"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-annual-events",
+    "name": "Annual Events",
+    "slug": {
+      "current": "annual-events"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-kansas-silent-film-festival",
+    "name": "Kansas Silent Film Festival",
+    "slug": {
+      "current": "kansas-silent-film-festival"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-jacob-hodge",
+    "name": "Jacob Hodge",
+    "slug": {
+      "current": "jacob-hodge"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-95",
+    "name": "95",
+    "slug": {
+      "current": "95"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-mulvane-art-museum",
+    "name": "Mulvane Art Museum",
+    "slug": {
+      "current": "mulvane-art-museum"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-ignacio-carvajala",
+    "name": "Ignacio Carvajala",
+    "slug": {
+      "current": "ignacio-carvajala"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-denton-kahler",
+    "name": "Denton Kahler",
+    "slug": {
+      "current": "denton-kahler"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-underground-instrument-repair",
+    "name": "Underground Instrument Repair",
+    "slug": {
+      "current": "underground-instrument-repair"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-mountain-biking",
+    "name": "Mountain Biking",
+    "slug": {
+      "current": "mountain-biking"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-scott-stebner",
+    "name": "Scott Stebner",
+    "slug": {
+      "current": "scott-stebner"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-trails",
+    "name": "Trails",
+    "slug": {
+      "current": "trails"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-fishing",
+    "name": "fishing",
+    "slug": {
+      "current": "fishing"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-toby-leavendusky",
+    "name": "Toby Leavendusky",
+    "slug": {
+      "current": "toby-leavendusky"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-blake-cazier",
+    "name": "Blake Cazier",
+    "slug": {
+      "current": "blake-cazier"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-team-blake",
+    "name": "Team Blake",
+    "slug": {
+      "current": "team-blake"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-tap-that",
+    "name": "Tap That",
+    "slug": {
+      "current": "tap-that"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-willcott-brewing-company",
+    "name": "Willcott Brewing Company",
+    "slug": {
+      "current": "willcott-brewing-company"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-olive-cafe",
+    "name": "Olive Cafe",
+    "slug": {
+      "current": "olive-cafe"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-anna-ps",
+    "name": "Anna P.S.",
+    "slug": {
+      "current": "anna-p-s"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-boobie-trap",
+    "name": "Boobie Trap",
+    "slug": {
+      "current": "boobie-trap"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-dirty-girls",
+    "name": "Dirty Girls",
+    "slug": {
+      "current": "dirty-girls"
+    }
+  },
+  {
+    "_type": "tag",
+    "_id": "category-969-the-beat",
+    "name": "969 The Beat",
+    "slug": {
+      "current": "969-the-beat"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-andy-mckee",
+    "name": "Andy McKee",
+    "slug": {
+      "current": "andy-mckee"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-capper-foundation",
+    "name": "Capper Foundation",
+    "slug": {
+      "current": "capper-foundation"
+    }
+  },
+  {
+    "_type": "category",
+    "_id": "category-serendipity",
+    "name": "Serendipity",
+    "slug": {
+      "current": "serendipity"
+    }
+  }
+]

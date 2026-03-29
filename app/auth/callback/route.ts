@@ -9,7 +9,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login?error=missing_code`)
   }
 
-  const response = NextResponse.redirect(`${origin}/dashboard`)
+  // ✅ Use a mutable redirectTo variable instead of a fixed response
+  let redirectTo = `${origin}/`
+
+  // ✅ Temp response just for cookie plumbing during exchangeCodeForSession
+  const tempResponse = NextResponse.next()
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,7 +23,7 @@ export async function GET(request: NextRequest) {
         getAll() { return request.cookies.getAll() },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+            tempResponse.cookies.set(name, value, options)
           )
         },
       },
@@ -36,7 +40,6 @@ export async function GET(request: NextRequest) {
   const userEmail = user.email
 
   if (userEmail) {
-    // Check if this email user is linked to an artist or venue
     const { data: artist } = await supabase
       .from('artists')
       .select('id, auth_user_id')
@@ -44,49 +47,43 @@ export async function GET(request: NextRequest) {
       .maybeSingle()
 
     if (artist) {
-      // Link auth_user_id if not already set
       if (!artist.auth_user_id) {
-        await supabase
-          .from('artists')
-          .update({ auth_user_id: user.id })
-          .eq('id', artist.id)
+        await supabase.from('artists').update({ auth_user_id: user.id }).eq('id', artist.id)
       }
-      // Route to dashboard
-      return NextResponse.redirect(`${origin}/dashboard`)
-    }
+      redirectTo = `${origin}/dashboard`
+    } else {
+      const { data: venue } = await supabase
+        .from('venues')
+        .select('id, auth_user_id')
+        .eq('email', userEmail)
+        .maybeSingle()
 
-    // Check venues
-    const { data: venue } = await supabase
-      .from('venues')
-      .select('id, auth_user_id')
-      .eq('email', userEmail)
-      .maybeSingle()
+      if (venue) {
+        if (!venue.auth_user_id) {
+          await supabase.from('venues').update({ auth_user_id: user.id }).eq('id', venue.id)
+        }
+        redirectTo = `${origin}/dashboard`
+      } else {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
+          .maybeSingle()
 
-    if (venue) {
-      if (!venue.auth_user_id) {
-        await supabase
-          .from('venues')
-          .update({ auth_user_id: user.id })
-          .eq('id', venue.id)
+        if (!profile) {
+          redirectTo = `${origin}/login?complete=1`
+        } else {
+          redirectTo = `${origin}/`
+        }
       }
-      return NextResponse.redirect(`${origin}/dashboard`)
     }
-
-    // No entity match — check if user has completed signup (has a profile)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', user.id)
-      .maybeSingle()
-
-    if (!profile) {
-      // New user who signed up via magic link but hasn't completed merge yet
-      return NextResponse.redirect(`${origin}/login?complete=1`)
-    }
-
-    // Returning user with no linked entities — send home
-    return NextResponse.redirect(`${origin}/`)
   }
 
-  return response
+  // ✅ Build ONE final response and copy all cookies onto it
+  const finalResponse = NextResponse.redirect(redirectTo)
+  tempResponse.cookies.getAll().forEach(({ name, value, ...options }) => {
+    finalResponse.cookies.set(name, value, options)
+  })
+
+  return finalResponse
 }
