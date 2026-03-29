@@ -311,7 +311,7 @@ export default async function DashboardPage() {
         </a>
 
         {/* SETTINGS — 1 col */}
-        <a href="/dashboard/settings" className="card">
+        <div className="card">
           <div className="card-label">Account</div>
           <div className="card-title">SETTINGS + NOTIFICATIONS</div>
           <hr className="card-hr" />
@@ -322,13 +322,13 @@ export default async function DashboardPage() {
             </div>
           )}
           <div className="settings-links">
-            <a href="/dashboard/settings" className="settings-link" onClick={e => e.stopPropagation()}>Edit Profile</a>
+            <a href="/dashboard/settings" className="settings-link">Edit Profile</a>
             <span className="settings-dot">·</span>
-            <a href="/dashboard/settings#notifications" className="settings-link" onClick={e => e.stopPropagation()}>Notifications</a>
+            <a href="/dashboard/settings#notifications" className="settings-link">Notifications</a>
             <span className="settings-dot">·</span>
-            <a href="/api/auth/signout" className="settings-link" onClick={e => e.stopPropagation()} style={{ color: 'var(--brand)' }}>Sign Out</a>
+            <a href="/api/auth/signout" className="settings-link" style={{ color: 'var(--brand)' }}>Sign Out</a>
           </div>
-        </a>
+        </div>
 
         {/* CREATE CTA — full width */}
         <div className="create-card col3">
