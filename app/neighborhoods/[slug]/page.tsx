@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '../../../lib/supabaseServer'
 import Link from 'next/link'
 import Image from 'next/image'
 import { notFound } from 'next/navigation'
@@ -52,7 +52,7 @@ const venueTypeBadge = (type: string) => {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const supabase = await createClient()
+  const supabase = createClient()
   const { data: hood } = await supabase
     .from('neighborhoods')
     .select('name, tagline, description, image_url')
@@ -74,7 +74,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function NeighborhoodDetailPage({ params }: Props) {
   const { slug } = await params
-  const supabase = await createClient()
+  const supabase = createClient()
 
   const { data: hood } = await supabase
     .from('neighborhoods')

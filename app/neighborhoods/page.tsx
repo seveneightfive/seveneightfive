@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '../../lib/supabaseServer'
 import Link from 'next/link'
 import Image from 'next/image'
 
@@ -20,7 +20,7 @@ type Neighborhood = {
 type VenueRow = { neighborhood: string | null }
 
 export default async function NeighborhoodsPage() {
-  const supabase = await createClient()
+  const supabase = createClient()
 
   const { data: neighborhoods } = await supabase
     .from('neighborhoods')
