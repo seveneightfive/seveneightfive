@@ -20,7 +20,16 @@ export default function EmailSettingsPage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
-      setCurrentEmail(user.email || '')
+      let email = user.email || ''
+      if (!email) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', user.id)
+          .maybeSingle()
+        email = profile?.email || ''
+      }
+      setCurrentEmail(email)
       setLoading(false)
     }
     load()
