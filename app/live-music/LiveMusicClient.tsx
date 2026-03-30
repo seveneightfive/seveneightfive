@@ -436,7 +436,7 @@ export default function LiveMusicClient({
             -webkit-overflow-scrolling: touch; scrollbar-width: none;
           }
           .lm-events-grid::-webkit-scrollbar { display: none; }
-          .lm-event-card { min-width: 240px; scroll-snap-align: start; flex-shrink: 0; }
+          .lm-event-card { width: 70vw; min-width: 200px; max-width: 260px; flex-shrink: 0; flex-grow: 0; scroll-snap-align: start; }
           .lm-musicians-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
           .lm-venues-grid { grid-template-columns: 1fr; }
           .lm-venue-card { max-width: 100%; overflow: hidden; }
