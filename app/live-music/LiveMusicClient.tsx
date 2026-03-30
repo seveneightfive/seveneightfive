@@ -699,7 +699,9 @@ export default function LiveMusicClient({
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <a
-              href="/events"
+              href="https://seveneightfive.fillout.com/add-event"
+              target="_blank"
+              rel="noopener noreferrer"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 8,
                 background: 'var(--accent)', color: 'white',
@@ -708,10 +710,12 @@ export default function LiveMusicClient({
                 padding: '13px 28px', borderRadius: 4, textDecoration: 'none',
               }}
             >
-              All Events
+              Add Event
             </a>
             <a
-              href="/artists"
+              href="https://seveneightfive.fillout.com/new-artist"
+              target="_blank"
+              rel="noopener noreferrer"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 8,
                 background: 'transparent', color: 'var(--ink)',
@@ -721,7 +725,7 @@ export default function LiveMusicClient({
                 border: '2px solid var(--border)',
               }}
             >
-              Artist Directory
+              Create Artist Page
             </a>
           </div>
         </section>
