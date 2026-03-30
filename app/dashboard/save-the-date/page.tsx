@@ -151,9 +151,8 @@ function downloadPDF(events: SaveTheDate[], label: string): void {
   @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'DM Sans', sans-serif; color: #111; background: #fff; padding: 40px; }
-  .header { display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 3px solid #111; padding-bottom: 16px; margin-bottom: 28px; }
-  .logo { font-family: 'DM Serif Display', serif; font-size: 48px; letter-spacing: -2px; line-height: 1; }
-  .logo span { font-size: 14px; font-family: 'DM Sans', sans-serif; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; display: block; margin-top: 2px; }
+  .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #111; padding-bottom: 16px; margin-bottom: 28px; }
+  .logo img { height: 52px; width: auto; display: block; }
   .meta { text-align: right; }
   .meta h2 { font-size: 22px; font-weight: 600; }
   .meta p { font-size: 12px; color: #666; margin-top: 2px; }
@@ -168,7 +167,7 @@ function downloadPDF(events: SaveTheDate[], label: string): void {
 </head>
 <body>
 <div class="header">
-  <div class="logo">785<span>Save The Date</span></div>
+  <div class="logo"><img src="https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785%20BG%20MAGAZINE.png" alt="785 Magazine" /></div>
   <div class="meta">
     <h2>${label}</h2>
     <p>Annual Planning Calendar · seveneightfive.com</p>
