@@ -16,6 +16,7 @@ type SaveTheDateEventType =
   | 'Special Event'
   | 'Arts + Exhibition'
   | 'Sports + Recreation'
+  | 'Party for a Cause'
 
 interface SaveTheDate {
   id: string
@@ -71,6 +72,7 @@ const EVENT_TYPES: SaveTheDateEventType[] = [
   'Special Event',
   'Arts + Exhibition',
   'Sports + Recreation',
+  'Party for a Cause',
 ]
 
 const MONTH_NAMES = [
@@ -124,8 +126,7 @@ function downloadCSV(events: SaveTheDate[]): void {
   URL.revokeObjectURL(url)
 }
 
-function downloadPDF(events: SaveTheDate[], month: number, year: number): void {
-  const monthLabel = `${MONTH_NAMES[month]} ${year}`
+function downloadPDF(events: SaveTheDate[], label: string): void {
   const rows = events
     .map(
       (e) => `
@@ -145,7 +146,7 @@ function downloadPDF(events: SaveTheDate[], month: number, year: number): void {
 <html>
 <head>
 <meta charset="UTF-8"/>
-<title>785 Save the Date – ${monthLabel}</title>
+<title>785 Save the Date – ${label}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -169,7 +170,7 @@ function downloadPDF(events: SaveTheDate[], month: number, year: number): void {
 <div class="header">
   <div class="logo">785<span>Save The Date</span></div>
   <div class="meta">
-    <h2>${monthLabel}</h2>
+    <h2>${label}</h2>
     <p>Annual Planning Calendar · seveneightfive.com</p>
     <p>Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
   </div>
@@ -186,7 +187,7 @@ function downloadPDF(events: SaveTheDate[], month: number, year: number): void {
       <th>Needs</th>
     </tr>
   </thead>
-  <tbody>${rows || "<tr><td colspan='7' style='text-align:center;padding:24px;color:#999;'>No approved events this month.</td></tr>"}</tbody>
+  <tbody>${rows || "<tr><td colspan='7' style='text-align:center;padding:24px;color:#999;'>No approved events this period.</td></tr>"}</tbody>
 </table>
 <div class="footer">
   <span>seveneightfive.com · Topeka's Arts + Culture Platform</span>
@@ -203,13 +204,23 @@ function downloadPDF(events: SaveTheDate[], month: number, year: number): void {
 }
 
 // ─── Add Event Modal ──────────────────────────────────────────────────────────
-function AddEventModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+function AddEventModal({
+  onClose,
+  onSuccess,
+  prefill,
+}: {
+  onClose: () => void
+  onSuccess: () => void
+  prefill: { name: string; email: string; phone: string }
+}) {
   const [form, setForm] = useState<AddEventForm>({
     title: '', organizer: '', event_date: '', event_end_date: '',
     start_time: '', end_time: '', event_type: 'Special Event',
     location_name: '', expected_capacity: '', about: '', needs: '',
     is_annual: false, is_nonprofit: false,
-    submitter_name: '', submitter_email: '', submitter_phone: '',
+    submitter_name: prefill.name,
+    submitter_email: prefill.email,
+    submitter_phone: prefill.phone,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -250,6 +261,11 @@ function AddEventModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
           <button className="close-btn" onClick={onClose}>✕</button>
         </div>
         <form onSubmit={handleSubmit} className="modal-form">
+          {/* Hidden submitter fields — pre-filled from user profile */}
+          <input type="hidden" value={form.submitter_name} />
+          <input type="hidden" value={form.submitter_email} />
+          <input type="hidden" value={form.submitter_phone} />
+
           <div className="form-grid">
             <div className="form-group full">
               <label>Event Title *</label>
@@ -307,20 +323,18 @@ function AddEventModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
               <label>Needs <span className="optional">(venue, sponsors, volunteers, etc.)</span></label>
               <textarea rows={2} value={form.needs} onChange={(e) => set('needs', e.target.value)} placeholder="What are you still looking for?" />
             </div>
-            <div className="form-divider full"><span>Submitter Info</span></div>
-            <div className="form-group">
-              <label>Your Name</label>
-              <input value={form.submitter_name} onChange={(e) => set('submitter_name', e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label>Email *</label>
-              <input type="email" required value={form.submitter_email} onChange={(e) => set('submitter_email', e.target.value)} />
-            </div>
-            <div className="form-group full">
-              <label>Phone <span className="optional">(optional)</span></label>
-              <input type="tel" value={form.submitter_phone} onChange={(e) => set('submitter_phone', e.target.value)} />
-            </div>
           </div>
+
+          {/* Show submitter info as read-only confirmation */}
+          {(form.submitter_name || form.submitter_email) && (
+            <div className="submitter-confirm">
+              <span className="submitter-confirm-label">Submitting as</span>
+              <span className="submitter-confirm-value">
+                {form.submitter_name}{form.submitter_name && form.submitter_email ? ' · ' : ''}{form.submitter_email}
+              </span>
+            </div>
+          )}
+
           {error && <p className="form-error">{error}</p>}
           <div className="modal-footer">
             <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>
@@ -408,22 +422,99 @@ function EventDetailModal({ event, onClose }: { event: SaveTheDate; onClose: () 
   )
 }
 
+// ─── Agenda List ──────────────────────────────────────────────────────────────
+function AgendaList({
+  events,
+  loading,
+  emptyLabel,
+  onSelect,
+}: {
+  events: SaveTheDate[]
+  loading: boolean
+  emptyLabel: string
+  onSelect: (e: SaveTheDate) => void
+}) {
+  if (loading) return <div className="loading-state">Loading events…</div>
+  if (events.length === 0) {
+    return (
+      <div className="agenda-empty">
+        <strong>{emptyLabel}</strong>
+        Be the first to claim a date!
+      </div>
+    )
+  }
+  return (
+    <>
+      {events.map((ev) => {
+        const d = new Date(ev.event_date + 'T12:00:00')
+        const dayNum = d.getDate()
+        const dayName = DAY_NAMES[d.getDay()]
+        const isMultiDay = ev.event_end_date && ev.event_end_date !== ev.event_date
+        return (
+          <div key={ev.id} className="agenda-item" onClick={() => onSelect(ev)}>
+            <div className="agenda-date">
+              <div className="agenda-date-day">{dayNum}</div>
+              <div className="agenda-date-dow">{dayName}</div>
+            </div>
+            <div className="agenda-content">
+              <div className="agenda-title">{ev.title}</div>
+              <div className="agenda-meta">
+                <span className="agenda-organizer">{ev.organizer}</span>
+                <span className="agenda-type-chip">{ev.event_type}</span>
+              </div>
+              {ev.location_name && (
+                <div className="agenda-location">📍 {ev.location_name}</div>
+              )}
+              {isMultiDay && (
+                <div className="agenda-multiday">through {formatDate(ev.event_end_date)}</div>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function SaveTheDatePage() {
   const today = new Date()
+  const [view, setView] = useState<'month' | 'year'>('month')
   const [month, setMonth] = useState<number>(today.getMonth())
   const [year, setYear] = useState<number>(today.getFullYear())
   const [events, setEvents] = useState<SaveTheDate[]>([])
+  const [yearEvents, setYearEvents] = useState<SaveTheDate[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [showAdd, setShowAdd] = useState<boolean>(false)
   const [selectedEvent, setSelectedEvent] = useState<SaveTheDate | null>(null)
+  const [prefill, setPrefill] = useState({ name: '', email: '', phone: '' })
 
-  const fetchEvents = useCallback(async () => {
+  // Load user profile for form pre-fill
+  useEffect(() => {
+    async function loadProfile() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, email, phone_number')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (profile) {
+        setPrefill({
+          name: profile.full_name || '',
+          email: profile.email || user.email || '',
+          phone: profile.phone_number || '',
+        })
+      }
+    }
+    loadProfile()
+  }, [])
+
+  const fetchMonthEvents = useCallback(async () => {
     setLoading(true)
     const from = `${year}-${String(month + 1).padStart(2, '0')}-01`
     const lastDay = new Date(year, month + 1, 0).getDate()
     const to = `${year}-${String(month + 1).padStart(2, '0')}-${lastDay}`
-
     const { data, error } = await supabase
       .from('save_the_date')
       .select('*')
@@ -431,25 +522,57 @@ export default function SaveTheDatePage() {
       .gte('event_date', from)
       .lte('event_date', to)
       .order('event_date', { ascending: true })
-
     if (!error) setEvents((data as SaveTheDate[]) ?? [])
     setLoading(false)
   }, [month, year])
 
-  useEffect(() => { fetchEvents() }, [fetchEvents])
+  const fetchYearEvents = useCallback(async () => {
+    setLoading(true)
+    const from = `${year}-01-01`
+    const to = `${year}-12-31`
+    const { data, error } = await supabase
+      .from('save_the_date')
+      .select('*')
+      .eq('status', 'approved')
+      .gte('event_date', from)
+      .lte('event_date', to)
+      .order('event_date', { ascending: true })
+    if (!error) setYearEvents((data as SaveTheDate[]) ?? [])
+    setLoading(false)
+  }, [year])
 
-  function prevMonth(): void {
+  useEffect(() => {
+    if (view === 'month') fetchMonthEvents()
+    else fetchYearEvents()
+  }, [view, fetchMonthEvents, fetchYearEvents])
+
+  function prevPeriod() {
+    if (view === 'year') { setYear((y) => y - 1); return }
     if (month === 0) { setMonth(11); setYear((y) => y - 1) }
     else setMonth((m) => m - 1)
   }
-  function nextMonth(): void {
+  function nextPeriod() {
+    if (view === 'year') { setYear((y) => y + 1); return }
     if (month === 11) { setMonth(0); setYear((y) => y + 1) }
     else setMonth((m) => m + 1)
   }
-  function goToday(): void {
-    setMonth(today.getMonth())
-    setYear(today.getFullYear())
+
+  function toggleView() {
+    setView((v) => v === 'month' ? 'year' : 'month')
   }
+
+  // Group year events by month
+  const byMonth: Record<number, SaveTheDate[]> = {}
+  if (view === 'year') {
+    yearEvents.forEach((ev) => {
+      const m = parseInt(ev.event_date.split('-')[1], 10) - 1
+      if (!byMonth[m]) byMonth[m] = []
+      byMonth[m].push(ev)
+    })
+  }
+
+  const displayLabel = view === 'year' ? String(year) : `${MONTH_NAMES[month]} ${year}`
+  const allEvents = view === 'year' ? yearEvents : events
 
   return (
     <>
@@ -458,12 +581,36 @@ export default function SaveTheDatePage() {
           font-family: 'DM Sans', -apple-system, sans-serif;
           max-width: 860px;
           margin: 0 auto;
-          padding: 40px 24px 80px;
+          padding: 0 24px 80px;
           color: #111;
         }
-        .std-topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
-        .std-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: #666; text-decoration: none; border: 1.5px solid #ddd; border-radius: 7px; padding: 6px 12px; transition: border-color 0.15s, color 0.15s; }
-        .std-back:hover { border-color: #999; color: #111; }
+        /* ── top nav (matches other dashboard pages) ── */
+        .std-topnav {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 16px 0;
+          border-bottom: 1px solid #eee;
+          margin-bottom: 32px;
+        }
+        .std-back {
+          font-family: 'Oswald', sans-serif;
+          font-size: 0.72rem;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: rgba(0,0,0,0.35);
+          text-decoration: none;
+          transition: color 0.15s;
+        }
+        .std-back:hover { color: #111; }
+        .std-page-label {
+          font-family: 'Oswald', sans-serif;
+          font-size: 0.72rem;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: rgba(0,0,0,0.25);
+        }
+        /* ── header ── */
         .std-header {
           display: flex;
           align-items: flex-start;
@@ -471,7 +618,15 @@ export default function SaveTheDatePage() {
           gap: 24px;
           margin-bottom: 32px;
         }
-        .std-header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 6px; }
+        .std-header h1 {
+          font-family: 'Oswald', sans-serif;
+          font-size: 2rem;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          margin-bottom: 6px;
+          line-height: 1;
+        }
         .std-header p { font-size: 14px; color: #555; max-width: 520px; line-height: 1.5; }
         .btn-primary { background: #111; color: #fff; border: none; padding: 10px 18px; font-size: 14px; font-weight: 600; border-radius: 8px; cursor: pointer; white-space: nowrap; transition: opacity 0.15s; }
         .btn-primary:hover { opacity: 0.82; }
@@ -480,13 +635,23 @@ export default function SaveTheDatePage() {
         .btn-ghost:hover { border-color: #aaa; }
         .btn-outline { background: #fff; color: #111; border: 1.5px solid #ddd; padding: 8px 14px; font-size: 13px; font-weight: 500; border-radius: 7px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: border-color 0.15s, background 0.15s; }
         .btn-outline:hover { border-color: #999; background: #f5f5f5; }
+        /* ── calendar controls ── */
         .cal-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-        .cal-month-label { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; min-width: 200px; }
+        .cal-month-label {
+          font-family: 'Oswald', sans-serif;
+          font-size: 22px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          min-width: 180px;
+        }
         .cal-nav { background: none; border: 1.5px solid #ddd; border-radius: 7px; width: 34px; height: 34px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: border-color 0.15s; }
         .cal-nav:hover { border-color: #999; }
-        .today-btn { background: none; border: 1.5px solid #ddd; border-radius: 7px; padding: 6px 14px; font-size: 13px; font-weight: 500; cursor: pointer; transition: border-color 0.15s; }
-        .today-btn:hover { border-color: #999; }
+        .view-toggle { background: none; border: 1.5px solid #ddd; border-radius: 7px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: border-color 0.15s, background 0.15s, color 0.15s; font-family: 'Oswald', sans-serif; letter-spacing: 0.06em; text-transform: uppercase; }
+        .view-toggle:hover { border-color: #999; }
+        .view-toggle.active { background: #111; border-color: #111; color: #fff; }
         .download-group { margin-left: auto; display: flex; gap: 8px; }
+        /* ── agenda ── */
         .agenda-list { border: 1.5px solid #e5e5e5; border-radius: 12px; overflow: hidden; }
         .agenda-empty { padding: 48px 24px; text-align: center; color: #999; font-size: 15px; }
         .agenda-empty strong { display: block; color: #555; margin-bottom: 4px; font-size: 16px; }
@@ -494,7 +659,7 @@ export default function SaveTheDatePage() {
         .agenda-item:last-child { border-bottom: none; }
         .agenda-item:hover { background: #fafafa; }
         .agenda-date { padding: 16px 16px 16px 20px; border-right: 1px solid #eee; background: #fafafa; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 70px; }
-        .agenda-date-day { font-size: 22px; font-weight: 700; line-height: 1; }
+        .agenda-date-day { font-family: 'Oswald', sans-serif; font-size: 22px; font-weight: 700; line-height: 1; }
         .agenda-date-dow { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
         .agenda-content { padding: 14px 20px; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
         .agenda-title { font-size: 15px; font-weight: 600; }
@@ -503,7 +668,26 @@ export default function SaveTheDatePage() {
         .agenda-type-chip { font-size: 11px; font-weight: 600; color: #555; background: #f0f0f0; border-radius: 4px; padding: 2px 7px; letter-spacing: 0.3px; }
         .agenda-location { font-size: 12px; color: #999; }
         .agenda-multiday { font-size: 11px; color: #888; font-style: italic; }
+        /* ── year view month sections ── */
+        .year-month-section { margin-bottom: 36px; }
+        .year-month-heading {
+          font-family: 'Oswald', sans-serif;
+          font-size: 13px;
+          font-weight: 700;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: #888;
+          padding: 10px 0 8px;
+          border-bottom: 2px solid #111;
+          margin-bottom: 8px;
+          display: flex;
+          align-items: baseline;
+          gap: 10px;
+        }
+        .year-month-count { font-size: 11px; font-weight: 500; color: #aaa; letter-spacing: 0; }
+        .year-month-empty { font-size: 13px; color: #ccc; padding: 12px 0; font-style: italic; }
         .loading-state { padding: 40px 24px; text-align: center; color: #aaa; font-size: 14px; }
+        /* ── modal ── */
         .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
         .modal { background: #fff; border-radius: 14px; width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,0.18); }
         .modal-detail { max-width: 520px; }
@@ -523,8 +707,9 @@ export default function SaveTheDatePage() {
         .checkboxes { flex-direction: column; justify-content: flex-end; gap: 10px; }
         .checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; cursor: pointer; }
         .checkbox-label input { width: 16px; height: 16px; cursor: pointer; }
-        .form-divider { position: relative; text-align: center; border-top: 1px solid #eee; margin: 4px 0 0; }
-        .form-divider span { position: relative; top: -10px; background: #fff; padding: 0 10px; font-size: 12px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.8px; }
+        .submitter-confirm { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 12px; background: #f5f5f5; border-radius: 7px; font-size: 13px; }
+        .submitter-confirm-label { font-weight: 600; color: #555; white-space: nowrap; }
+        .submitter-confirm-value { color: #333; }
         .form-error { color: #C80650; font-size: 13px; margin-top: 10px; padding: 10px 12px; background: #fce8ef; border-radius: 6px; }
         .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .event-type-badge { font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: #666; background: #f0f0f0; border-radius: 4px; padding: 3px 8px; display: inline-block; margin-bottom: 6px; }
@@ -549,19 +734,18 @@ export default function SaveTheDatePage() {
           .form-group.full { grid-column: 1; }
           .download-group { margin-left: 0; }
           .cal-controls { gap: 6px; }
+          .std-page { padding: 0 16px 60px; }
         }
       `}</style>
 
       <div className="std-page">
-        <div className="std-topbar">
-          <a href="/dashboard" className="std-back">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5M12 5l-7 7 7 7"/>
-            </svg>
-            Dashboard
-          </a>
+        {/* ── Top nav (matches other dashboard pages) ── */}
+        <div className="std-topnav">
+          <a href="/dashboard" className="std-back">← Dashboard</a>
+          <span className="std-page-label">Save The Date</span>
         </div>
 
+        {/* ── Header ── */}
         <div className="std-header">
           <div>
             <h1>Save The Date</h1>
@@ -573,59 +757,77 @@ export default function SaveTheDatePage() {
           <button className="btn-primary" onClick={() => setShowAdd(true)}>+ Add Event</button>
         </div>
 
+        {/* ── Calendar controls ── */}
         <div className="cal-controls">
-          <button className="cal-nav" onClick={prevMonth}>‹</button>
-          <button className="today-btn" onClick={goToday}>Today</button>
-          <button className="cal-nav" onClick={nextMonth}>›</button>
-          <span className="cal-month-label">{MONTH_NAMES[month]} {year}</span>
+          <button className="cal-nav" onClick={prevPeriod}>‹</button>
+          <button
+            className={`view-toggle${view === 'year' ? ' active' : ''}`}
+            onClick={toggleView}
+          >
+            Year
+          </button>
+          <button className="cal-nav" onClick={nextPeriod}>›</button>
+          <span className="cal-month-label">{displayLabel}</span>
           <div className="download-group">
-            <button className="btn-outline" onClick={() => downloadCSV(events)}>⬇ CSV</button>
-            <button className="btn-outline" onClick={() => downloadPDF(events, month, year)}>⬇ PDF</button>
+            <button className="btn-outline" onClick={() => downloadCSV(allEvents)}>⬇ CSV</button>
+            <button className="btn-outline" onClick={() => downloadPDF(allEvents, displayLabel)}>⬇ PDF</button>
           </div>
         </div>
 
-        <div className="agenda-list">
-          {loading ? (
-            <div className="loading-state">Loading events…</div>
-          ) : events.length === 0 ? (
-            <div className="agenda-empty">
-              <strong>No events saved for {MONTH_NAMES[month]} {year}</strong>
-              Be the first to claim a date!
+        {/* ── Month view ── */}
+        {view === 'month' && (
+          <div className="agenda-list">
+            <AgendaList
+              events={events}
+              loading={loading}
+              emptyLabel={`No events saved for ${MONTH_NAMES[month]} ${year}`}
+              onSelect={setSelectedEvent}
+            />
+          </div>
+        )}
+
+        {/* ── Year view — all 12 months ── */}
+        {view === 'year' && (
+          loading ? (
+            <div className="agenda-list">
+              <div className="loading-state">Loading events…</div>
             </div>
           ) : (
-            events.map((ev) => {
-              const d = new Date(ev.event_date + 'T12:00:00')
-              const dayNum = d.getDate()
-              const dayName = DAY_NAMES[d.getDay()]
-              const isMultiDay = ev.event_end_date && ev.event_end_date !== ev.event_date
+            MONTH_NAMES.map((mName, mIdx) => {
+              const mEvents = byMonth[mIdx] || []
               return (
-                <div key={ev.id} className="agenda-item" onClick={() => setSelectedEvent(ev)}>
-                  <div className="agenda-date">
-                    <div className="agenda-date-day">{dayNum}</div>
-                    <div className="agenda-date-dow">{dayName}</div>
+                <div key={mIdx} className="year-month-section">
+                  <div className="year-month-heading">
+                    {mName}
+                    {mEvents.length > 0 && (
+                      <span className="year-month-count">{mEvents.length} event{mEvents.length !== 1 ? 's' : ''}</span>
+                    )}
                   </div>
-                  <div className="agenda-content">
-                    <div className="agenda-title">{ev.title}</div>
-                    <div className="agenda-meta">
-                      <span className="agenda-organizer">{ev.organizer}</span>
-                      <span className="agenda-type-chip">{ev.event_type}</span>
+                  {mEvents.length === 0 ? (
+                    <div className="year-month-empty">No events</div>
+                  ) : (
+                    <div className="agenda-list">
+                      <AgendaList
+                        events={mEvents}
+                        loading={false}
+                        emptyLabel=""
+                        onSelect={setSelectedEvent}
+                      />
                     </div>
-                    {ev.location_name && (
-                      <div className="agenda-location">📍 {ev.location_name}</div>
-                    )}
-                    {isMultiDay && (
-                      <div className="agenda-multiday">through {formatDate(ev.event_end_date)}</div>
-                    )}
-                  </div>
+                  )}
                 </div>
               )
             })
-          )}
-        </div>
+          )
+        )}
       </div>
 
       {showAdd && (
-        <AddEventModal onClose={() => setShowAdd(false)} onSuccess={fetchEvents} />
+        <AddEventModal
+          onClose={() => setShowAdd(false)}
+          onSuccess={() => view === 'month' ? fetchMonthEvents() : fetchYearEvents()}
+          prefill={prefill}
+        />
       )}
       {selectedEvent && (
         <EventDetailModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
