@@ -217,6 +217,11 @@ export default function LiveMusicClient({
           animation: bounce 2s ease-in-out infinite;
         }
         @keyframes bounce { 0%,100%{transform:translateX(-50%) translateY(0);} 50%{transform:translateX(-50%) translateY(5px);} }
+        .lm-photo-credit {
+          position: absolute; bottom: 10px; right: 14px;
+          font-size: 0.6rem; color: rgba(255,255,255,0.35); letter-spacing: 0.08em;
+          font-style: italic;
+        }
 
         /* PAGE LAYOUT */
         .lm-page { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
@@ -259,8 +264,8 @@ export default function LiveMusicClient({
         /* EVENT GRID */
         .lm-events-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-          gap: 20px;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 16px;
         }
 
         /* EVENT CARD */
@@ -295,11 +300,7 @@ export default function LiveMusicClient({
         .lm-event-body { padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
         .lm-event-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .lm-event-time { font-size: 0.72rem; font-weight: 600; color: var(--accent); letter-spacing: 0.06em; }
-        .lm-event-type-tag {
-          font-size: 0.58rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
-          color: var(--ink-faint); background: var(--off); border: 1px solid var(--border);
-          padding: 2px 7px; border-radius: 100px;
-        }
+        .lm-event-date-meta { font-size: 0.72rem; font-weight: 600; color: var(--ink-soft); letter-spacing: 0.04em; }
         .lm-event-title {
           font-family: var(--serif); font-size: 1.1rem; font-weight: 600;
           text-transform: uppercase; line-height: 1.15; letter-spacing: 0.01em;
@@ -399,7 +400,7 @@ export default function LiveMusicClient({
           font-family: var(--serif); font-size: 0.95rem; font-weight: 600;
           text-transform: uppercase; letter-spacing: 0.04em; line-height: 1.2; margin-bottom: 3px;
         }
-        .lm-venue-addr { font-size: 0.72rem; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .lm-venue-neighborhood { font-size: 0.72rem; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .lm-venue-count {
           flex-shrink: 0; display: flex; flex-direction: column; align-items: center;
           gap: 2px; min-width: 40px;
@@ -421,14 +422,26 @@ export default function LiveMusicClient({
         .lm-stat-num { font-family: var(--serif); font-size: 2rem; font-weight: 700; color: var(--accent); line-height: 1; margin-bottom: 4px; }
         .lm-stat-label { font-size: 0.65rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); }
 
+        @media (max-width: 900px) {
+          .lm-events-grid { grid-template-columns: repeat(2, 1fr); }
+        }
         @media (max-width: 640px) {
           .lm-hero { height: 70vh; min-height: 400px; }
           .lm-hero-title { font-size: clamp(2.6rem, 14vw, 4rem); }
           .lm-page { padding: 0 16px; }
           .lm-section { padding: 48px 0; }
-          .lm-events-grid { grid-template-columns: 1fr; }
+          .lm-events-grid {
+            display: flex; flex-direction: row; overflow-x: auto;
+            gap: 12px; padding-bottom: 12px; scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch; scrollbar-width: none;
+          }
+          .lm-events-grid::-webkit-scrollbar { display: none; }
+          .lm-event-card { min-width: 240px; scroll-snap-align: start; flex-shrink: 0; }
           .lm-musicians-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
           .lm-venues-grid { grid-template-columns: 1fr; }
+          .lm-venue-card { max-width: 100%; overflow: hidden; }
+          .lm-venue-info { min-width: 0; overflow: hidden; }
+          .lm-venue-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
           .lm-stats { flex-wrap: wrap; }
           .lm-stat { flex: 1 1 50%; border-bottom: 1px solid var(--border); }
           .lm-stat:nth-child(even) { border-right: none; }
@@ -443,7 +456,7 @@ export default function LiveMusicClient({
           <h1 className="lm-hero-title">Keep <span>Music</span> Live</h1>
           <p className="lm-hero-byline">— Suki</p>
           <p className="lm-hero-sub">
-            Your guide to live music in Topeka, KS — concerts, local artists, and the venues keeping it all alive.
+            Your guide to live music in Topeka, KS — concerts, local artists, and the venues keeping it all live.
           </p>
           <a href="#concerts" className="lm-hero-cta">
             See Upcoming Concerts
@@ -452,6 +465,7 @@ export default function LiveMusicClient({
         <div className="lm-hero-scroll" aria-hidden>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
+        <p className="lm-photo-credit">Photo by Tyler Strunk</p>
       </section>
 
       <div className="lm-page">
@@ -506,7 +520,6 @@ export default function LiveMusicClient({
             ) : (
               pagedEvents.map(event => {
                 const time = formatTime(event.event_start_time)
-                const types = (event.event_types || []).filter(t => t !== 'Live Music').slice(0, 2)
                 const href = event.slug ? `/events/${event.slug}` : '#'
                 const isFree = event.ticket_price === 0
                 const isPaid = event.ticket_price !== null && event.ticket_price > 0
@@ -523,8 +536,8 @@ export default function LiveMusicClient({
                     </div>
                     <div className="lm-event-body">
                       <div className="lm-event-meta">
-                        {time && <span className="lm-event-time">{time}</span>}
-                        {types.map(t => <span key={t} className="lm-event-type-tag">{t}</span>)}
+                        <span className="lm-event-date-meta">{formatDateLabel(event.event_date)}</span>
+                        {time && <><span style={{ color: 'var(--ink-faint)' }}>·</span><span className="lm-event-time">{time}</span></>}
                       </div>
                       <div className="lm-event-title">{event.title}</div>
                       {event.venue && (
@@ -594,9 +607,6 @@ export default function LiveMusicClient({
               <h2 className="lm-section-title">
                 Local <em>Musicians</em>
               </h2>
-              <p style={{ fontSize: '0.85rem', color: 'var(--ink-soft)', marginTop: 6, fontWeight: 300 }}>
-                Topeka artists keeping the scene alive
-              </p>
             </div>
             <a href="/artists?type=Musician" className="lm-view-all">
               View all {initialMusicians.length} musicians →
@@ -628,6 +638,12 @@ export default function LiveMusicClient({
               )
             })}
           </div>
+
+          <div style={{ marginTop: 24, textAlign: 'center' }}>
+            <a href="/artists?type=Musician" className="lm-view-all">
+              View all {initialMusicians.length} musicians →
+            </a>
+          </div>
         </section>
 
         {/* ── VENUES ── */}
@@ -637,9 +653,6 @@ export default function LiveMusicClient({
               <h2 className="lm-section-title">
                 Music <em>Venues</em>
               </h2>
-              <p style={{ fontSize: '0.85rem', color: 'var(--ink-soft)', marginTop: 6, fontWeight: 300 }}>
-                Where the music happens in Topeka, KS
-              </p>
             </div>
             <a href="/venues" className="lm-view-all">
               All venues →
@@ -661,9 +674,9 @@ export default function LiveMusicClient({
                     }
                     <div className="lm-venue-info">
                       <div className="lm-venue-name">{venue.name}</div>
-                      <div className="lm-venue-addr">
-                        {[venue.neighborhood, venue.address].filter(Boolean).join(' · ')}
-                      </div>
+                      {venue.neighborhood && (
+                        <div className="lm-venue-neighborhood">{venue.neighborhood}</div>
+                      )}
                     </div>
                     <div className="lm-venue-count">
                       <span className="lm-venue-count-num">{venue.upcoming_count}</span>
