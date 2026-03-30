@@ -66,7 +66,7 @@ function VenueDashboardInner() {
     load()
   }, [router])
 
-  const set = (field: keyof Venue, value: string) =>
+  const set = (field: keyof Venue, value: string | string[] | null) =>
     setForm(f => f ? { ...f, [field]: value } : f)
 
   const handleSave = async () => {
