@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabaseServerAuth'
 import AvatarMenu from './AvatarMenu'
+import StripeConnectButton from '@/app/components/StripeConnectButton'
 
 export default async function DashboardPage() {
   try {
@@ -315,11 +316,11 @@ export default async function DashboardPage() {
           <div className="card-label">Account</div>
           <div className="card-title">SETTINGS + NOTIFICATIONS</div>
           <hr className="card-hr" />
-          {stripeIncomplete && isCreator && (
-            <div className="alert-strip">
-              <div className="alert-dot" />
-              <div className="alert-msg">Stripe setup incomplete</div>
-            </div>
+          {isCreator && (
+            <StripeConnectButton
+              accountStatus={profile?.stripe_account_status ?? null}
+              returnPath="/dashboard"
+            />
           )}
           <div className="settings-links">
             <a href="/dashboard/settings" className="settings-link">Edit Profile</a>
