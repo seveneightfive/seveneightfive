@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import DateFilter from './DateFilter'
 import { useNavState } from '../components/NavContext'
+import AdvertisementBanner from '../components/AdvertisementBanner'
 
 type Venue = {
   id: string
@@ -320,8 +321,14 @@ export default function EventsList() {
                 <div className="empty-sub">Try adjusting your filters or check back soon.</div>
               </div>
             ) : (
-              dayGroups.map(group => (
-                <div key={group.dateKey} className="day-group">
+              dayGroups.map((group, groupIdx) => (
+                <div key={group.dateKey}>
+                {groupIdx === 1 && (
+                  <div style={{ marginBottom: 48 }}>
+                    <AdvertisementBanner />
+                  </div>
+                )}
+                <div className="day-group">
                   <div className="day-header">
                     <span className={`day-label ${group.label === 'Today' ? 'today' : ''}`}>{group.label}</span>
                     <span className="day-sublabel">{group.sublabel}</span>
@@ -392,6 +399,7 @@ export default function EventsList() {
                       )
                     })}
                   </div>
+                </div>
                 </div>
               ))
             )}

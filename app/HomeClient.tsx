@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import styles from './home.module.css'
 import FeaturedSlider, { type FeaturedEvent } from './FeaturedSlider'
+import AdvertisementBanner from './components/AdvertisementBanner'
 
 type Event = {
   id: string
@@ -78,6 +79,11 @@ export default function HomeClient({
             <FeaturedSlider events={featuredEvents} />
           </section>
         )}
+
+        {/* ── Advertisement Banner ── */}
+        <section>
+          <AdvertisementBanner />
+        </section>
 
         {/* ── Upcoming Events ── */}
         <section id="events">

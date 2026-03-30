@@ -53,6 +53,24 @@ export async function POST(request: NextRequest) {
         if (session.payment_status !== 'paid') break
 
         const meta = session.metadata || {}
+
+        // ── Advertisement payment ──────────────────────────────────────
+        if (meta.type === 'advertisement' && meta.ad_id) {
+          const { error: adError } = await admin
+            .from('advertisements')
+            .update({ payment_status: 'paid', status: 'active' })
+            .eq('id', meta.ad_id)
+
+          if (adError) {
+            console.error('[webhook] failed to activate advertisement:', adError)
+            return NextResponse.json({ error: 'Failed to activate advertisement' }, { status: 500 })
+          }
+
+          console.log(`[webhook] advertisement ${meta.ad_id} activated`)
+          break
+        }
+
+        // ── Ticket purchase ────────────────────────────────────────────
         const tierId = meta.tier_id
         const eventId = meta.event_id
         const buyerUserId = meta.buyer_user_id
