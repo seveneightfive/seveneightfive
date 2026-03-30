@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 export type HeroSlide = {
   id: string
   order: number
+  eyebrow: string | null
   headline: string
   body: string | null
   button_label: string | null

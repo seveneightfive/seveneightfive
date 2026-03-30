@@ -85,7 +85,7 @@ export default async function HomePage() {
     // 5. Hero slides
     supabase
       .from('hero_slides')
-      .select('id, order, headline, body, button_label, button_url, image_url')
+      .select('id, order, eyebrow, headline, body, button_label, button_url, image_url')
       .eq('active', true)
       .order('order', { ascending: true }),
   ])
