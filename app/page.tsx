@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import HomeClient from './HomeClient'
+import type { HeroSlide } from './HeroSlider'
 
 export const revalidate = 3600
 
@@ -35,6 +36,7 @@ export default async function HomePage() {
     { data: upcomingEventIds },
     { data: featuredRaw },
     { data: notoVenues },
+    { data: heroSlidesRaw },
   ] = await Promise.all([
 
     // 1. Events for today + tomorrow for the home page list
@@ -79,6 +81,13 @@ export default async function HomePage() {
       .from('venues')
       .select('id')
       .eq('neighborhood', 'NOTO'),
+
+    // 5. Hero slides
+    supabase
+      .from('hero_slides')
+      .select('id, order, headline, body, button_label, button_url, image_url')
+      .eq('active', true)
+      .order('order', { ascending: true }),
   ])
 
   // Count upcoming events at NOTO venues
@@ -165,6 +174,8 @@ export default async function HomePage() {
     venue: Array.isArray(e.venues) ? e.venues[0] ?? null : e.venues ?? null,
   }))
 
+  const heroSlides: HeroSlide[] = (heroSlidesRaw ?? []) as HeroSlide[]
+
   return (
     <HomeClient
       events={normalizedEvents}
@@ -172,6 +183,7 @@ export default async function HomePage() {
       featuredEvents={featuredEvents}
       notoVenueCount={notoVenueIds.length}
       notoEventCount={notoEventCount ?? 0}
+      heroSlides={heroSlides}
     />
   )
 }

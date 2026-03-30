@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import styles from './home.module.css'
 import FeaturedSlider, { type FeaturedEvent } from './FeaturedSlider'
+import HeroSlider, { type HeroSlide } from './HeroSlider'
 import AdvertisementBanner from './components/AdvertisementBanner'
 
 type Event = {
@@ -43,31 +44,37 @@ export default function HomeClient({
   featuredEvents,
   notoVenueCount,
   notoEventCount,
+  heroSlides,
 }: {
   events: Event[]
   artists: Artist[]
   featuredEvents: FeaturedEvent[]
   notoVenueCount: number
   notoEventCount: number
+  heroSlides: HeroSlide[]
 }) {
   return (
     <>
       <main className={styles.main}>
 
         {/* ── Hero ── */}
-        <section className={styles.hero}>
-          <p className={styles.kicker}>LOCAL. VOCAL.</p>
-          <h1>
-            What&apos;s<br /><em>On</em> in<br />Top City
-          </h1>
-          <p>Discover upcoming events, artists, and neighborhoods making noise this week.</p>
-          <Link href="/events" className={styles.heroCta}>
-            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path d="M5 12h14M12 5l7 7-7 7" />
-            </svg>
-            Browse Events
-          </Link>
-        </section>
+        {heroSlides.length > 0 ? (
+          <HeroSlider slides={heroSlides} />
+        ) : (
+          <section className={styles.hero}>
+            <p className={styles.kicker}>LOCAL. VOCAL.</p>
+            <h1>
+              What&apos;s<br /><em>On</em> in<br />Top City
+            </h1>
+            <p>Discover upcoming events, artists, and neighborhoods making noise this week.</p>
+            <Link href="/events" className={styles.heroCta}>
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+              Browse Events
+            </Link>
+          </section>
+        )}
 
         {/* ── Featured Events Slider ── */}
         {featuredEvents.length > 0 && (
