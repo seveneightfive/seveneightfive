@@ -311,6 +311,23 @@ export default async function DashboardPage() {
           )}
         </a>
 
+        {/* SAVE THE DATE — 1 col */}
+        <a href="/dashboard/save-the-date" className="card">
+          <div className="card-label">Community Planning</div>
+          <div className="card-title">SAVE THE DATE</div>
+          <div className="card-desc">Annual event calendar — claim your date, reduce conflicts</div>
+          <hr className="card-hr" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            <div>
+              <div style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text)' }}>Plan ahead</div>
+              <div style={{ fontSize: '0.62rem', color: 'var(--muted)' }}>Browse &amp; submit community dates →</div>
+            </div>
+          </div>
+        </a>
+
         {/* SETTINGS — 1 col */}
         <div className="card">
           <div className="card-label">Account</div>
