@@ -25,7 +25,7 @@ type Venue = {
   description: string | null
   image_url: string | null
   logo: string | null
-  venue_type: string | null
+  venue_type: string[] | null
   address: string | null
 }
 
@@ -243,10 +243,14 @@ export default async function NeighborhoodDetailPage({ params }: Props) {
                     </div>
 
                     <div className="p-5 flex flex-col flex-1">
-                      {venue.venue_type && (
-                        <span className={`self-start text-xs font-semibold px-2.5 py-0.5 rounded-full mb-2 ${venueTypeBadge(venue.venue_type)}`}>
-                          {venue.venue_type}
-                        </span>
+                      {venue.venue_type && venue.venue_type.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          {venue.venue_type.map(t => (
+                            <span key={t} className={`self-start text-xs font-semibold px-2.5 py-0.5 rounded-full ${venueTypeBadge(t)}`}>
+                              {t}
+                            </span>
+                          ))}
+                        </div>
                       )}
                       <h3 className="font-black text-base uppercase tracking-tight text-zinc-950 group-hover:text-[#FFCE03] transition-colors leading-tight mb-1">
                         {venue.name}

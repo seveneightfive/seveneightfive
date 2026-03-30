@@ -13,7 +13,7 @@ type Venue = {
   state: string | null
   image_url: string | null
   logo: string | null
-  venue_type: string | null
+  venue_type: string[] | null
 }
 
 type Event = {
@@ -37,7 +37,7 @@ export default function ArtGalleriesClient() {
       const { data: venueData } = await supabase
         .from('venues')
         .select('id, name, slug, address, neighborhood, city, state, image_url, logo, venue_type')
-        .in('venue_type', ['Studio / Classes', 'Gallery / Museum'])
+        .overlaps('venue_type', ['Studio / Classes', 'Gallery / Museum'])
         .order('name')
 
       const venues = venueData || []
@@ -201,7 +201,7 @@ export default function ArtGalleriesClient() {
                         : <div className="venue-card-img-placeholder">{venue.name[0]}</div>
                       }
                       <div className="venue-card-body">
-                        {venue.venue_type && <div className="venue-card-type">{venue.venue_type}</div>}
+                        {venue.venue_type?.map(t => <div key={t} className="venue-card-type">{t}</div>)}
                         <div className="venue-card-name">{venue.name}</div>
                         {(venue.neighborhood || venue.city) && (
                           <div className="venue-card-location">

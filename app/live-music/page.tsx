@@ -57,7 +57,7 @@ export default async function LiveMusicPage() {
     supabase
       .from('venues')
       .select('id, name, slug, address, neighborhood, image_url, logo, venue_type')
-      .ilike('venue_type', '%music%')
+      .overlaps('venue_type', ['Live Music', 'Music Venue', 'Bar / Nightclub', 'Concert Venue'])
       .order('name'),
   ])
 

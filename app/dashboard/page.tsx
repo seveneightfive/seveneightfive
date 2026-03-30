@@ -252,7 +252,7 @@ export default async function DashboardPage() {
                   </div>
                   <div>
                     <div className="follow-name">{f.name}</div>
-                    <div className="follow-type">{f.artist_type || f.venue_type || (f.kind === 'venue' ? 'Venue' : 'Artist')}</div>
+                    <div className="follow-type">{f.artist_type || (Array.isArray(f.venue_type) ? f.venue_type[0] : f.venue_type) || (f.kind === 'venue' ? 'Venue' : 'Artist')}</div>
                   </div>
                 </div>
               ))}
@@ -277,7 +277,7 @@ export default async function DashboardPage() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="follow-name">{firstPage.name}</div>
-                <div className="follow-type">{TYPE_LABEL[firstPage.artist_type] || firstPage.venue_type || (firstPage.kind === 'venue' ? 'Venue' : 'Artist')}</div>
+                <div className="follow-type">{TYPE_LABEL[firstPage.artist_type] || (Array.isArray(firstPage.venue_type) ? firstPage.venue_type[0] : firstPage.venue_type) || (firstPage.kind === 'venue' ? 'Venue' : 'Artist')}</div>
               </div>
               {!firstPage.tagline && (
                 <span className="badge badge-brand">No tagline</span>

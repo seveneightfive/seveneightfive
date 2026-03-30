@@ -45,7 +45,7 @@ type Venue = {
   neighborhood: string | null
   image_url: string | null
   logo: string | null
-  venue_type: string | null
+  venue_type: string[] | null
   upcoming_count: number
 }
 

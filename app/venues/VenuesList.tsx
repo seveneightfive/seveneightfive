@@ -15,7 +15,7 @@ type Venue = {
   image_url: string | null
   logo: string | null
   website: string | null
-  venue_type: string | null
+  venue_type: string[] | null
 }
 
 export default function VenuesList({ initialNeighborhood, initialVenues = [] }: { initialNeighborhood?: string; initialVenues?: Venue[] }) {
@@ -73,12 +73,12 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const neighborhoods = ['All', ...Array.from(new Set(venues.map(v => v.neighborhood).filter(Boolean) as string[])).sort()]
-  const venueTypes = ['All', ...Array.from(new Set(venues.map(v => v.venue_type).filter(Boolean) as string[])).sort()]
+  const venueTypes = ['All', ...Array.from(new Set(venues.flatMap(v => v.venue_type || []))).sort()]
 
   const applyFilters = useCallback(() => {
     let result = [...venues]
     if (activeNeighborhood !== 'All') result = result.filter(v => v.neighborhood === activeNeighborhood)
-    if (activeType !== 'All') result = result.filter(v => v.venue_type === activeType)
+    if (activeType !== 'All') result = result.filter(v => v.venue_type?.includes(activeType))
     if (search.trim()) {
       const q = search.toLowerCase()
       result = result.filter(v =>
@@ -230,7 +230,11 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
                     : <div className="venue-card-img-placeholder">{venue.name[0]}</div>
                   }
                   <div className="venue-card-body">
-                    {venue.venue_type && <div className="venue-card-type">{venue.venue_type}</div>}
+                    {venue.venue_type && venue.venue_type.length > 0 && (
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
+                        {venue.venue_type.map(t => <div key={t} className="venue-card-type">{t}</div>)}
+                      </div>
+                    )}
                     <div className="venue-card-name">{venue.name}</div>
                     {(venue.neighborhood || venue.city) && (
                       <div className="venue-card-location">

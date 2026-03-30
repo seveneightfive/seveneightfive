@@ -13,7 +13,7 @@ type Venue = {
   city: string | null
   state: string | null
   website: string | null
-  venue_type: string | null
+  venue_type: string[] | null
   image_url: string | null
 }
 
@@ -184,15 +184,30 @@ function VenueDashboardInner() {
 
         {/* Venue Type */}
         <div style={fieldStyle}>
-          <label style={labelStyle}>Venue Type</label>
-          <select
-            style={{ ...inputStyle, cursor: 'pointer' }}
-            value={form.venue_type || ''}
-            onChange={e => set('venue_type', e.target.value)}
-          >
-            <option value="">Select type...</option>
-            {VENUE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
+          <label style={labelStyle}>Venue Type <span style={{ fontWeight: 400, color: '#999' }}>(select all that apply)</span></label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+            {VENUE_TYPES.map(t => {
+              const selected = form.venue_type?.includes(t) ?? false
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => {
+                    const current = form.venue_type || []
+                    set('venue_type', selected ? current.filter(v => v !== t) : [...current, t])
+                  }}
+                  style={{
+                    padding: '6px 14px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 500,
+                    cursor: 'pointer', border: selected ? '1.5px solid #1a1814' : '1.5px solid #ddd',
+                    background: selected ? '#1a1814' : '#fff', color: selected ? '#fff' : '#555',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {t}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {/* Address */}

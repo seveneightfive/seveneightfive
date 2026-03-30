@@ -15,7 +15,7 @@ type Venue = {
   state: string | null
   image_url: string | null
   website: string | null
-  venue_type: string | null
+  venue_type: string[] | null
   phone: string | null
   email: string | null
   social_instagram: string | null
@@ -246,7 +246,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
         )}
         <div className="hero-body">
           <div className="hero-eyebrow">
-            {venue.venue_type && <span className="hero-type-label">{venue.venue_type}</span>}
+            {venue.venue_type?.map(t => <span key={t} className="hero-type-label">{t}</span>)}
           </div>
           <h1 className="hero-name">{venue.name}</h1>
           <div className="hero-pills">
@@ -420,10 +420,10 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
                 <div className="contact-cell-value">{[venue.neighborhood, venue.city, venue.state].filter(Boolean).join(', ')}</div>
               </div>
             )}
-            {venue.venue_type && (
+            {venue.venue_type && venue.venue_type.length > 0 && (
               <div className="contact-cell">
                 <div className="contact-cell-label">Type</div>
-                <div className="contact-cell-value">{venue.venue_type}</div>
+                <div className="contact-cell-value">{venue.venue_type.join(' · ')}</div>
               </div>
             )}
             {venue.website && (
