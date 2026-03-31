@@ -339,6 +339,10 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         .venue-arrow { color: var(--ink-faint); flex-shrink: 0; transition: transform 0.15s; }
         .venue-card:hover .venue-arrow { transform: translateX(3px); }
 
+        /* RELATED EVENT CARDS */
+.related-card { display: flex; align-items: center; gap: 14px; padding: 12px; border-radius: 10px; background: var(--off); text-decoration: none; color: var(--ink); transition: background 0.15s; }
+.related-card:hover { background: var(--warm); }
+
         /* FOOTER */
         .event-footer { padding: 28px 24px 48px; text-align: center; border-top: 1px solid var(--border); max-width: 680px; margin: 0 auto; }
         .footer-brand { font-family: var(--serif); font-size: 0.72rem; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-faint); text-decoration: none; }
@@ -558,14 +562,8 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         return (
           <a
             key={rel.id}
-            href={`/event/${rel.slug}`}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '14px',
-              padding: '12px', borderRadius: '10px', background: 'var(--off)',
-              textDecoration: 'none', color: 'var(--ink)', transition: 'background 0.15s'
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--warm)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'var(--off)')}
+            href={`/events/${rel.slug}`}
+            className='related-card'
           >
             {/* Thumbnail */}
             <div style={{
