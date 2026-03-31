@@ -81,6 +81,29 @@ async function getEvent(slug: string): Promise<Event | null> {
   } as Event
 }
 
+async function getRelatedEvents(currentId: string, eventTypes: string[] | null): Promise<Event[]> {
+  if (!eventTypes || eventTypes.length === 0) return []
+
+  const { data } = await supabase
+    .from('events')
+    .select(`
+      id, title, slug, event_date, event_start_time, image_url, event_types,
+      venues (id, name, address, neighborhood, city, state, slug, website, image_url, logo)
+    `)
+    .neq('id', currentId)
+    .gte('event_date', new Date().toISOString().split('T')[0])
+    .overlaps('event_types', eventTypes)
+    .order('event_date', { ascending: true })
+    .limit(3)
+
+  if (!data) return []
+  return data.map((e: any) => ({
+    ...e,
+    venue: Array.isArray(e.venues) ? e.venues[0] || null : e.venues || null,
+    artists: [],
+  })) as Event[]
+}
+
 // ─── SEO ──────────────────────────────────────────────────────────────────────
 
 export async function generateMetadata(
@@ -221,6 +244,8 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
   const { slug } = await params
   const event = await getEvent(slug)
   if (!event) notFound()
+
+  const relatedEvents = await getRelatedEvents(event.id, event.event_types)
 
   const jsonLd = getJsonLd(event)
   const d = new Date(event.event_date + 'T12:00:00')
@@ -519,6 +544,62 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
             </a>
           </div>
         )}
+
+        {/* RELATED EVENTS */}
+{relatedEvents.length > 0 && (
+  <div className="section">
+    <div className="section-eyebrow">More Events You Might Like</div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {relatedEvents.map((rel) => {
+        const relDate = new Date(rel.event_date + 'T12:00:00')
+        const relDateStr = relDate.toLocaleDateString('en-US', {
+          weekday: 'short', month: 'short', day: 'numeric'
+        })
+        return (
+          <a
+            key={rel.id}
+            href={`/event/${rel.slug}`}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '14px',
+              padding: '12px', borderRadius: '10px', background: 'var(--off)',
+              textDecoration: 'none', color: 'var(--ink)', transition: 'background 0.15s'
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--warm)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--off)')}
+          >
+            {/* Thumbnail */}
+            <div style={{
+              width: '64px', height: '64px', borderRadius: '8px',
+              overflow: 'hidden', flexShrink: 0, background: 'var(--border)'
+            }}>
+              {rel.image_url
+                ? <img src={rel.image_url} alt={rel.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--serif)', fontSize: '1.4rem', color: 'var(--ink-faint)' }}>{rel.title[0]}</div>
+              }
+            </div>
+
+            {/* Info */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {rel.event_types && rel.event_types.length > 0 && (
+                <div style={{ fontSize: '0.6rem', fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '3px' }}>
+                  {rel.event_types[0]}
+                </div>
+              )}
+              <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.95rem', lineHeight: 1.2, marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {rel.title}
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--ink-faint)' }}>
+                {relDateStr}{rel.venue ? ` · ${rel.venue.name}` : ''}
+              </div>
+            </div>
+
+            <span style={{ color: 'var(--ink-faint)', flexShrink: 0 }}>→</span>
+          </a>
+        )
+      })}
+    </div>
+  </div>
+)}
 
       </main>
 
