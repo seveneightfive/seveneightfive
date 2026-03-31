@@ -24,10 +24,28 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
+  const { pathname } = request.nextUrl
 
-  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
+  const PROTECTED = [
+    '/dashboard/tickets',
+    '/dashboard/following',
+    '/dashboard/edit',
+    '/dashboard/venue',
+    '/dashboard/events',
+    '/dashboard/advertise',
+    '/dashboard/scan',
+    '/dashboard/appearances',
+    '/dashboard/announcements',
+    '/dashboard/settings',
+    '/dashboard/save-the-date',
+  ]
+
+  const needsAuth = PROTECTED.some(p => pathname.startsWith(p))
+
+  if (!user && needsAuth) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    url.searchParams.set('next', pathname)
     return NextResponse.redirect(url)
   }
 
