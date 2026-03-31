@@ -1,7 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
-import BackButton from './BackButton'
 import ImageLightbox from './ImageLightbox'
 import TicketPurchaseButton from '@/app/components/TicketPurchaseButton'
 import FollowFavoriteButtons from '@/app/components/FollowFavoriteButtons'
@@ -283,11 +282,6 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         .hero-today { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); background: rgba(200,6,80,0.2); border: 1px solid rgba(200,6,80,0.3); padding: 3px 8px; border-radius: 100px; }
         .hero-star { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: white; background: var(--accent); padding: 3px 8px; border-radius: 100px; }
 
-        /* TOP NAV */
-        .top-nav { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; height: 52px; }
-        .nav-divider { margin: 0 12px; color: var(--border); }
-        .nav-current { font-size: 0.72rem; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
-
         /* CONTENT */
         .content { max-width: 680px; margin: 0 auto; padding: 0 24px; }
 
@@ -340,11 +334,23 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         .venue-card:hover .venue-arrow { transform: translateX(3px); }
 
         /* RELATED EVENT CARDS */
-.related-card { display: flex; align-items: center; gap: 14px; padding: 12px; border-radius: 10px; background: var(--off); text-decoration: none; color: var(--ink); transition: background 0.15s; }
-.related-card:hover { background: var(--warm); }
+        .related-card { display: flex; align-items: center; gap: 14px; padding: 12px; border-radius: 10px; background: var(--off); text-decoration: none; color: var(--ink); transition: background 0.15s; }
+        .related-card:hover { background: var(--warm); }
+
+        /* RELATED SECTION HEADER */
+        .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+        .section-header .section-eyebrow { margin-bottom: 0; }
+        .see-all-link { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); text-decoration: none; transition: opacity 0.15s; }
+        .see-all-link:hover { opacity: 0.75; }
+
+        /* BROWSE CTA */
+        .browse-cta { padding: 32px 0 8px; text-align: center; border-top: 1px solid var(--border); }
+        .browse-cta-link { display: inline-flex; align-items: center; gap: 8px; font-family: var(--serif); font-size: 0.82rem; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-faint); text-decoration: none; transition: color 0.15s; }
+        .browse-cta-link em { font-style: normal; color: var(--accent); font-weight: 600; }
+        .browse-cta-link:hover { color: var(--ink); }
 
         /* FOOTER */
-        .event-footer { padding: 28px 24px 48px; text-align: center; border-top: 1px solid var(--border); max-width: 680px; margin: 0 auto; }
+        .event-footer { padding: 16px 24px 48px; text-align: center; max-width: 680px; margin: 0 auto; }
         .footer-brand { font-family: var(--serif); font-size: 0.72rem; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-faint); text-decoration: none; }
         .footer-brand em { font-style: normal; color: var(--accent); font-weight: 600; }
         .footer-brand:hover { color: var(--ink); }
@@ -364,14 +370,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         }
       `}</style>
 
-      {/* TOP NAV */}
-      <nav className="top-nav">
-        <BackButton />
-        <span className="nav-divider">/</span>
-        <span className="nav-current">{event.title}</span>
-      </nav>
-
-      {/* HERO */}
+      {/* HERO — starts at top of page, no nav above it */}
       <section className="hero">
         {event.image_url
           ? <ImageLightbox src={event.image_url} alt={event.title} />
@@ -550,54 +549,64 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         )}
 
         {/* RELATED EVENTS */}
-{relatedEvents.length > 0 && (
-  <div className="section">
-    <div className="section-eyebrow">More Events You Might Like</div>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      {relatedEvents.map((rel) => {
-        const relDate = new Date(rel.event_date + 'T12:00:00')
-        const relDateStr = relDate.toLocaleDateString('en-US', {
-          weekday: 'short', month: 'short', day: 'numeric'
-        })
-        return (
-          <a
-            key={rel.id}
-            href={`/events/${rel.slug}`}
-            className='related-card'
-          >
-            {/* Thumbnail */}
-            <div style={{
-              width: '64px', height: '64px', borderRadius: '8px',
-              overflow: 'hidden', flexShrink: 0, background: 'var(--border)'
-            }}>
-              {rel.image_url
-                ? <img src={rel.image_url} alt={rel.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--serif)', fontSize: '1.4rem', color: 'var(--ink-faint)' }}>{rel.title[0]}</div>
-              }
+        {relatedEvents.length > 0 && (
+          <div className="section">
+            <div className="section-header">
+              <div className="section-eyebrow">More Events You Might Like</div>
+              <a href="/events" className="see-all-link">See All →</a>
             </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {relatedEvents.map((rel) => {
+                const relDate = new Date(rel.event_date + 'T12:00:00')
+                const relDateStr = relDate.toLocaleDateString('en-US', {
+                  weekday: 'short', month: 'short', day: 'numeric'
+                })
+                return (
+                  <a
+                    key={rel.id}
+                    href={`/events/${rel.slug}`}
+                    className="related-card"
+                  >
+                    {/* Thumbnail */}
+                    <div style={{
+                      width: '64px', height: '64px', borderRadius: '8px',
+                      overflow: 'hidden', flexShrink: 0, background: 'var(--border)'
+                    }}>
+                      {rel.image_url
+                        ? <img src={rel.image_url} alt={rel.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--serif)', fontSize: '1.4rem', color: 'var(--ink-faint)' }}>{rel.title[0]}</div>
+                      }
+                    </div>
 
-            {/* Info */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {rel.event_types && rel.event_types.length > 0 && (
-                <div style={{ fontSize: '0.6rem', fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '3px' }}>
-                  {rel.event_types[0]}
-                </div>
-              )}
-              <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.95rem', lineHeight: 1.2, marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {rel.title}
-              </div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--ink-faint)' }}>
-                {relDateStr}{rel.venue ? ` · ${rel.venue.name}` : ''}
-              </div>
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {rel.event_types && rel.event_types.length > 0 && (
+                        <div style={{ fontSize: '0.6rem', fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '3px' }}>
+                          {rel.event_types[0]}
+                        </div>
+                      )}
+                      <div style={{ fontFamily: 'var(--serif)', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.95rem', lineHeight: 1.2, marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {rel.title}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--ink-faint)' }}>
+                        {relDateStr}{rel.venue ? ` · ${rel.venue.name}` : ''}
+                      </div>
+                    </div>
+
+                    <span style={{ color: 'var(--ink-faint)', flexShrink: 0 }}>→</span>
+                  </a>
+                )
+              })}
             </div>
+          </div>
+        )}
 
-            <span style={{ color: 'var(--ink-faint)', flexShrink: 0 }}>→</span>
+        {/* BROWSE ALL CTA */}
+        <div className="browse-cta">
+          <a href="/events" className="browse-cta-link">
+            Browse all events on <em>seveneightfive</em> →
           </a>
-        )
-      })}
-    </div>
-  </div>
-)}
+        </div>
 
       </main>
 
