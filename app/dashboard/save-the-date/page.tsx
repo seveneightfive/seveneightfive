@@ -232,6 +232,13 @@ function AddEventModal({
     e.preventDefault()
     setSaving(true)
     setError('')
+
+    if (!form.submitter_email || form.submitter_email.trim() === '') {
+      setError('Could not detect your email. Please refresh and try again, or contact support.')
+      setSaving(false)
+      return
+    }
+
     const payload = {
       ...form,
       expected_capacity: form.expected_capacity ? parseInt(form.expected_capacity) : null,
@@ -245,6 +252,7 @@ function AddEventModal({
       submitter_phone: form.submitter_phone || null,
       status: 'pending' as SaveTheDateStatus,
     }
+
     const { error: err } = await supabase.from('save_the_date').insert([payload])
     setSaving(false)
     if (err) { setError(err.message); return }
@@ -260,11 +268,6 @@ function AddEventModal({
           <button className="close-btn" onClick={onClose}>✕</button>
         </div>
         <form onSubmit={handleSubmit} className="modal-form">
-          {/* Hidden submitter fields — pre-filled from user profile */}
-          <input type="hidden" value={form.submitter_name} />
-          <input type="hidden" value={form.submitter_email} />
-          <input type="hidden" value={form.submitter_phone} />
-
           <div className="form-grid">
             <div className="form-group full">
               <label>Event Title *</label>
@@ -322,9 +325,18 @@ function AddEventModal({
               <label>Needs <span className="optional">(venue, sponsors, volunteers, etc.)</span></label>
               <textarea rows={2} value={form.needs} onChange={(e) => set('needs', e.target.value)} placeholder="What are you still looking for?" />
             </div>
+            <div className="form-group full">
+              <label>Your Email *</label>
+              <input
+                required
+                type="email"
+                value={form.submitter_email}
+                onChange={(e) => set('submitter_email', e.target.value)}
+                placeholder="your@email.com"
+              />
+            </div>
           </div>
 
-          {/* Show submitter info as read-only confirmation */}
           {(form.submitter_name || form.submitter_email) && (
             <div className="submitter-confirm">
               <span className="submitter-confirm-label">Submitting as</span>
@@ -487,24 +499,27 @@ export default function SaveTheDatePage() {
   const [showAdd, setShowAdd] = useState<boolean>(false)
   const [selectedEvent, setSelectedEvent] = useState<SaveTheDate | null>(null)
   const [prefill, setPrefill] = useState({ name: '', email: '', phone: '' })
+  const [prefillReady, setPrefillReady] = useState(false)
 
   // Load user profile for form pre-fill
   useEffect(() => {
     async function loadProfile() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        setPrefillReady(true) // unblock button even if no user
+        return
+      }
       const { data: profile } = await supabase
         .from('profiles')
         .select('full_name, email, phone_number')
         .eq('id', user.id)
         .maybeSingle()
-      if (profile) {
-        setPrefill({
-          name: profile.full_name || '',
-          email: profile.email || user.email || '',
-          phone: profile.phone_number || '',
-        })
-      }
+      setPrefill({
+        name: profile?.full_name || '',
+        email: profile?.email || user.email || '',
+        phone: profile?.phone_number || '',
+      })
+      setPrefillReady(true)
     }
     loadProfile()
   }, [])
@@ -583,7 +598,6 @@ export default function SaveTheDatePage() {
           padding: 0 24px 80px;
           color: #111;
         }
-        /* ── top nav (matches other dashboard pages) ── */
         .std-topnav {
           display: flex;
           align-items: center;
@@ -609,7 +623,6 @@ export default function SaveTheDatePage() {
           text-transform: uppercase;
           color: rgba(0,0,0,0.25);
         }
-        /* ── header ── */
         .std-header {
           display: flex;
           align-items: flex-start;
@@ -634,7 +647,6 @@ export default function SaveTheDatePage() {
         .btn-ghost:hover { border-color: #aaa; }
         .btn-outline { background: #fff; color: #111; border: 1.5px solid #ddd; padding: 8px 14px; font-size: 13px; font-weight: 500; border-radius: 7px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: border-color 0.15s, background 0.15s; }
         .btn-outline:hover { border-color: #999; background: #f5f5f5; }
-        /* ── calendar controls ── */
         .cal-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
         .cal-month-label {
           font-family: 'Oswald', sans-serif;
@@ -650,7 +662,6 @@ export default function SaveTheDatePage() {
         .view-toggle:hover { border-color: #999; }
         .view-toggle.active { background: #111; border-color: #111; color: #fff; }
         .download-group { margin-left: auto; display: flex; gap: 8px; }
-        /* ── agenda ── */
         .agenda-list { border: 1.5px solid #e5e5e5; border-radius: 12px; overflow: hidden; }
         .agenda-empty { padding: 48px 24px; text-align: center; color: #999; font-size: 15px; }
         .agenda-empty strong { display: block; color: #555; margin-bottom: 4px; font-size: 16px; }
@@ -667,7 +678,6 @@ export default function SaveTheDatePage() {
         .agenda-type-chip { font-size: 11px; font-weight: 600; color: #555; background: #f0f0f0; border-radius: 4px; padding: 2px 7px; letter-spacing: 0.3px; }
         .agenda-location { font-size: 12px; color: #999; }
         .agenda-multiday { font-size: 11px; color: #888; font-style: italic; }
-        /* ── year view month sections ── */
         .year-month-section { margin-bottom: 36px; }
         .year-month-heading {
           font-family: 'Oswald', sans-serif;
@@ -686,7 +696,6 @@ export default function SaveTheDatePage() {
         .year-month-count { font-size: 11px; font-weight: 500; color: #aaa; letter-spacing: 0; }
         .year-month-empty { font-size: 13px; color: #ccc; padding: 12px 0; font-style: italic; }
         .loading-state { padding: 40px 24px; text-align: center; color: #aaa; font-size: 14px; }
-        /* ── modal ── */
         .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
         .modal { background: #fff; border-radius: 14px; width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,0.18); }
         .modal-detail { max-width: 520px; }
@@ -738,13 +747,11 @@ export default function SaveTheDatePage() {
       `}</style>
 
       <div className="std-page">
-        {/* ── Top nav (matches other dashboard pages) ── */}
         <div className="std-topnav">
           <a href="/dashboard" className="std-back">← Dashboard</a>
           <span className="std-page-label">Save The Date</span>
         </div>
 
-        {/* ── Header ── */}
         <div className="std-header">
           <div>
             <h1>Save The Date</h1>
@@ -753,10 +760,15 @@ export default function SaveTheDatePage() {
               Add your large event and date as soon as you know. No other information is required.
             </p>
           </div>
-          <button className="btn-primary" onClick={() => setShowAdd(true)}>+ Add Event</button>
+          <button
+            className="btn-primary"
+            onClick={() => setShowAdd(true)}
+            disabled={!prefillReady}
+          >
+            + Add Event
+          </button>
         </div>
 
-        {/* ── Calendar controls ── */}
         <div className="cal-controls">
           <button className="cal-nav" onClick={prevPeriod}>‹</button>
           <button
@@ -773,7 +785,6 @@ export default function SaveTheDatePage() {
           </div>
         </div>
 
-        {/* ── Month view ── */}
         {view === 'month' && (
           <div className="agenda-list">
             <AgendaList
@@ -785,7 +796,6 @@ export default function SaveTheDatePage() {
           </div>
         )}
 
-        {/* ── Year view — all 12 months ── */}
         {view === 'year' && (
           loading ? (
             <div className="agenda-list">
