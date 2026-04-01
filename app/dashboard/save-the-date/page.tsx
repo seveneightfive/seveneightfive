@@ -250,7 +250,7 @@ function AddEventModal({
       needs: form.needs || null,
       submitter_name: form.submitter_name || null,
       submitter_phone: form.submitter_phone || null,
-      status: 'pending' as SaveTheDateStatus,
+      status: 'approved' as SaveTheDateStatus,
     }
 
     const { error: err } = await supabase.from('save_the_date').insert([payload])
@@ -741,7 +741,7 @@ export default function SaveTheDatePage() {
           .form-grid { grid-template-columns: 1fr; }
           .form-group.full { grid-column: 1; }
           .download-group { margin-left: 0; }
-          .cal-controls { gap: 6px; }
+          .cal-controls { gap: 6px; } .download-group { margin-left: 0; margin-top: 10px; width: 100%; justify-content: flex-start; }
           .std-page { padding: 0 16px 60px; }
         }
       `}</style>
