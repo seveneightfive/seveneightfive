@@ -490,7 +490,7 @@ function AgendaList({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function SaveTheDatePage() {
   const today = new Date()
-  const [view, setView] = useState<'month' | 'year'>('month')
+  const [view, setView] = useState<'month' | 'year'>('year')
   const [month, setMonth] = useState<number>(today.getMonth())
   const [year, setYear] = useState<number>(today.getFullYear())
   const [events, setEvents] = useState<SaveTheDate[]>([])
