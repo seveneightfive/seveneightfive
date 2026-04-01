@@ -475,7 +475,7 @@ export default async function DashboardPage() {
               <a
                 href="/save-the-date/new"
                 className="std-btn"
-                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                
               >
                 + Claim a Date
               </a>
