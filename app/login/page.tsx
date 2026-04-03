@@ -448,8 +448,8 @@ function LoginPageInner() {
               <h1 className="heading">Email<br />Link</h1>
               <p className="sub">
                 {mode === 'signin'
-                  ? `We'll send a sign-in link to ${email || 'your email'}.`
-                  : 'Enter your email and we'll send a sign-in link — no password needed.'}
+                  ? `We will send a sign-in link to ${email || 'your email'}.`
+                  : 'Enter your email and we will send you a sign-in link — no password needed.'}
               </p>
               <form onSubmit={handleMagicLink}>
                 <div className="field">
