@@ -58,6 +58,8 @@ const STYLES = `
   .divider-line { flex: 1; height: 1px; background: rgba(255,255,255,0.1); }
   .divider-text { font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.25); }
   .error { margin-top: 12px; font-size: 0.82rem; color: #ff6b6b; }
+  .not-found-box { margin-top: 16px; padding: 16px; background: rgba(255,255,255,0.05); border: 1.5px solid rgba(255,255,255,0.1); border-radius: 8px; font-size: 0.84rem; color: rgba(255,255,255,0.5); line-height: 1.6; }
+  .not-found-box strong { color: rgba(255,255,255,0.8); font-weight: 500; }
   .hint { margin-top: 14px; font-size: 0.78rem; color: rgba(255,255,255,0.3); line-height: 1.5; }
   .hint strong { color: rgba(255,255,255,0.6); font-weight: 500; }
   .back-btn { display: inline-block; margin-top: 28px; font-size: 0.78rem; color: rgba(255,255,255,0.35); background: none; border: none; padding: 0; font-family: var(--sans); cursor: pointer; transition: color 0.15s; }
@@ -71,6 +73,19 @@ const STYLES = `
   .completing-text { font-size: 0.88rem; color: rgba(255,255,255,0.5); }
 `
 
+async function checkEmail(email: string): Promise<{ found: boolean; hasPhone: boolean }> {
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/check-email`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    }
+  )
+  if (!res.ok) throw new Error('Email check failed')
+  return res.json()
+}
+
 function LoginPageInner() {
   const [mode, setMode] = useState<Mode>('signin')
   const [step, setStep] = useState<Step>('choice')
@@ -81,9 +96,13 @@ function LoginPageInner() {
   const [lastName, setLastName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  // 'not_found' shows inline message instead of navigating away
+  const [emailNotFound, setEmailNotFound] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
+
+  const nextUrl = searchParams.get('next') || '/dashboard'
 
   // Handle ?complete=1 redirect from auth callback (magic link sign-up)
   useEffect(() => {
@@ -104,7 +123,7 @@ function LoginPageInner() {
       })
       localStorage.removeItem('signup_pending')
       const data = await res.json()
-      router.push(data.role === 'creator' ? '/dashboard' : '/')
+      router.push(data.role === 'creator' ? nextUrl : '/')
     }
     run()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -114,13 +133,42 @@ function LoginPageInner() {
     return digits.startsWith('1') ? `+${digits}` : `+1${digits}`
   }
 
-  const resetError = () => setError('')
+  const resetError = () => { setError(''); setEmailNotFound(false) }
 
   const switchMode = (m: Mode) => {
     setMode(m)
     setStep(m === 'signup' ? 'signup_info' : 'choice')
     setPhone(''); setOtp(''); setEmail(''); setFirstName(''); setLastName('')
     resetError()
+  }
+
+  // ── Sign in: email-first check → routes to phone OTP or magic link ──
+  const handleEmailCheck = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    resetError()
+
+    try {
+      const { found, hasPhone } = await checkEmail(email)
+
+      if (!found) {
+        setEmailNotFound(true)
+        setLoading(false)
+        return
+      }
+
+      // Route based on what's on file
+      if (hasPhone) {
+        setStep('phone')
+      } else {
+        // Go straight to magic link and pre-send it
+        setStep('magic')
+      }
+    } catch {
+      setError('Something went wrong. Please try again.')
+    }
+
+    setLoading(false)
   }
 
   // ── Send phone OTP ──
@@ -142,7 +190,7 @@ function LoginPageInner() {
   // ── Verify OTP ──
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (loading) return // hard guard against double-submission
+    if (loading) return
     setLoading(true)
     resetError()
     const pendingPhone = sessionStorage.getItem('pending_phone') || normalizePhone(phone)
@@ -158,9 +206,7 @@ function LoginPageInner() {
     const user = data.user
     if (!user) { setError('Something went wrong. Please try again.'); setLoading(false); return }
 
-    // Keep loading=true and disable all interaction while redirecting
     if (mode === 'signup') {
-      // Sign up: call merge directly with pre-collected name + email
       const res = await fetch('/api/auth/merge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -169,16 +215,14 @@ function LoginPageInner() {
       const result = await res.json()
       if (!res.ok) { setError(result.error || 'Something went wrong.'); setLoading(false); return }
       sessionStorage.removeItem('pending_phone')
-      router.push(result.role === 'creator' ? '/dashboard' : '/')
+      router.push(result.role === 'creator' ? nextUrl : '/')
     } else {
-      // Sign in: check existing entity links
       const [{ data: artist }, { data: venue }] = await Promise.all([
         supabase.from('artists').select('id').eq('auth_user_id', user.id).maybeSingle(),
         supabase.from('venues').select('id').eq('auth_user_id', user.id).maybeSingle(),
       ])
       if (artist || venue) {
-        router.push('/dashboard')
-        // leave loading=true — page is navigating away
+        router.push(nextUrl)
       } else {
         setLoading(false)
         setStep('profile')
@@ -198,7 +242,7 @@ function LoginPageInner() {
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextUrl)}` },
     })
     if (error) {
       if (mode === 'signup') localStorage.removeItem('signup_pending')
@@ -233,7 +277,7 @@ function LoginPageInner() {
     }
 
     sessionStorage.removeItem('pending_phone')
-    router.push(data.role === 'creator' ? '/dashboard' : '/')
+    router.push(data.role === 'creator' ? nextUrl : '/')
   }
 
   return (
@@ -255,22 +299,40 @@ function LoginPageInner() {
             </div>
           )}
 
-          {/* ── SIGN IN: CHOICE ── */}
+          {/* ── SIGN IN: EMAIL-FIRST CHOICE ── */}
           {step === 'choice' && (
             <>
               <h1 className="heading">Sign<br />In</h1>
-              <p className="sub">Use your phone number or email to access your account.</p>
-              <button className="btn" onClick={() => { resetError(); setStep('phone') }}>
-                📱 Sign in with Phone
-              </button>
-              <div className="divider">
-                <div className="divider-line" />
-                <span className="divider-text">or</span>
-                <div className="divider-line" />
-              </div>
-              <button className="btn-ghost" onClick={() => { resetError(); setStep('magic') }}>
-                ✉ Sign in with Email Link
-              </button>
+              <p className="sub">Enter your email and we'll get you in the right way.</p>
+              <form onSubmit={handleEmailCheck}>
+                <div className="field">
+                  <label htmlFor="signin-email">Email Address</label>
+                  <input
+                    id="signin-email" type="email" placeholder="your@email.com"
+                    value={email} onChange={e => { setEmail(e.target.value); setEmailNotFound(false) }}
+                    required autoComplete="email" autoFocus
+                  />
+                </div>
+
+                {emailNotFound && (
+                  <div className="not-found-box">
+                    <strong>No account found for that email.</strong><br />
+                    Try a different address, or{' '}
+                    <strong
+                      style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                      onClick={() => switchMode('signup')}
+                    >
+                      create an account
+                    </strong>.
+                  </div>
+                )}
+
+                {error && <div className="error">{error}</div>}
+
+                <button type="submit" className="btn" disabled={loading || !email}>
+                  {loading ? 'Checking…' : 'Continue →'}
+                </button>
+              </form>
               <a href="/" className="back-btn">← Back to The 785</a>
             </>
           )}
@@ -380,11 +442,15 @@ function LoginPageInner() {
             </>
           )}
 
-          {/* ── MAGIC LINK (sign-in only) ── */}
+          {/* ── MAGIC LINK ── */}
           {step === 'magic' && (
             <>
               <h1 className="heading">Email<br />Link</h1>
-              <p className="sub">Enter your email and we'll send a sign-in link — no password needed.</p>
+              <p className="sub">
+                {mode === 'signin'
+                  ? `We'll send a sign-in link to ${email || 'your email'}.`
+                  : 'Enter your email and we'll send a sign-in link — no password needed.'}
+              </p>
               <form onSubmit={handleMagicLink}>
                 <div className="field">
                   <label htmlFor="magic-email">Email Address</label>
@@ -409,7 +475,8 @@ function LoginPageInner() {
               <div className="sent-icon">✉</div>
               <h1 className="heading">Check<br />Email</h1>
               <p className="sub">
-                We sent a {mode === 'signup' ? 'confirmation' : 'login'} link to <strong style={{color: 'rgba(255,255,255,0.8)'}}>{email}</strong>.
+                We sent a {mode === 'signup' ? 'confirmation' : 'login'} link to{' '}
+                <strong style={{color: 'rgba(255,255,255,0.8)'}}>{email}</strong>.
               </p>
               <div className="hint">
                 Didn't get it? Check spam or{' '}

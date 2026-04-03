@@ -21,7 +21,7 @@ type SaveTheDateEventType =
 interface SaveTheDate {
   id: string
   title: string
-  organizer: string
+  organizer: string | null
   event_date: string
   event_end_date: string | null
   start_time: string | null
@@ -106,7 +106,7 @@ function downloadCSV(events: SaveTheDate[]): void {
     'Is Annual', 'Is Nonprofit', 'Submitter Name', 'Submitter Email',
   ]
   const rows = events.map((e) => [
-    e.title, e.organizer,
+    e.title, e.organizer ?? '',
     formatDate(e.event_date), formatDate(e.event_end_date),
     formatTime(e.start_time) ?? '', formatTime(e.end_time) ?? '',
     e.event_type, e.location_name ?? '',
@@ -132,7 +132,7 @@ function downloadPDF(events: SaveTheDate[], label: string): void {
       (e) => `
       <tr>
         <td>${formatDate(e.event_date)}${e.event_end_date ? ` – ${formatDate(e.event_end_date)}` : ''}</td>
-        <td><strong>${e.title}</strong><br/><span class="org">${e.organizer}</span></td>
+        <td><strong>${e.title}</strong>${e.organizer ? `<br/><span class="org">${e.organizer}</span>` : ''}</td>
         <td>${e.event_type}</td>
         <td>${e.location_name ?? '—'}</td>
         <td>${e.expected_capacity ? e.expected_capacity.toLocaleString() : '—'}</td>
@@ -234,13 +234,14 @@ function AddEventModal({
     setError('')
 
     if (!form.submitter_email || form.submitter_email.trim() === '') {
-      setError('Could not detect your email. Please refresh and try again, or contact support.')
+      setError('Could not detect your email. Please refresh and try again, or contact us at 785-249-3126.')
       setSaving(false)
       return
     }
 
     const payload = {
       ...form,
+      organizer: form.organizer || null,
       expected_capacity: form.expected_capacity ? parseInt(form.expected_capacity) : null,
       event_end_date: form.event_end_date || null,
       start_time: form.start_time || null,
@@ -274,8 +275,8 @@ function AddEventModal({
               <input required value={form.title} onChange={(e) => set('title', e.target.value)} placeholder="Event name" />
             </div>
             <div className="form-group full">
-              <label>Organizer / Organization *</label>
-              <input required value={form.organizer} onChange={(e) => set('organizer', e.target.value)} placeholder="Who's putting this on?" />
+              <label>Organizer / Organization <span className="optional">(optional)</span></label>
+              <input value={form.organizer} onChange={(e) => set('organizer', e.target.value)} placeholder="Who's putting this on?" />
             </div>
             <div className="form-group">
               <label>Event Date *</label>
@@ -370,7 +371,7 @@ function EventDetailModal({ event, onClose }: { event: SaveTheDate; onClose: () 
           <div>
             <span className="event-type-badge">{event.event_type}</span>
             <h2>{event.title}</h2>
-            <p className="detail-organizer">{event.organizer}</p>
+            {event.organizer && <p className="detail-organizer">{event.organizer}</p>}
           </div>
           <button className="close-btn" onClick={onClose}>✕</button>
         </div>
@@ -470,7 +471,7 @@ function AgendaList({
             <div className="agenda-content">
               <div className="agenda-title">{ev.title}</div>
               <div className="agenda-meta">
-                <span className="agenda-organizer">{ev.organizer}</span>
+                {ev.organizer && <span className="agenda-organizer">{ev.organizer}</span>}
                 <span className="agenda-type-chip">{ev.event_type}</span>
               </div>
               {ev.location_name && (
@@ -506,7 +507,7 @@ export default function SaveTheDatePage() {
     async function loadProfile() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        setPrefillReady(true) // unblock button even if no user
+        setPrefillReady(true)
         return
       }
       const { data: profile } = await supabase
@@ -741,7 +742,8 @@ export default function SaveTheDatePage() {
           .form-grid { grid-template-columns: 1fr; }
           .form-group.full { grid-column: 1; }
           .download-group { margin-left: 0; }
-          .cal-controls { gap: 6px; } .download-group { margin-left: 0; margin-top: 10px; width: 100%; justify-content: flex-start; }
+          .cal-controls { gap: 6px; }
+          .download-group { margin-left: 0; margin-top: 10px; width: 100%; justify-content: flex-start; }
           .std-page { padding: 0 16px 60px; }
         }
       `}</style>

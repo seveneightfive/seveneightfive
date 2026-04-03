@@ -91,7 +91,7 @@ export default function SaveTheDateNewPage() {
       submitter_name:    form.submitter_name    || null,
       submitter_email:   form.submitter_email,
       submitter_phone:   form.submitter_phone   || null,
-      status:            'pending',
+      status:            'approved',
     }])
 
     setSaving(false)
@@ -236,7 +236,7 @@ export default function SaveTheDateNewPage() {
         </form>
 
         <p className="fine-print">
-          Submissions are reviewed before appearing on the calendar — usually within 24 hours.
+          Questions? Email <a href="mailto:kerrice@seveneightfive.com">kerrice@seveneightfive.com</a>
           Questions? Email <a href="mailto:kerrice@seveneightfive.com">kerrice@seveneightfive.com</a>
         </p>
 
