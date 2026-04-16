@@ -78,7 +78,7 @@ async function getLiveMusicEvents() {
     .from('events')
     .select('id, title, slug, event_date, event_start_time, image_url, venues (name, neighborhood)')
     .gte('event_date', today)
-    .overlaps('event_types', ['Live Music', 'Art'])
+    .overlaps('event_types', ['Live Music'])
     .order('event_date', { ascending: true })
     .limit(3)
   return data ?? []
@@ -90,7 +90,7 @@ async function getFamilyEvents() {
     .from('events')
     .select('id, title, slug, event_date, event_start_time, image_url, venues (name, neighborhood)')
     .gte('event_date', today)
-    .overlaps('event_types', ['Community / Cultural', 'Workshop / Class', 'Exhibition'])
+    .overlaps('event_types', ['Family', 'Community / Cultural', 'Holiday'])
     .order('event_date', { ascending: true })
     .limit(3)
   return data ?? []
@@ -328,7 +328,7 @@ export default async function TopekaEventsPage() {
 
       {/* ── HERO ── */}
       <div className="te-hero">
-        <p className="te-hero-eyebrow">Topeka, Kansas · 785</p>
+        <p className="te-hero-eyebrow">Topeka, Kansas · seveneightfive</p>
         <h1>Your daily guide to<br />events, live music,<br />art and more</h1>
         <div className="te-hero-actions">
           <Link href="/events" className="te-btn-primary">Browse Events</Link>
@@ -366,7 +366,7 @@ export default async function TopekaEventsPage() {
       <Section
         title="First Friday"
         emoji="🖼️"
-        href="/events"
+        href="/topeka-art-galleries"
         linkLabel="See all"
         events={firstFriday}
         emptyMsg="First Friday events coming soon."
