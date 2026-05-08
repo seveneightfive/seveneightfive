@@ -149,11 +149,14 @@ export default function LoginPage() {
     }
 
     // 4. (optional) venues if you add email field later
-    const { data: venues } = await supabase
-      .from('venues')
-      .select('id')
-      .eq('email', email)
-      .catch(() => ({ data: null }))
+    const { data: venues, error: venuesError } = await supabase
+  .from('venues')
+  .select('id')
+  .eq('email', email)
+
+if (venuesError) {
+  console.warn('Venue lookup failed:', venuesError.message)
+}
 
     if (venues) {
       await Promise.all(
