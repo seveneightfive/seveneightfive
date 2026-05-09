@@ -14,9 +14,22 @@ export default function OnboardingPage() {
 
   const [fullName, setFullName] = useState('')
   const [username, setUsername] = useState('')
-  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [otp, setOtp] = useState('')
+
+  const [step, setStep] = useState<'profile' | 'verify-phone'>('profile')
 
   const [error, setError] = useState('')
+
+  const normalizePhone = (value: string) => {
+    const digits = value.replace(/\D/g, '')
+
+    if (digits.startsWith('1')) {
+      return `+${digits}`
+    }
+
+    return `+1${digits}`
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -41,7 +54,7 @@ export default function OnboardingPage() {
       }
 
       setFullName(profile?.full_name || '')
-      setEmail(profile?.email || '')
+      setPhone(profile?.phone_number || '')
 
       setLoading(false)
     }
@@ -49,11 +62,52 @@ export default function OnboardingPage() {
     load()
   }, [router])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const sendPhoneVerification = async (
+    e: React.FormEvent
+  ) => {
     e.preventDefault()
 
     setSaving(true)
     setError('')
+
+    const normalizedPhone = normalizePhone(phone)
+
+    const { error } = await supabase.auth.updateUser({
+      phone: normalizedPhone,
+    })
+
+    if (error) {
+      setError(error.message)
+      setSaving(false)
+      return
+    }
+
+    setStep('verify-phone')
+    setSaving(false)
+  }
+
+  const verifyPhone = async (
+    e: React.FormEvent
+  ) => {
+    e.preventDefault()
+
+    setSaving(true)
+    setError('')
+
+    const normalizedPhone = normalizePhone(phone)
+
+    const { error: otpError } =
+      await supabase.auth.verifyOtp({
+        phone: normalizedPhone,
+        token: otp,
+        type: 'phone_change',
+      })
+
+    if (otpError) {
+      setError(otpError.message)
+      setSaving(false)
+      return
+    }
 
     const {
       data: { user },
@@ -64,28 +118,15 @@ export default function OnboardingPage() {
       return
     }
 
-    // UPDATE AUTH EMAIL
-    if (email && email !== user.email) {
-      const { error: authError } = await supabase.auth.updateUser({
-        email,
-      })
-
-      if (authError) {
-        setError(authError.message)
-        setSaving(false)
-        return
-      }
-    }
-
-    // UPDATE PROFILE
     const { error: profileError } = await supabase
       .from('profiles')
       .update({
         full_name: fullName,
         username,
-        email,
+        phone_number: normalizedPhone,
         onboarding_completed: true,
-        onboarding_completed_at: new Date().toISOString(),
+        onboarding_completed_at:
+          new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq('id', user.id)
@@ -100,58 +141,114 @@ export default function OnboardingPage() {
   }
 
   if (loading) {
-    return <div>Loading...</div>
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        Loading...
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-black text-white flex items-center justify-center p-6">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-md space-y-4"
-      >
-        <h1 className="text-4xl font-bold">
-          Complete Your Profile
-        </h1>
+      <div className="w-full max-w-md">
 
-        <input
-          className="w-full p-4 rounded bg-zinc-900 border border-zinc-700"
-          placeholder="Full Name"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          required
-        />
+        {step === 'profile' && (
+          <form
+            onSubmit={sendPhoneVerification}
+            className="space-y-4"
+          >
+            <h1 className="text-5xl font-bold">
+              Complete Your Profile
+            </h1>
 
-        <input
-          className="w-full p-4 rounded bg-zinc-900 border border-zinc-700"
-          placeholder="Username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          required
-        />
+            <input
+              className="w-full p-4 rounded bg-zinc-900 border border-zinc-700"
+              placeholder="Full Name"
+              value={fullName}
+              onChange={(e) =>
+                setFullName(e.target.value)
+              }
+              required
+            />
 
-        <input
-          className="w-full p-4 rounded bg-zinc-900 border border-zinc-700"
-          placeholder="Email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
+            <input
+              className="w-full p-4 rounded bg-zinc-900 border border-zinc-700"
+              placeholder="Username"
+              value={username}
+              onChange={(e) =>
+                setUsername(e.target.value)
+              }
+              required
+            />
 
-        {error && (
-          <div className="text-red-400">
-            {error}
-          </div>
+            <input
+              className="w-full p-4 rounded bg-zinc-900 border border-zinc-700"
+              placeholder="Phone Number"
+              value={phone}
+              onChange={(e) =>
+                setPhone(e.target.value)
+              }
+              required
+            />
+
+            {error && (
+              <div className="text-red-400">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={saving}
+              className="w-full p-4 rounded bg-pink-600"
+            >
+              {saving
+                ? 'Sending Code...'
+                : 'Continue'}
+            </button>
+          </form>
         )}
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="w-full p-4 rounded bg-pink-600"
-        >
-          {saving ? 'Saving...' : 'Continue'}
-        </button>
-      </form>
+        {step === 'verify-phone' && (
+          <form
+            onSubmit={verifyPhone}
+            className="space-y-4"
+          >
+            <h1 className="text-5xl font-bold">
+              Verify Phone
+            </h1>
+
+            <input
+              className="w-full p-4 rounded bg-zinc-900 border border-zinc-700 text-center tracking-[0.3em]"
+              placeholder="000000"
+              value={otp}
+              onChange={(e) =>
+                setOtp(
+                  e.target.value.replace(/\D/g, '')
+                )
+              }
+              maxLength={6}
+            />
+
+            {error && (
+              <div className="text-red-400">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={saving || otp.length < 6}
+              className="w-full p-4 rounded bg-pink-600"
+            >
+              {saving
+                ? 'Verifying...'
+                : 'Complete Setup'}
+            </button>
+          </form>
+        )}
+
+      </div>
     </div>
   )
 }
