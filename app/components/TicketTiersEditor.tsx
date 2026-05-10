@@ -202,8 +202,7 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
 
       {enabled && !isStripeReady && (
         <div className="tte-stripe-warn">
-          ⚠ You need to <a href="/dashboard">connect Stripe</a> before you can sell tickets.
-          Tiers saved here will go live once your account is connected.
+          ⚠ You need to <a href="/dashboard/settings/payouts">connect Stripe</a> before you can sell tickets.
         </div>
       )}
 
