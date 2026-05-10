@@ -18,9 +18,18 @@ type Profile = {
 }
 
 export default function PayoutsSettingsPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', background: '#1a1814' }} />}>
+      <PayoutsSettings />
+    </Suspense>
+  )
+}
+
+function PayoutsSettings() {
   const supabase = createClient()
   const router = useRouter()
   const searchParams = useSearchParams()
+  // ... rest of component (everything else stays the same)
 
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
