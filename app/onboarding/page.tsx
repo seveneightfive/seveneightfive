@@ -14,22 +14,10 @@ export default function OnboardingPage() {
 
   const [fullName, setFullName] = useState('')
   const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
-  const [otp, setOtp] = useState('')
-
-  const [step, setStep] = useState<'profile' | 'verify-phone'>('profile')
 
   const [error, setError] = useState('')
-
-  const normalizePhone = (value: string) => {
-    const digits = value.replace(/\D/g, '')
-
-    if (digits.startsWith('1')) {
-      return `+${digits}`
-    }
-
-    return `+1${digits}`
-  }
 
   useEffect(() => {
     const load = async () => {
@@ -48,13 +36,26 @@ export default function OnboardingPage() {
         .eq('id', user.id)
         .single()
 
-      if (profile?.onboarding_completed) {
+      if (
+        profile?.onboarding_completed &&
+        profile?.username &&
+        profile?.email &&
+        profile?.phone_number
+      ) {
         router.push('/dashboard')
         return
       }
 
       setFullName(profile?.full_name || '')
-      setPhone(profile?.phone_number || '')
+      setUsername(profile?.username || '')
+      setEmail(
+        profile?.email || user.email || ''
+      )
+      setPhone(
+        profile?.phone_number ||
+          user.phone ||
+          ''
+      )
 
       setLoading(false)
     }
@@ -62,52 +63,13 @@ export default function OnboardingPage() {
     load()
   }, [router])
 
-  const sendPhoneVerification = async (
+  const handleSubmit = async (
     e: React.FormEvent
   ) => {
     e.preventDefault()
 
     setSaving(true)
     setError('')
-
-    const normalizedPhone = normalizePhone(phone)
-
-    const { error } = await supabase.auth.updateUser({
-      phone: normalizedPhone,
-    })
-
-    if (error) {
-      setError(error.message)
-      setSaving(false)
-      return
-    }
-
-    setStep('verify-phone')
-    setSaving(false)
-  }
-
-  const verifyPhone = async (
-    e: React.FormEvent
-  ) => {
-    e.preventDefault()
-
-    setSaving(true)
-    setError('')
-
-    const normalizedPhone = normalizePhone(phone)
-
-    const { error: otpError } =
-      await supabase.auth.verifyOtp({
-        phone: normalizedPhone,
-        token: otp,
-        type: 'phone_change',
-      })
-
-    if (otpError) {
-      setError(otpError.message)
-      setSaving(false)
-      return
-    }
 
     const {
       data: { user },
@@ -118,18 +80,36 @@ export default function OnboardingPage() {
       return
     }
 
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .update({
-        full_name: fullName,
-        username,
-        phone_number: normalizedPhone,
-        onboarding_completed: true,
-        onboarding_completed_at:
-          new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+    const { error: authError } =
+      await supabase.auth.updateUser({
+        email,
+        phone,
+        data: {
+          full_name: fullName,
+        },
       })
-      .eq('id', user.id)
+
+    if (authError) {
+      setError(authError.message)
+      setSaving(false)
+      return
+    }
+
+    const { error: profileError } =
+      await supabase
+        .from('profiles')
+        .update({
+          full_name: fullName,
+          username,
+          email,
+          phone_number: phone,
+          onboarding_completed: true,
+          onboarding_completed_at:
+            new Date().toISOString(),
+          updated_at:
+            new Date().toISOString(),
+        })
+        .eq('id', user.id)
 
     if (profileError) {
       setError(profileError.message)
@@ -150,105 +130,78 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-black text-white flex items-center justify-center p-6">
-      <div className="w-full max-w-md">
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-md space-y-4"
+      >
+        <div className="mb-8">
+          <h1 className="text-5xl font-bold mb-3">
+            Complete Your Profile
+          </h1>
 
-        {step === 'profile' && (
-          <form
-            onSubmit={sendPhoneVerification}
-            className="space-y-4"
-          >
-            <h1 className="text-5xl font-bold">
-              Complete Your Profile
-            </h1>
+          <p className="text-zinc-400">
+            Finish setting up your account.
+          </p>
+        </div>
 
-            <input
-              className="w-full p-4 rounded bg-zinc-900 border border-zinc-700"
-              placeholder="Full Name"
-              value={fullName}
-              onChange={(e) =>
-                setFullName(e.target.value)
-              }
-              required
-            />
+        <input
+          required
+          placeholder="Full Name"
+          value={fullName}
+          onChange={(e) =>
+            setFullName(e.target.value)
+          }
+          className="w-full p-4 rounded bg-zinc-900 border border-zinc-700"
+        />
 
-            <input
-              className="w-full p-4 rounded bg-zinc-900 border border-zinc-700"
-              placeholder="Username"
-              value={username}
-              onChange={(e) =>
-                setUsername(e.target.value)
-              }
-              required
-            />
+        <input
+          required
+          placeholder="Username"
+          value={username}
+          onChange={(e) =>
+            setUsername(e.target.value)
+          }
+          className="w-full p-4 rounded bg-zinc-900 border border-zinc-700"
+        />
 
-            <input
-              className="w-full p-4 rounded bg-zinc-900 border border-zinc-700"
-              placeholder="Phone Number"
-              value={phone}
-              onChange={(e) =>
-                setPhone(e.target.value)
-              }
-              required
-            />
+        <input
+          required
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) =>
+            setEmail(e.target.value)
+          }
+          className="w-full p-4 rounded bg-zinc-900 border border-zinc-700"
+        />
 
-            {error && (
-              <div className="text-red-400">
-                {error}
-              </div>
-            )}
+        <input
+          required
+          type="tel"
+          placeholder="Phone Number"
+          value={phone}
+          onChange={(e) =>
+            setPhone(e.target.value)
+          }
+          className="w-full p-4 rounded bg-zinc-900 border border-zinc-700"
+        />
 
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full p-4 rounded bg-pink-600"
-            >
-              {saving
-                ? 'Sending Code...'
-                : 'Continue'}
-            </button>
-          </form>
+        {error && (
+          <div className="text-red-400">
+            {error}
+          </div>
         )}
 
-        {step === 'verify-phone' && (
-          <form
-            onSubmit={verifyPhone}
-            className="space-y-4"
-          >
-            <h1 className="text-5xl font-bold">
-              Verify Phone
-            </h1>
-
-            <input
-              className="w-full p-4 rounded bg-zinc-900 border border-zinc-700 text-center tracking-[0.3em]"
-              placeholder="000000"
-              value={otp}
-              onChange={(e) =>
-                setOtp(
-                  e.target.value.replace(/\D/g, '')
-                )
-              }
-              maxLength={6}
-            />
-
-            {error && (
-              <div className="text-red-400">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={saving || otp.length < 6}
-              className="w-full p-4 rounded bg-pink-600"
-            >
-              {saving
-                ? 'Verifying...'
-                : 'Complete Setup'}
-            </button>
-          </form>
-        )}
-
-      </div>
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full p-4 rounded bg-pink-600"
+        >
+          {saving
+            ? 'Saving...'
+            : 'Continue'}
+        </button>
+      </form>
     </div>
   )
 }
