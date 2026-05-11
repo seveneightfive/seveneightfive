@@ -198,7 +198,7 @@ export default function MyEventsPage() {
                 </div>
               </div>
             ))}
-          </div>
+      </div>
         )}
       </div>
     </>
