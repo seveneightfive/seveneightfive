@@ -150,7 +150,7 @@ export default function MyEventsPage() {
             <p style={{ fontSize: '0.85rem' }}>Add your first event to get started.</p>
           </div>
         ) : (
-          <div>
+        <div>
             {events.map(event => (
               <div
                 key={event.id}
@@ -198,7 +198,7 @@ export default function MyEventsPage() {
                 </div>
               </div>
             ))}
-      </div>
+          </div>
         )}
       </div>
     </>
