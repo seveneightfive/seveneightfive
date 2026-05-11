@@ -300,12 +300,15 @@ function EventEditInner() {
 
     setSaving(false)
     setSaved(true)
-    setTimeout(() => {
-      setSaved(false)
-      if (newEventId) router.push(`/dashboard/events/edit?id=${newEventId}`)
-    }, 1500)
+    // For a brand-new event, redirect to the edit page so tier editor appears
+    if (newEventId) {
+      router.push(`/dashboard/events/edit?id=${newEventId}`)
+      return
+    }
+    // For an existing event, keep success banner visible — user sees it
+    // and can navigate using the buttons that now appear
   }
-
+    
   const handleDelete = async () => {
     if (!form.id) return
     if (!confirm(`Delete "${form.title}"? This cannot be undone.`)) return
@@ -596,6 +599,85 @@ function EventEditInner() {
         {error && (
           <div style={{ padding: '12px 16px', background: 'rgba(200,6,80,0.12)', border: '1px solid rgba(200,6,80,0.3)', borderRadius: 8, color: '#FFCE03', fontSize: '0.85rem', marginBottom: 20 }}>
             {error}
+          </div>
+        )}
+
+        {saved && !isNew && (
+          <div style={{
+            padding: '14px 16px',
+            background: 'rgba(45,122,45,0.12)',
+            border: '1px solid rgba(126,207,126,0.4)',
+            borderRadius: 10,
+            marginBottom: 16,
+          }}>
+            <div style={{
+              color: '#7ecf7e',
+              fontFamily: "'Oswald', sans-serif",
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              marginBottom: 10,
+            }}>
+              ✓ Event saved
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <a
+                href={`/dashboard/events/${form.id || eventId}/tickets`}
+                style={{
+                  padding: '8px 14px',
+                  background: 'rgba(255,206,3,0.12)',
+                  border: '1px solid rgba(255,206,3,0.35)',
+                  borderRadius: 6,
+                  color: '#FFCE03',
+                  fontFamily: "'Oswald', sans-serif",
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  textDecoration: 'none',
+                }}
+              >
+                Manage Tickets →
+              </a>
+              <a
+                href="/dashboard/events"
+                style={{
+                  padding: '8px 14px',
+                  background: 'transparent',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: 6,
+                  color: 'rgba(255,255,255,0.55)',
+                  fontFamily: "'Oswald', sans-serif",
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  textDecoration: 'none',
+                }}
+              >
+                All Events
+              </a>
+              <button
+                type="button"
+                onClick={() => setSaved(false)}
+                style={{
+                  padding: '8px 14px',
+                  background: 'transparent',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: 6,
+                  color: 'rgba(255,255,255,0.55)',
+                  fontFamily: "'Oswald', sans-serif",
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                }}
+              >
+                Keep Editing
+              </button>
+            </div>
           </div>
         )}
 
