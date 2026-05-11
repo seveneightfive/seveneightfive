@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
         events (
           id, title, event_date, event_start_time, image_url, slug,
           auth_user_id,
-          profiles!events_auth_user_id_fkey (
+          profiles!events_auth_user_id_profile_fkey (
             stripe_account_id,
             stripe_account_status
           )
