@@ -150,7 +150,7 @@ export default function MyEventsPage() {
             <p style={{ fontSize: '0.85rem' }}>Add your first event to get started.</p>
           </div>
         ) : (
-        <div>
+          <div>
             {events.map(event => (
               <div
                 key={event.id}
@@ -163,7 +163,7 @@ export default function MyEventsPage() {
                   {event.venue_name && <div className="event-venue">{event.venue_name}</div>}
                 </div>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
-                  
+                  <a
                     href={`/dashboard/events/${event.id}/tickets`}
                     onClick={e => e.stopPropagation()}
                     style={{
@@ -184,7 +184,7 @@ export default function MyEventsPage() {
                     Tickets
                   </a>
                   {event.slug && (
-                    
+                    <a
                       href={`/events/${event.slug}`}
                       target="_blank"
                       rel="noopener noreferrer"
