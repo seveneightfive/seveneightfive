@@ -163,8 +163,28 @@ export default function MyEventsPage() {
                   {event.venue_name && <div className="event-venue">{event.venue_name}</div>}
                 </div>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
+                  
+                    href={`/dashboard/events/${event.id}/tickets`}
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      padding: '5px 10px',
+                      background: 'rgba(255,206,3,0.1)',
+                      border: '1px solid rgba(255,206,3,0.3)',
+                      borderRadius: 6,
+                      color: '#FFCE03',
+                      fontFamily: "'Oswald', sans-serif",
+                      fontSize: '0.68rem',
+                      fontWeight: 600,
+                      letterSpacing: '0.1em',
+                      textTransform: 'uppercase',
+                      textDecoration: 'none',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Tickets
+                  </a>
                   {event.slug && (
-                    <a
+                    
                       href={`/events/${event.slug}`}
                       target="_blank"
                       rel="noopener noreferrer"
