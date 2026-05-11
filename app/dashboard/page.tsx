@@ -229,6 +229,20 @@ export default async function DashboardPage() {
           .settings-link:hover { color: var(--text); }
           .settings-dot { margin: 0 6px; color: var(--borders); font-size: 0.68rem; }
 
+          /* ── TICKET CTA (top of dashboard) ── */
+          .ticket-cta { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 16px 20px 0; padding: 16px 20px; background: var(--white); border: 0.5px solid var(--borders); border-left: 3px solid var(--brand); border-radius: 12px; text-decoration: none; color: inherit; transition: box-shadow 0.15s, transform 0.15s; }
+          .ticket-cta:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); transform: translateY(-1px); }
+          .ticket-cta-left { flex: 1; min-width: 0; }
+          .ticket-cta-eyebrow { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brand); margin-bottom: 4px; }
+          .ticket-cta-title { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; color: var(--text); letter-spacing: 0.02em; line-height: 1.2; }
+          .ticket-cta-sub { font-size: 0.75rem; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+          .ticket-cta-arrow { font-family: var(--serif); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brand); white-space: nowrap; flex-shrink: 0; padding: 8px 14px; border: 1px solid rgba(200,6,80,0.25); border-radius: 6px; background: rgba(200,6,80,0.04); }
+          @media (max-width: 640px) {
+            .ticket-cta { margin: 14px 16px 0; padding: 14px 16px; gap: 14px; }
+            .ticket-cta-title { font-size: 1rem; }
+            .ticket-cta-arrow { padding: 7px 11px; font-size: 0.72rem; }
+          }
+
           /* ── CREATE CTA ── */
           .create-card { background: var(--brand); border: 0.5px solid var(--brand); border-radius: 14px; padding: 20px 24px; display: flex; flex-direction: row; align-items: center; gap: 0; }
           .create-left { flex-shrink: 0; margin-right: 24px; }
@@ -292,6 +306,20 @@ export default async function DashboardPage() {
           </p>
         </div>
         <hr className="hr" />
+
+        {/* ── TICKET CTA (logged-in only) ─────────────────────────────────── */}
+        {!isGuest && (
+          <a href="/dashboard/events/edit" className="ticket-cta">
+            <div className="ticket-cta-left">
+              <div className="ticket-cta-eyebrow">Sellers</div>
+              <div className="ticket-cta-title">Create and sell tickets to an event</div>
+              <div className="ticket-cta-sub">
+                Set up your event, add ticket tiers, and start taking payments — all in one place.
+              </div>
+            </div>
+            <div className="ticket-cta-arrow">Create →</div>
+          </a>
+        )}
 
         {/* ── GRID ──────────────────────────────────────────────────────────── */}
         <div className="grid">
@@ -528,7 +556,7 @@ export default async function DashboardPage() {
             </div>
             <div className="create-rule" />
             <div className="create-btns">
-              <a href="https://seveneightfive.fillout.com/add-event"   target="_blank" rel="noopener noreferrer" className="create-btn">Event</a>
+              <a href="/dashboard/events/edit" className="create-btn">Event</a>
               <a href={isGuest ? '/login?next=/dashboard/announcements/new' : '/dashboard/announcements/new'} className="create-btn">Announcement</a>
               <a href="https://seveneightfive.fillout.com/new-artist"  target="_blank" rel="noopener noreferrer" className="create-btn">Artist Page</a>
               <a href="https://seveneightfive.fillout.com/add-venue"   target="_blank" rel="noopener noreferrer" className="create-btn">Venue Page</a>
