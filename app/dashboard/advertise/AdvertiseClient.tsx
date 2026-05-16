@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { Megaphone, Plus, Upload, X, ArrowLeft, ArrowUpRight } from 'lucide-react'
 
 type Ad = {
   id: string
@@ -47,14 +48,23 @@ function calcEndDate(start: string, duration: number): string {
 }
 
 function formatDate(s: string) {
-  return new Date(s + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return new Date(s + 'T12:00:00').toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 
 function wordCount(s: string) {
   return s.trim().split(/\s+/).filter(Boolean).length
 }
 
-export default function AdvertiseClient({ userId, initialAds, successParam, cancelledAdId }: Props) {
+export default function AdvertiseClient({
+  userId,
+  initialAds,
+  successParam,
+  cancelledAdId,
+}: Props) {
   const [ads, setAds] = useState<Ad[]>(initialAds)
   const [showForm, setShowForm] = useState(initialAds.length === 0)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -65,22 +75,42 @@ export default function AdvertiseClient({ userId, initialAds, successParam, canc
 
   const price = form.duration === 5 ? '$10' : '$15'
   const endDate = calcEndDate(form.start_date, form.duration)
-  const canSubmit = form.headline && form.ad_copy && form.button_text && form.button_link && form.start_date && !uploading
+  const canSubmit =
+    form.headline &&
+    form.ad_copy &&
+    form.button_text &&
+    form.button_link &&
+    form.start_date &&
+    !uploading
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 5 * 1024 * 1024) { setError('Image must be under 5MB'); return }
-    if (!file.type.startsWith('image/')) { setError('Please upload an image file'); return }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be under 5MB')
+      return
+    }
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file')
+      return
+    }
 
     setUploading(true)
     setError('')
     const ext = file.name.split('.').pop()
     const path = `${userId}-${Date.now()}.${ext}`
-    const { error: upErr } = await supabase.storage.from('advertisements').upload(path, file, { upsert: true })
-    if (upErr) { setError('Upload failed — try again'); setUploading(false); return }
-    const { data: { publicUrl } } = supabase.storage.from('advertisements').getPublicUrl(path)
-    setForm(f => ({ ...f, ad_image_url: publicUrl }))
+    const { error: upErr } = await supabase.storage
+      .from('advertisements')
+      .upload(path, file, { upsert: true })
+    if (upErr) {
+      setError('Upload failed — try again')
+      setUploading(false)
+      return
+    }
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from('advertisements').getPublicUrl(path)
+    setForm((f) => ({ ...f, ad_image_url: publicUrl }))
     setUploading(false)
   }
 
@@ -96,422 +126,553 @@ export default function AdvertiseClient({ userId, initialAds, successParam, canc
       body: JSON.stringify({ ...form }),
     })
     const json = await res.json()
-    if (!res.ok) { setError(json.error || 'Something went wrong'); setSubmitting(false); return }
+    if (!res.ok) {
+      setError(json.error || 'Something went wrong')
+      setSubmitting(false)
+      return
+    }
     window.location.href = json.url
   }
 
-  // Delete a cancelled (unpaid) draft ad
   async function deleteDraft(adId: string) {
-    await supabase.from('advertisements').delete().eq('id', adId).eq('payment_status', 'pending')
-    setAds(a => a.filter(x => x.id !== adId))
+    await supabase
+      .from('advertisements')
+      .delete()
+      .eq('id', adId)
+      .eq('payment_status', 'pending')
+    setAds((a) => a.filter((x) => x.id !== adId))
   }
 
-  const adStatusLabel = (ad: Ad) => {
+  const adStatusInfo = (ad: Ad) => {
     const today = new Date().toISOString().split('T')[0]
-    if (ad.payment_status !== 'paid') return { label: 'Pending Payment', color: '#b8860b', bg: '#fef9e7' }
-    if (today < ad.start_date) return { label: 'Scheduled', color: '#1d6fa4', bg: '#e8f4fb' }
-    if (today >= ad.start_date && today <= ad.end_date) return { label: 'Active', color: '#2d7a2d', bg: '#eafaf1' }
-    return { label: 'Ended', color: '#6b6560', bg: '#f5f4f1' }
+    if (ad.payment_status !== 'paid')
+      return {
+        label: 'Pending Payment',
+        classes:
+          'bg-warning-50 text-warning-700 border-warning-200 dark:bg-warning-500/15 dark:text-warning-400 dark:border-warning-500/30',
+      }
+    if (today < ad.start_date)
+      return {
+        label: 'Scheduled',
+        classes:
+          'bg-blue-light-50 text-blue-light-700 border-blue-light-200 dark:bg-blue-light-500/15 dark:text-blue-light-400 dark:border-blue-light-500/30',
+      }
+    if (today >= ad.start_date && today <= ad.end_date)
+      return {
+        label: 'Active',
+        classes:
+          'bg-success-50 text-success-700 border-success-200 dark:bg-success-500/15 dark:text-success-400 dark:border-success-500/30',
+      }
+    return {
+      label: 'Ended',
+      classes:
+        'bg-gray-100 text-gray-500 border-gray-200 dark:bg-white/[0.06] dark:text-gray-400 dark:border-gray-700',
+    }
   }
 
   return (
-    <>
-      <style>{`
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        :root {
-          --ink: #1a1814; --ink-soft: #6b6560; --ink-faint: #b8b3ad;
-          --white: #ffffff; --off: #f5f4f1; --warm: #f2ede6;
-          --accent: #C80650; --gold: #FFCE03; --border: rgba(0,0,0,0.1);
-          --serif: 'Oswald', sans-serif; --sans: 'DM Sans', system-ui, sans-serif;
-        }
-        body { background: var(--off); color: var(--ink); font-family: var(--sans); }
-
-        .adv-wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 80px; }
-        .adv-topbar { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 24px; height: 52px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 100; }
-        .adv-back { font-size: 0.78rem; color: var(--ink-soft); text-decoration: none; display: flex; align-items: center; gap: 6px; }
-        .adv-back:hover { color: var(--ink); }
-        .adv-wordmark { font-family: var(--serif); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-faint); }
-        .adv-wordmark em { font-style: normal; color: var(--accent); }
-
-        .adv-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 32px; }
-        .adv-title { font-family: var(--serif); font-size: 2rem; font-weight: 700; text-transform: uppercase; line-height: 1; }
-        .adv-sub { font-size: 0.85rem; color: var(--ink-soft); margin-top: 6px; font-weight: 300; }
-        .adv-new-btn { display: inline-flex; align-items: center; gap: 7px; background: var(--gold); color: var(--ink); font-family: var(--serif); font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; padding: 12px 22px; border-radius: 8px; border: none; cursor: pointer; transition: opacity 0.15s; }
-        .adv-new-btn:hover { opacity: 0.88; }
-
-        /* SUCCESS / NOTICE BANNERS */
-        .adv-notice { padding: 12px 16px; border-radius: 8px; font-size: 0.82rem; font-weight: 500; margin-bottom: 24px; }
-        .adv-notice.success { background: #eafaf1; color: #2d7a2d; border: 1px solid rgba(45,122,45,0.2); }
-        .adv-notice.warning { background: #fef9e7; color: #8a6800; border: 1px solid rgba(255,206,3,0.3); }
-
-        /* AD LIST */
-        .ad-list { display: grid; gap: 16px; margin-bottom: 40px; }
-        .ad-card { background: var(--white); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: grid; grid-template-columns: 1fr auto; }
-        .ad-card-body { padding: 20px 20px 16px; display: flex; flex-direction: column; gap: 8px; }
-        .ad-card-img { width: 140px; object-fit: cover; flex-shrink: 0; }
-        .ad-card-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-        .ad-badge { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 9px; border-radius: 100px; }
-        .ad-headline { font-family: var(--serif); font-size: 1.1rem; font-weight: 600; text-transform: uppercase; }
-        .ad-copy { font-size: 0.82rem; color: var(--ink-soft); line-height: 1.5; }
-        .ad-meta-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 0.72rem; color: var(--ink-faint); margin-top: 4px; }
-        .ad-stat { display: flex; align-items: center; gap: 4px; }
-        .ad-stat strong { color: var(--ink); font-weight: 600; }
-        .ad-delete { font-size: 0.72rem; color: var(--accent); background: none; border: none; cursor: pointer; text-decoration: underline; margin-top: 8px; align-self: flex-start; }
-
-        /* FORM LAYOUT */
-        .adv-form-wrap { background: var(--white); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
-        .adv-form-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-        .adv-form-title { font-family: var(--serif); font-size: 1.2rem; font-weight: 600; text-transform: uppercase; }
-        .adv-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
-        .adv-fields { padding: 24px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 18px; overflow-y: auto; max-height: 80vh; }
-        .adv-preview-pane { padding: 24px; background: var(--off); display: flex; flex-direction: column; gap: 16px; position: sticky; top: 52px; }
-
-        .adv-field label { display: block; font-size: 0.62rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #374151; margin-bottom: 6px; }
-        .adv-field input, .adv-field textarea, .adv-field select {
-          width: 100%; padding: 11px 14px; border: 1.5px solid var(--border);
-          border-radius: 8px; font-family: var(--sans); font-size: 0.88rem;
-          color: var(--ink); background: var(--white); outline: none; transition: border-color 0.15s;
-        }
-        .adv-field input:focus, .adv-field textarea:focus, .adv-field select:focus { border-color: var(--accent); }
-        .adv-field .hint { font-size: 0.68rem; color: var(--ink-faint); margin-top: 4px; }
-        .adv-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-        .upload-btn { width: 100%; padding: 14px; border: 2px dashed var(--border); border-radius: 8px; background: var(--off); cursor: pointer; font-family: var(--sans); font-size: 0.82rem; color: var(--ink-soft); transition: border-color 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        .upload-btn:hover { border-color: var(--gold); }
-        .img-preview { position: relative; border-radius: 8px; overflow: hidden; }
-        .img-preview img { width: 100%; height: 140px; object-fit: cover; display: block; }
-        .img-remove { position: absolute; top: 8px; right: 8px; background: var(--accent); color: white; border: none; border-radius: 50%; width: 26px; height: 26px; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; }
-
-        .price-strip { background: var(--off); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
-        .price-strip-label { font-size: 0.72rem; color: var(--ink-faint); }
-        .price-strip-amount { font-family: var(--serif); font-size: 1.4rem; font-weight: 700; }
-        .price-strip-dates { font-size: 0.72rem; color: var(--ink-soft); margin-top: 2px; }
-
-        .adv-submit { width: 100%; padding: 15px; background: var(--accent); color: white; border: none; border-radius: 8px; font-family: var(--serif); font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; transition: opacity 0.15s; }
-        .adv-submit:hover:not(:disabled) { opacity: 0.88; }
-        .adv-submit:disabled { opacity: 0.45; cursor: not-allowed; }
-        .adv-error { font-size: 0.78rem; color: var(--accent); padding: 4px 0; }
-
-        /* LIVE PREVIEW CARD */
-        .preview-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 10px; }
-        .preview-card { background: #1a1814; border-radius: 10px; overflow: hidden; }
-        .preview-content { padding: 20px 22px; display: flex; flex-direction: column; gap: 10px; }
-        .preview-sponsored { display: inline-block; background: var(--gold); color: #1a1814; font-size: 0.55rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 2px 8px; border-radius: 100px; }
-        .preview-headline { font-family: var(--serif); font-size: 1.2rem; font-weight: 700; text-transform: uppercase; color: white; line-height: 1.1; }
-        .preview-copy { font-size: 0.78rem; color: rgba(255,255,255,0.7); font-weight: 300; line-height: 1.5; }
-        .preview-content-text { font-size: 0.72rem; color: rgba(255,255,255,0.45); line-height: 1.5; }
-        .preview-cta { display: inline-flex; align-items: center; gap: 5px; background: var(--accent); color: white; font-family: var(--serif); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; padding: 8px 14px; border-radius: 5px; }
-        .preview-img { width: 100%; max-height: 140px; object-fit: cover; display: block; }
-        .preview-placeholder { width: 100%; height: 100px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; font-size: 0.72rem; color: rgba(255,255,255,0.2); }
-
-        @media (max-width: 860px) {
-          .adv-form-grid { grid-template-columns: 1fr; }
-          .adv-fields { max-height: none; border-right: none; border-bottom: 1px solid var(--border); }
-          .adv-preview-pane { position: static; }
-          .ad-card-img { width: 100px; }
-        }
-        @media (max-width: 640px) {
-          .adv-wrap { padding: 20px 16px 80px; }
-          .adv-2col { grid-template-columns: 1fr; }
-          .adv-form-grid { grid-template-columns: 1fr; }
-          .ad-card { grid-template-columns: 1fr; }
-          .ad-card-img { width: 100%; height: 120px; }
-        }
-      `}</style>
-
-      {/* Topbar */}
-      <header className="adv-topbar">
-        <a href="/dashboard" className="adv-back">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
-          </svg>
-          Dashboard
-        </a>
-        <span style={{ flex: 1 }} />
-        <span className="adv-wordmark"><em>785</em>MAGAZINE</span>
-      </header>
-
-      <div className="adv-wrap">
-
-        {/* Header */}
-        <div className="adv-header">
-          <div>
-            <h1 className="adv-title">Advertise</h1>
-            <p className="adv-sub">Promote your business or event to the Topeka community.</p>
-          </div>
-          {ads.length > 0 && !showForm && (
-            <button className="adv-new-btn" onClick={() => setShowForm(true)}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-              Place New Ad
-            </button>
-          )}
+    <div className="space-y-6">
+      {/* Page header */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
+            Publisher &amp; Buyer
+          </p>
+          <h1 className="mb-2 font-display text-3xl font-bold leading-none text-gray-900 dark:text-white">
+            Advertise
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Promote your business or event to the Topeka community.
+          </p>
         </div>
-
-        {/* Success notice */}
-        {successParam && (
-          <div className="adv-notice success">
-            ✓ Payment confirmed — your ad is now live and will appear on the home page and events page.
-          </div>
+        {ads.length > 0 && !showForm && (
+          <button
+            type="button"
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-accent-500 px-5 py-2.5 font-display text-sm font-semibold uppercase tracking-wider text-gray-900 transition hover:bg-accent-600"
+          >
+            <Plus className="h-4 w-4" />
+            Place New Ad
+          </button>
         )}
+      </div>
 
-        {/* Cancelled notice + cleanup */}
-        {cancelledAdId && (
-          <div className="adv-notice warning" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* Success notice */}
+      {successParam && (
+        <Notice tone="success">
+          ✓ Payment confirmed — your ad is now live and will appear on the home
+          page and events page.
+        </Notice>
+      )}
+
+      {/* Cancelled notice */}
+      {cancelledAdId && (
+        <Notice tone="warning">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <span>Checkout cancelled — your draft ad was not published.</span>
-            <button onClick={() => deleteDraft(cancelledAdId)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.72rem', color: '#8a6800', textDecoration: 'underline' }}>
+            <button
+              type="button"
+              onClick={() => deleteDraft(cancelledAdId)}
+              className="text-xs font-semibold underline hover:no-underline"
+            >
               Remove draft
             </button>
           </div>
-        )}
+        </Notice>
+      )}
 
-        {/* Existing ads */}
-        {ads.length > 0 && (
-          <div className="ad-list">
-            {ads.map(ad => {
-              const { label, color, bg } = adStatusLabel(ad)
-              return (
-                <div key={ad.id} className="ad-card">
-                  <div className="ad-card-body">
-                    <div className="ad-card-top">
-                      <span className="ad-badge" style={{ background: bg, color }}>{label}</span>
-                      {ad.payment_status === 'paid' && (
-                        <span style={{ fontSize: '0.68rem', color: 'var(--ink-faint)' }}>
-                          {formatDate(ad.start_date)} → {formatDate(ad.end_date)}
-                        </span>
-                      )}
-                    </div>
-                    {ad.headline && <div className="ad-headline">{ad.headline}</div>}
-                    {ad.ad_copy && <div className="ad-copy">{ad.ad_copy}</div>}
-                    <div className="ad-meta-row">
-                      <span className="ad-stat"><strong>{ad.views}</strong> views</span>
-                      <span className="ad-stat"><strong>{ad.clicks}</strong> clicks</span>
-                      {ad.clicks > 0 && ad.views > 0 && (
-                        <span className="ad-stat"><strong>{((ad.clicks / ad.views) * 100).toFixed(1)}%</strong> CTR</span>
-                      )}
-                      <span>${(ad.price / 100).toFixed(0)} · {ad.duration} days</span>
-                    </div>
-                    {ad.payment_status === 'pending' && (
-                      <button className="ad-delete" onClick={() => deleteDraft(ad.id)}>Delete draft</button>
+      {/* Existing ads */}
+      {ads.length > 0 && (
+        <div className="grid gap-4">
+          {ads.map((ad) => {
+            const info = adStatusInfo(ad)
+            return (
+              <div
+                key={ad.id}
+                className="grid grid-cols-1 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] md:grid-cols-[1fr_auto]"
+              >
+                <div className="flex flex-col gap-2 p-5">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span
+                      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] ${info.classes}`}
+                    >
+                      {info.label}
+                    </span>
+                    {ad.payment_status === 'paid' && (
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        {formatDate(ad.start_date)} → {formatDate(ad.end_date)}
+                      </span>
                     )}
                   </div>
-                  {ad.ad_image_url && (
-                    <img src={ad.ad_image_url} alt={ad.headline || ''} className="ad-card-img" />
+                  {ad.headline && (
+                    <div className="font-display text-lg font-semibold uppercase tracking-wide text-gray-900 dark:text-white">
+                      {ad.headline}
+                    </div>
+                  )}
+                  {ad.ad_copy && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {ad.ad_copy}
+                    </p>
+                  )}
+                  <div className="mt-1 flex flex-wrap items-center gap-4 text-xs text-gray-400 dark:text-gray-500">
+                    <span>
+                      <strong className="font-semibold text-gray-700 dark:text-gray-200">
+                        {ad.views}
+                      </strong>{' '}
+                      views
+                    </span>
+                    <span>
+                      <strong className="font-semibold text-gray-700 dark:text-gray-200">
+                        {ad.clicks}
+                      </strong>{' '}
+                      clicks
+                    </span>
+                    {ad.clicks > 0 && ad.views > 0 && (
+                      <span>
+                        <strong className="font-semibold text-gray-700 dark:text-gray-200">
+                          {((ad.clicks / ad.views) * 100).toFixed(1)}%
+                        </strong>{' '}
+                        CTR
+                      </span>
+                    )}
+                    <span>
+                      ${(ad.price / 100).toFixed(0)} · {ad.duration} days
+                    </span>
+                  </div>
+                  {ad.payment_status === 'pending' && (
+                    <button
+                      type="button"
+                      onClick={() => deleteDraft(ad.id)}
+                      className="mt-1 self-start text-xs font-semibold text-brand-600 underline hover:no-underline dark:text-brand-400"
+                    >
+                      Delete draft
+                    </button>
                   )}
                 </div>
-              )
-            })}
+                {ad.ad_image_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={ad.ad_image_url}
+                    alt={ad.headline || ''}
+                    className="h-32 w-full object-cover md:h-full md:w-36"
+                  />
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Create form */}
+      {showForm && (
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+          {/* Form header */}
+          <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5 dark:border-gray-800">
+            <span className="font-display text-xl font-semibold uppercase tracking-wide text-gray-900 dark:text-white">
+              Create Your Ad
+            </span>
+            {ads.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="text-gray-400 transition hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                aria-label="Close form"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
           </div>
-        )}
 
-        {/* Create form */}
-        {showForm && (
-          <div className="adv-form-wrap">
-            <div className="adv-form-header">
-              <span className="adv-form-title">Create Your Ad</span>
-              {ads.length > 0 && (
-                <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: '1.2rem' }}>✕</button>
-              )}
-            </div>
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-2">
+              {/* ── Fields ── */}
+              <div className="flex flex-col gap-5 border-b border-gray-200 p-6 dark:border-gray-800 md:max-h-[80vh] md:overflow-y-auto md:border-b-0 md:border-r">
+                <Field
+                  label="Headline"
+                  required
+                  hint={`${form.headline.length}/60 characters`}
+                >
+                  <input
+                    type="text"
+                    placeholder="Your business name, event, or tagline"
+                    maxLength={60}
+                    value={form.headline}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, headline: e.target.value }))
+                    }
+                    required
+                    className={inputCls}
+                  />
+                </Field>
 
-            <form onSubmit={handleSubmit}>
-              <div className="adv-form-grid">
+                <Field
+                  label="Ad Copy"
+                  required
+                  hint={`${wordCount(form.ad_copy)}/20 words`}
+                >
+                  <textarea
+                    rows={3}
+                    placeholder="Main message — keep it punchy (max 20 words)"
+                    value={form.ad_copy}
+                    onChange={(e) => {
+                      const w = e.target.value.trim().split(/\s+/).filter(Boolean).length
+                      if (w <= 20 || e.target.value.length < form.ad_copy.length) {
+                        setForm((f) => ({ ...f, ad_copy: e.target.value }))
+                      }
+                    }}
+                    required
+                    className={inputCls}
+                  />
+                </Field>
 
-                {/* ── Fields ── */}
-                <div className="adv-fields">
+                <Field
+                  label="Additional Content"
+                  optional
+                  hint={`${wordCount(form.content)}/40 words`}
+                >
+                  <textarea
+                    rows={2}
+                    placeholder="Supporting description (max 40 words)"
+                    value={form.content}
+                    onChange={(e) => {
+                      const w = e.target.value.trim().split(/\s+/).filter(Boolean).length
+                      if (w <= 40 || e.target.value.length < form.content.length) {
+                        setForm((f) => ({ ...f, content: e.target.value }))
+                      }
+                    }}
+                    className={inputCls}
+                  />
+                </Field>
 
-                  <div className="adv-field">
-                    <label>Headline <span style={{ color: 'var(--accent)' }}>*</span></label>
+                <Field label="Ad Image" optional hint="max 5MB">
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  {form.ad_image_url ? (
+                    <div className="relative overflow-hidden rounded-lg">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={form.ad_image_url}
+                        alt="Preview"
+                        className="block h-36 w-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, ad_image_url: '' }))}
+                        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-brand-600 text-white transition hover:bg-brand-700"
+                        aria-label="Remove image"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      disabled={uploading}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-3.5 text-sm text-gray-500 transition hover:border-accent-500 dark:border-gray-700 dark:bg-white/[0.02] dark:text-gray-400 dark:hover:border-accent-500"
+                    >
+                      <Upload className="h-4 w-4" />
+                      {uploading ? 'Uploading…' : 'Upload image'}
+                    </button>
+                  )}
+                </Field>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="Button Text" required>
                     <input
                       type="text"
-                      placeholder="Your business name, event, or tagline"
-                      maxLength={60}
-                      value={form.headline}
-                      onChange={e => setForm(f => ({ ...f, headline: e.target.value }))}
+                      placeholder="Learn More"
+                      maxLength={30}
+                      value={form.button_text}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, button_text: e.target.value }))
+                      }
                       required
+                      className={inputCls}
                     />
-                    <span className="hint">{form.headline.length}/60 characters</span>
-                  </div>
-
-                  <div className="adv-field">
-                    <label>Ad Copy <span style={{ color: 'var(--accent)' }}>*</span></label>
-                    <textarea
-                      rows={3}
-                      placeholder="Main message — keep it punchy (max 20 words)"
-                      value={form.ad_copy}
-                      onChange={e => {
-                        const w = e.target.value.trim().split(/\s+/).filter(Boolean).length
-                        if (w <= 20 || e.target.value.length < form.ad_copy.length) {
-                          setForm(f => ({ ...f, ad_copy: e.target.value }))
-                        }
-                      }}
+                  </Field>
+                  <Field label="Button Link" required>
+                    <input
+                      type="url"
+                      placeholder="https://"
+                      value={form.button_link}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, button_link: e.target.value }))
+                      }
                       required
+                      className={inputCls}
                     />
-                    <span className="hint">{wordCount(form.ad_copy)}/20 words</span>
-                  </div>
+                  </Field>
+                </div>
 
-                  <div className="adv-field">
-                    <label>Additional Content <span style={{ color: 'var(--ink-faint)' }}>(optional)</span></label>
-                    <textarea
-                      rows={2}
-                      placeholder="Supporting description (max 40 words)"
-                      value={form.content}
-                      onChange={e => {
-                        const w = e.target.value.trim().split(/\s+/).filter(Boolean).length
-                        if (w <= 40 || e.target.value.length < form.content.length) {
-                          setForm(f => ({ ...f, content: e.target.value }))
-                        }
-                      }}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="Start Date" required>
+                    <input
+                      type="date"
+                      value={form.start_date}
+                      min={new Date().toISOString().split('T')[0]}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, start_date: e.target.value }))
+                      }
+                      required
+                      className={inputCls}
                     />
-                    <span className="hint">{wordCount(form.content)}/40 words</span>
-                  </div>
+                  </Field>
+                  <Field label="Package" required>
+                    <select
+                      value={form.duration}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          duration: parseInt(e.target.value),
+                        }))
+                      }
+                      className={inputCls}
+                    >
+                      <option value={5}>5 Days — $10</option>
+                      <option value={14}>14 Days — $15</option>
+                    </select>
+                  </Field>
+                </div>
 
-                  <div className="adv-field">
-                    <label>Ad Image <span style={{ color: 'var(--ink-faint)' }}>(optional, max 5MB)</span></label>
-                    <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageUpload} style={{ display: 'none' }} />
-                    {form.ad_image_url ? (
-                      <div className="img-preview">
-                        <img src={form.ad_image_url} alt="Preview" />
-                        <button type="button" className="img-remove" onClick={() => setForm(f => ({ ...f, ad_image_url: '' }))}>✕</button>
+                {/* Price strip */}
+                <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-white/[0.02]">
+                  <div>
+                    <div className="text-xs text-gray-400 dark:text-gray-500">
+                      Total · {form.duration}-day banner placement
+                    </div>
+                    <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      {formatDate(form.start_date)} → {formatDate(endDate)}
+                    </div>
+                  </div>
+                  <div className="font-display text-2xl font-bold text-gray-900 dark:text-white">
+                    {price}
+                  </div>
+                </div>
+
+                {error && (
+                  <p className="text-sm font-semibold text-brand-600 dark:text-brand-400">
+                    {error}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={!canSubmit || submitting}
+                  className="w-full rounded-lg bg-brand-600 px-4 py-3.5 font-display text-sm font-semibold uppercase tracking-wider text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {submitting
+                    ? 'Redirecting to checkout…'
+                    : `Pay ${price} & Go Live`}
+                </button>
+
+                <p className="text-center text-xs leading-relaxed text-gray-400 dark:text-gray-500">
+                  Secure checkout via Stripe. Your ad activates immediately
+                  after payment. Appears on the home page and events page.
+                </p>
+              </div>
+
+              {/* ── Live Preview ── */}
+              <div className="flex flex-col gap-4 bg-gray-50 p-6 dark:bg-white/[0.02] md:sticky md:top-0">
+                <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
+                  Live Preview
+                </div>
+
+                {/*
+                  Preview stays dark regardless of dashboard theme — this card
+                  is a WYSIWYG of how the ad actually renders on the public
+                  site (which is dark). Don't add dark: variants here.
+                */}
+                <div className="overflow-hidden rounded-xl bg-[#1a1814]">
+                  {form.ad_image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={form.ad_image_url}
+                      alt="Preview"
+                      className="block max-h-36 w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-24 w-full items-center justify-center bg-white/5 text-xs text-white/20">
+                      Image will appear here
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-2.5 px-5 py-5">
+                    <span className="inline-block w-fit rounded-full bg-accent-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-[#1a1814]">
+                      Sponsored
+                    </span>
+                    {form.headline ? (
+                      <div className="font-display text-lg font-bold uppercase leading-tight text-white">
+                        {form.headline}
                       </div>
                     ) : (
-                      <button type="button" className="upload-btn" onClick={() => fileRef.current?.click()} disabled={uploading}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
-                          <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
-                        </svg>
-                        {uploading ? 'Uploading…' : 'Upload image'}
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="adv-2col">
-                    <div className="adv-field">
-                      <label>Button Text <span style={{ color: 'var(--accent)' }}>*</span></label>
-                      <input
-                        type="text"
-                        placeholder="Learn More"
-                        maxLength={30}
-                        value={form.button_text}
-                        onChange={e => setForm(f => ({ ...f, button_text: e.target.value }))}
-                        required
-                      />
-                    </div>
-                    <div className="adv-field">
-                      <label>Button Link <span style={{ color: 'var(--accent)' }}>*</span></label>
-                      <input
-                        type="url"
-                        placeholder="https://"
-                        value={form.button_link}
-                        onChange={e => setForm(f => ({ ...f, button_link: e.target.value }))}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="adv-2col">
-                    <div className="adv-field">
-                      <label>Start Date <span style={{ color: 'var(--accent)' }}>*</span></label>
-                      <input
-                        type="date"
-                        value={form.start_date}
-                        min={new Date().toISOString().split('T')[0]}
-                        onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))}
-                        required
-                      />
-                    </div>
-                    <div className="adv-field">
-                      <label>Package <span style={{ color: 'var(--accent)' }}>*</span></label>
-                      <select
-                        value={form.duration}
-                        onChange={e => setForm(f => ({ ...f, duration: parseInt(e.target.value) }))}
-                      >
-                        <option value={5}>5 Days — $10</option>
-                        <option value={14}>14 Days — $15</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Price strip */}
-                  <div className="price-strip">
-                    <div>
-                      <div className="price-strip-label">Total · {form.duration}-day banner placement</div>
-                      <div className="price-strip-dates" style={{ marginTop: 3 }}>
-                        {formatDate(form.start_date)} → {formatDate(endDate)}
+                      <div className="font-display text-lg font-bold uppercase leading-tight text-white/20">
+                        Your headline
                       </div>
-                    </div>
-                    <div className="price-strip-amount">{price}</div>
-                  </div>
-
-                  {error && <div className="adv-error">{error}</div>}
-
-                  <button type="submit" className="adv-submit" disabled={!canSubmit || submitting}>
-                    {submitting ? 'Redirecting to checkout…' : `Pay ${price} & Go Live`}
-                  </button>
-
-                  <p style={{ fontSize: '0.68rem', color: 'var(--ink-faint)', textAlign: 'center', lineHeight: 1.5 }}>
-                    Secure checkout via Stripe. Your ad activates immediately after payment.
-                    Appears on the home page and events page.
-                  </p>
-                </div>
-
-                {/* ── Live Preview ── */}
-                <div className="adv-preview-pane">
-                  <div className="preview-label">Live Preview</div>
-                  <div className="preview-card">
-                    {form.ad_image_url && (
-                      <img src={form.ad_image_url} alt="Preview" className="preview-img" />
                     )}
-                    {!form.ad_image_url && (
-                      <div className="preview-placeholder">Image will appear here</div>
+                    {form.ad_copy && (
+                      <p className="text-xs leading-relaxed text-white/70">
+                        {form.ad_copy}
+                      </p>
                     )}
-                    <div className="preview-content">
-                      <span className="preview-sponsored">Sponsored</span>
-                      {form.headline
-                        ? <div className="preview-headline">{form.headline}</div>
-                        : <div className="preview-headline" style={{ color: 'rgba(255,255,255,0.2)' }}>Your headline</div>
-                      }
-                      {form.ad_copy && <div className="preview-copy">{form.ad_copy}</div>}
-                      {form.content && <div className="preview-content-text">{form.content}</div>}
-                      {form.button_text && (
-                        <div>
-                          <span className="preview-cta">
-                            {form.button_text}
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                              <line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/>
-                            </svg>
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div style={{ fontSize: '0.68rem', color: 'var(--ink-faint)', lineHeight: 1.6 }}>
-                    This ad will appear on the <strong style={{ color: 'var(--ink-soft)' }}>home page</strong> (below featured events) and the <strong style={{ color: 'var(--ink-soft)' }}>events page</strong> (between event groups).
+                    {form.content && (
+                      <p className="text-[11px] leading-relaxed text-white/45">
+                        {form.content}
+                      </p>
+                    )}
+                    {form.button_text && (
+                      <div>
+                        <span className="inline-flex items-center gap-1 rounded-md bg-brand-600 px-3 py-1.5 font-display text-[11px] font-semibold uppercase tracking-wide text-white">
+                          {form.button_text}
+                          <ArrowUpRight className="h-3 w-3" />
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
+                <p className="text-xs leading-relaxed text-gray-400 dark:text-gray-500">
+                  This ad will appear on the{' '}
+                  <strong className="font-semibold text-gray-600 dark:text-gray-300">
+                    home page
+                  </strong>{' '}
+                  (below featured events) and the{' '}
+                  <strong className="font-semibold text-gray-600 dark:text-gray-300">
+                    events page
+                  </strong>{' '}
+                  (between event groups).
+                </p>
               </div>
-            </form>
-          </div>
-        )}
+            </div>
+          </form>
+        </div>
+      )}
 
-        {/* Empty state */}
-        {ads.length === 0 && !showForm && (
-          <div style={{ textAlign: 'center', padding: '64px 24px', background: 'var(--white)', borderRadius: 14, border: '1px solid var(--border)' }}>
-            <div style={{ fontFamily: 'var(--serif)', fontSize: '2.5rem', fontWeight: 700, color: 'var(--border)', marginBottom: 16 }}>$</div>
-            <p style={{ fontFamily: 'var(--serif)', fontSize: '1.2rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>No Ads Yet</p>
-            <p style={{ fontSize: '0.85rem', color: 'var(--ink-soft)', marginBottom: 24 }}>
-              Reach the Topeka community with a banner placement — from $10 for 5 days.
-            </p>
-            <button className="adv-new-btn" onClick={() => setShowForm(true)}>
-              Place Your First Ad
-            </button>
-          </div>
-        )}
+      {/* Empty state */}
+      {ads.length === 0 && !showForm && (
+        <div className="rounded-2xl border border-gray-200 bg-white px-6 py-16 text-center dark:border-gray-800 dark:bg-white/[0.03]">
+          <Megaphone
+            className="mx-auto mb-4 h-10 w-10 text-gray-300 dark:text-gray-600"
+            strokeWidth={1.5}
+          />
+          <p className="mb-2 font-display text-xl font-semibold uppercase text-gray-900 dark:text-white">
+            No Ads Yet
+          </p>
+          <p className="mx-auto mb-6 max-w-md text-sm text-gray-500 dark:text-gray-400">
+            Reach the Topeka community with a banner placement — from $10 for 5
+            days.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-accent-500 px-5 py-2.5 font-display text-sm font-semibold uppercase tracking-wider text-gray-900 transition hover:bg-accent-600"
+          >
+            <Plus className="h-4 w-4" />
+            Place Your First Ad
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
-      </div>
-    </>
+// ─── Bits ────────────────────────────────────────────────────────────────────
+
+const inputCls =
+  'w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90 dark:focus:border-brand-500'
+
+function Field({
+  label,
+  required,
+  optional,
+  hint,
+  children,
+}: {
+  label: string
+  required?: boolean
+  optional?: boolean
+  hint?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-600 dark:text-gray-300">
+        {label}
+        {required && (
+          <span className="ml-1 text-brand-600 dark:text-brand-400">*</span>
+        )}
+        {optional && (
+          <span className="ml-1 font-normal normal-case tracking-normal text-gray-400 dark:text-gray-500">
+            (optional)
+          </span>
+        )}
+      </label>
+      {children}
+      {hint && (
+        <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{hint}</p>
+      )}
+    </div>
+  )
+}
+
+function Notice({
+  tone,
+  children,
+}: {
+  tone: 'success' | 'warning'
+  children: React.ReactNode
+}) {
+  const cls =
+    tone === 'success'
+      ? 'border-success-200 bg-success-50 text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400'
+      : 'border-warning-200 bg-warning-50 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400'
+  return (
+    <div className={`rounded-lg border px-4 py-3 text-sm font-medium ${cls}`}>
+      {children}
+    </div>
   )
 }

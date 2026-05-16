@@ -3,17 +3,26 @@ import { createClient as createAuthClient } from '@/lib/supabaseServerAuth'
 import { createClient } from '@/lib/supabaseServer'
 import AdvertiseClient from './AdvertiseClient'
 
-export const metadata = { title: 'Advertise — seveneightfive Dashboard' }
+export const metadata = { title: 'Advertise — 785 Magazine' }
 
 export default async function AdvertisePage({
   searchParams,
 }: {
-  searchParams: { success?: string; cancelled?: string; ad_id?: string }
+  searchParams: Promise<{
+    success?: string
+    cancelled?: string
+    ad_id?: string
+  }>
 }) {
-  const supabase = await createAuthClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // searchParams is a Promise in Next.js 15+. Await it before destructuring.
+  const params = await searchParams
 
-  if (!user) redirect('/login')
+  const supabase = await createAuthClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) redirect('/login?next=/dashboard/advertise')
 
   const admin = createClient()
   const { data: ads } = await admin
@@ -26,8 +35,8 @@ export default async function AdvertisePage({
     <AdvertiseClient
       userId={user.id}
       initialAds={ads ?? []}
-      successParam={searchParams.success === '1'}
-      cancelledAdId={searchParams.ad_id ?? null}
+      successParam={params.success === '1'}
+      cancelledAdId={params.ad_id ?? null}
     />
   )
 }

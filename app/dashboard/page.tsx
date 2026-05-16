@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabaseServerAuth'
-import { redirect } from 'next/navigation'
-import AvatarMenu from './AvatarMenu'
+import type { Metadata } from 'next'
 import StripeConnectButton from '@/app/components/StripeConnectButton'
+import Link from 'next/link'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,56 +14,96 @@ type SaveTheDate = {
   location_name: string | null
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+export const metadata: Metadata = {
+  title: '785 Magazine — Dashboard',
+  description: 'Your 785 — tickets, pages, ads, and what to do tonight.',
+}
 
 export const dynamic = 'force-dynamic'
-  
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default async function DashboardPage() {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-    // ── Determine auth state without hard redirect ──────────────────────────
-    // Logged-in users get full data; guests get the public shell
     const isGuest = !user
 
-    // ── Fetch user data (logged-in only) ────────────────────────────────────
-    const [
-      { data: artists },
-      { data: venues },
-      { data: profile },
-    ] = user ? await Promise.all([
-      supabase.from('artists').select('id, name, slug, tagline, image_url, avatar_url, artist_type, verified').eq('auth_user_id', user.id),
-      supabase.from('venues').select('id, name, slug, venue_type, image_url, logo').eq('auth_user_id', user.id),
-      supabase.from('profiles').select('full_name, email, phone_number, role, stripe_account_id, stripe_account_status, avatar_url').eq('id', user.id).maybeSingle(),
-    ]) : [{ data: [] }, { data: [] }, { data: null }]
+    // ── User data (logged-in only) ───────────────────────────────────────
+    const [{ data: artists }, { data: venues }, { data: profile }] = user
+      ? await Promise.all([
+          supabase
+            .from('artists')
+            .select(
+              'id, name, slug, tagline, image_url, avatar_url, artist_type, verified'
+            )
+            .eq('auth_user_id', user.id),
+          supabase
+            .from('venues')
+            .select('id, name, slug, venue_type, image_url, logo')
+            .eq('auth_user_id', user.id),
+          supabase
+            .from('profiles')
+            .select(
+              'full_name, email, phone_number, role, stripe_account_id, stripe_account_status, avatar_url'
+            )
+            .eq('id', user.id)
+            .maybeSingle(),
+        ])
+      : [{ data: [] }, { data: [] }, { data: null }]
 
-    const [{ data: venueUserLinks }, { data: artistUserLinks }] = user ? await Promise.all([
-      supabase.from('venue_users').select('venue_id').eq('user_id', user.id),
-      supabase.from('artist_users').select('artist_id').eq('user_id', user.id),
-    ]) : [{ data: [] }, { data: [] }]
+    const [{ data: venueUserLinks }, { data: artistUserLinks }] = user
+      ? await Promise.all([
+          supabase.from('venue_users').select('venue_id').eq('user_id', user.id),
+          supabase.from('artist_users').select('artist_id').eq('user_id', user.id),
+        ])
+      : [{ data: [] }, { data: [] }]
 
-    const extraVenueIds  = (venueUserLinks  || []).map((r: any) => r.venue_id).filter((id: string)  => !(venues  || []).some((v: any) => v.id === id))
-    const extraArtistIds = (artistUserLinks || []).map((r: any) => r.artist_id).filter((id: string) => !(artists || []).some((a: any) => a.id === id))
+    const extraVenueIds = (venueUserLinks || [])
+      .map((r: any) => r.venue_id)
+      .filter((id: string) => !(venues || []).some((v: any) => v.id === id))
+    const extraArtistIds = (artistUserLinks || [])
+      .map((r: any) => r.artist_id)
+      .filter((id: string) => !(artists || []).some((a: any) => a.id === id))
 
     const [{ data: extraVenues }, { data: extraArtists }] = await Promise.all([
-      extraVenueIds.length  ? supabase.from('venues').select('id, name, slug, venue_type, image_url, logo').in('id', extraVenueIds)                                : Promise.resolve({ data: [] as any[] }),
-      extraArtistIds.length ? supabase.from('artists').select('id, name, slug, tagline, image_url, avatar_url, artist_type, verified').in('id', extraArtistIds) : Promise.resolve({ data: [] as any[] }),
+      extraVenueIds.length
+        ? supabase
+            .from('venues')
+            .select('id, name, slug, venue_type, image_url, logo')
+            .in('id', extraVenueIds)
+        : Promise.resolve({ data: [] as any[] }),
+      extraArtistIds.length
+        ? supabase
+            .from('artists')
+            .select(
+              'id, name, slug, tagline, image_url, avatar_url, artist_type, verified'
+            )
+            .in('id', extraArtistIds)
+        : Promise.resolve({ data: [] as any[] }),
     ])
 
-    const allVenues  = [...(venues  || []), ...(extraVenues  || [])]
+    const allVenues = [...(venues || []), ...(extraVenues || [])]
     const allArtists = [...(artists || []), ...(extraArtists || [])]
 
-    // ── Follows ──────────────────────────────────────────────────────────────
-    const { data: follows } = user ? await supabase
-      .from('follows')
-      .select('entity_type, entity_id')
-      .eq('follower_id', user.id)
-      .in('entity_type', ['artist', 'venue'])
-    : { data: [] }
+    // ── Follows ──────────────────────────────────────────────────────────
+    const { data: follows } = user
+      ? await supabase
+          .from('follows')
+          .select('entity_type, entity_id')
+          .eq('follower_id', user.id)
+          .in('entity_type', ['artist', 'venue'])
+      : { data: [] }
 
-    const followedArtistIds = (follows || []).filter((f: any) => f.entity_type === 'artist').map((f: any) => f.entity_id)
-    const followedVenueIds  = (follows || []).filter((f: any) => f.entity_type === 'venue' ).map((f: any) => f.entity_id)
+    const followedArtistIds = (follows || [])
+      .filter((f: any) => f.entity_type === 'artist')
+      .map((f: any) => f.entity_id)
+    const followedVenueIds = (follows || [])
+      .filter((f: any) => f.entity_type === 'venue')
+      .map((f: any) => f.entity_id)
 
     const [
       { data: followedArtists },
@@ -71,17 +111,40 @@ export default async function DashboardPage() {
       { data: tickets },
       { data: ads },
     ] = await Promise.all([
-      followedArtistIds.length ? supabase.from('artists').select('id, name, slug, avatar_url, artist_type').in('id', followedArtistIds) : Promise.resolve({ data: [] as any[] }),
-      followedVenueIds.length  ? supabase.from('venues').select('id, name, slug, logo, image_url, venue_type').in('id', followedVenueIds)  : Promise.resolve({ data: [] as any[] }),
-      user
-        ? supabase.from('my_tickets').select('id, event_title, event_date, event_slug, tier_name, venue_name, status').eq('payment_status', 'paid').gte('event_date', new Date().toISOString().slice(0, 10)).order('event_date', { ascending: true }).limit(1)
+      followedArtistIds.length
+        ? supabase
+            .from('artists')
+            .select('id, name, slug, avatar_url, artist_type')
+            .in('id', followedArtistIds)
+        : Promise.resolve({ data: [] as any[] }),
+      followedVenueIds.length
+        ? supabase
+            .from('venues')
+            .select('id, name, slug, logo, image_url, venue_type')
+            .in('id', followedVenueIds)
         : Promise.resolve({ data: [] as any[] }),
       user
-        ? supabase.from('advertisements').select('id, headline, title, status, views, clicks').eq('user_id', user.id).order('created_at', { ascending: false }).limit(2)
+        ? supabase
+            .from('my_tickets')
+            .select(
+              'id, event_title, event_date, event_slug, tier_name, venue_name, status'
+            )
+            .eq('payment_status', 'paid')
+            .gte('event_date', new Date().toISOString().slice(0, 10))
+            .order('event_date', { ascending: true })
+            .limit(1)
+        : Promise.resolve({ data: [] as any[] }),
+      user
+        ? supabase
+            .from('advertisements')
+            .select('id, headline, title, status, views, clicks')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(2)
         : Promise.resolve({ data: [] as any[] }),
     ])
 
-    // ── Save the Dates — public, always loaded ───────────────────────────────
+    // ── Save the Date — always public ────────────────────────────────────
     const { data: saveDates } = await supabase
       .from('save_the_date')
       .select('id, title, event_date, organizer, event_type, location_name')
@@ -90,449 +153,358 @@ export default async function DashboardPage() {
       .order('event_date', { ascending: true })
       .limit(4)
 
-    // ── Derived values ───────────────────────────────────────────────────────
+    // ── Derived ───────────────────────────────────────────────────────────
     const firstName = profile?.full_name?.split(' ')[0] || 'There'
-    const initials  = profile?.full_name
-      ? profile.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
-      : '?'
 
     const allFollowed = [
       ...(followedArtists || []).map((a: any) => ({ ...a, kind: 'artist' })),
-      ...(followedVenues  || []).map((v: any) => ({ ...v, kind: 'venue'  })),
+      ...(followedVenues || []).map((v: any) => ({ ...v, kind: 'venue' })),
     ]
-    const allPages    = [
+    const allPages = [
       ...allArtists.map((a: any) => ({ ...a, kind: 'artist' })),
-      ...allVenues.map( (v: any) => ({ ...v, kind: 'venue'  })),
+      ...allVenues.map((v: any) => ({ ...v, kind: 'venue' })),
     ]
-    const firstPage   = allPages[0] || null
-    const nextTicket  = (tickets || [])[0] || null
-    const isCreator   = allPages.length > 0
-    const stripeIncomplete = profile?.stripe_account_status === 'pending' || (isCreator && !profile?.stripe_account_id)
+    const firstPage = allPages[0] || null
+    const nextTicket = (tickets || [])[0] || null
+    const isCreator = allPages.length > 0
 
-    const ticketMonth = nextTicket ? new Date(nextTicket.event_date + 'T12:00:00').toLocaleString('en-US', { month: 'short' }).toUpperCase() : null
-    const ticketDay   = nextTicket ? new Date(nextTicket.event_date + 'T12:00:00').getDate() : null
+    const ticketMonth = nextTicket
+      ? new Date(nextTicket.event_date + 'T12:00:00')
+          .toLocaleString('en-US', { month: 'short' })
+          .toUpperCase()
+      : null
+    const ticketDay = nextTicket
+      ? new Date(nextTicket.event_date + 'T12:00:00').getDate()
+      : null
 
     const TYPE_LABEL: Record<string, string> = {
-      Musician: 'Musician', Visual: 'Visual Artist', Performance: 'Performer', Literary: 'Literary Artist',
+      Musician: 'Musician',
+      Visual: 'Visual Artist',
+      Performance: 'Performer',
+      Literary: 'Literary Artist',
     }
 
     const pageEditHref = firstPage
-      ? firstPage.kind === 'artist' ? `/dashboard/edit?id=${firstPage.id}` : `/dashboard/venue?id=${firstPage.id}`
+      ? firstPage.kind === 'artist'
+        ? `/dashboard/edit?id=${firstPage.id}`
+        : `/dashboard/venue?id=${firstPage.id}`
       : '/dashboard'
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // RENDER
+    //
+    // Shell (sidebar + header) is provided by app/dashboard/layout.tsx.
+    // This page is just the content grid.
+    // ─────────────────────────────────────────────────────────────────────
+
     return (
-      <>
-        <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&display=swap');
-          *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-          :root {
-            --bg:     #f5f4f1;
-            --white:  #ffffff;
-            --text:   #1a1a1a;
-            --muted:  #6b6b6b;
-            --hint:   #aaaaaa;
-            --border: rgba(0,0,0,0.08);
-            --borders:rgba(0,0,0,0.12);
-            --brand:  #C80650;
-            --yellow: #FFCE03;
-            --serif:  'Oswald', sans-serif;
-            --sans:   'DM Sans', system-ui, sans-serif;
-          }
-          html, body { background: var(--bg); color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
-
-          /* ── TOPBAR ── */
-          .topbar { background: var(--white); border-bottom: 0.5px solid var(--borders); display: flex; align-items: center; padding: 0 20px; height: 52px; position: sticky; top: 0; z-index: 100; }
-          .wordmark { font-family: var(--serif); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; text-decoration: none; color: rgba(0,0,0,0.35); }
-          .wordmark em { font-style: normal; color: var(--brand); }
-          .topbar-guest { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-          .btn-ghost { font-size: 0.75rem; font-family: var(--sans); font-weight: 600; padding: 7px 13px; border-radius: 6px; border: 0.5px solid var(--borders); text-decoration: none; color: var(--text); }
-          .btn-primary { background: var(--brand); color: #fff; border: none; font-size: 0.75rem; font-family: var(--sans); font-weight: 600; padding: 7px 13px; border-radius: 6px; text-decoration: none; }
-
-          /* ── BANNER ── */
-          .banner { background: var(--white); border-bottom: 0.5px solid var(--borders); padding: 12px 20px; display: flex; align-items: center; gap: 10px; min-height: 44px; }
-          .banner-pill { font-size: 0.56rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; background: var(--bg); color: var(--hint); border: 0.5px solid var(--borders); padding: 3px 8px; border-radius: 4px; flex-shrink: 0; }
-          .banner-text { font-size: 0.75rem; color: var(--hint); font-style: italic; }
-
-          /* ── GREETING ── */
-          .greeting { padding: 24px 20px 0; }
-          .greeting-eyebrow { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--brand); font-weight: 700; margin-bottom: 4px; }
-          .greeting-name { font-family: var(--serif); font-size: 2.1rem; font-weight: 700; line-height: 1; color: var(--text); margin-bottom: 4px; }
-          .greeting-sub { font-size: 0.82rem; color: var(--muted); }
-          .hr { border: none; border-top: 0.5px solid var(--borders); margin: 20px 20px; }
-
-          /* ── GRID ── */
-          .grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; padding: 0 20px 60px; }
-          .col2 { grid-column: span 2; }
-          .col3 { grid-column: span 3; }
-
-          /* ── CARDS ── */
-          .card { background: var(--white); border: 0.5px solid var(--borders); border-radius: 14px; padding: 18px 16px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; transition: box-shadow 0.15s; text-decoration: none; color: inherit; }
-          .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
-          .card-label { font-size: 0.56rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--hint); margin-bottom: 2px; }
-          .card-title { font-family: var(--serif); font-size: 1.25rem; font-weight: 600; color: var(--text); letter-spacing: 0.04em; line-height: 1; }
-          .card-desc { font-size: 0.68rem; color: var(--muted); line-height: 1.4; }
-          .card-hr { border: none; border-top: 0.5px solid var(--border); margin: 6px 0; }
-          .card-empty { font-size: 0.68rem; color: var(--hint); font-style: italic; }
-
-          /* ── GUEST STATE ── */
-          .guest-state { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
-          .guest-text { font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
-          .guest-link { font-size: 0.68rem; font-weight: 700; color: var(--brand); text-decoration: none; margin-top: 2px; display: inline-block; }
-          .guest-link:hover { text-decoration: underline; }
-
-          /* ── BADGES ── */
-          .badge { display: inline-flex; align-items: center; font-size: 0.62rem; font-weight: 700; padding: 3px 8px; border-radius: 10px; white-space: nowrap; }
-          .badge-green { background: #eafaf1; color: #1e7e34; }
-          .badge-brand { background: #fce8ef; color: var(--brand); }
-          .badge-gold  { background: #fef9e7; color: #b8860b; }
-          .badge-gray  { background: #f0f0ee; color: var(--muted); }
-
-          /* ── TICKET ROW ── */
-          .ticket-row { display: flex; align-items: center; gap: 10px; }
-          .ticket-date { text-align: center; min-width: 28px; flex-shrink: 0; }
-          .ticket-month { font-size: 0.56rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--brand); }
-          .ticket-day { font-family: var(--serif); font-size: 1.4rem; font-weight: 700; color: var(--text); line-height: 1; }
-          .ticket-event { font-size: 0.68rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-          .ticket-venue { font-size: 0.62rem; color: var(--muted); margin-top: 2px; }
-
-          /* ── FOLLOW LIST ── */
-          .follow-list { display: flex; flex-direction: column; gap: 10px; }
-          .follow-row { display: flex; align-items: center; gap: 10px; }
-          .follow-av { width: 32px; height: 32px; border-radius: 50%; background: #e8ddd6; flex-shrink: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 700; color: #8a7a72; }
-          .follow-av.venue { border-radius: 8px; }
-          .follow-av img { width: 100%; height: 100%; object-fit: cover; }
-          .follow-name { font-size: 0.75rem; font-weight: 600; color: var(--text); }
-          .follow-type { font-size: 0.56rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--brand); margin-top: 1px; }
-
-          /* ── AD BLOCK ── */
-          .ad-block + .ad-block { margin-top: 8px; padding-top: 8px; border-top: 0.5px solid var(--border); }
-          .ad-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
-          .ad-name { font-size: 0.68rem; font-weight: 600; color: var(--text); }
-          .ad-stat { font-size: 0.62rem; color: var(--muted); }
-
-          /* ── SAVE THE DATE ── */
-          .std-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-          .std-btn { background: var(--brand); color: #fff; border: none; border-radius: 8px; padding: 9px 14px; font-family: var(--serif); font-size: 0.82rem; font-weight: 600; cursor: pointer; text-decoration: none; white-space: nowrap; letter-spacing: 0.03em; flex-shrink: 0; display: inline-block; }
-          .std-list { display: flex; flex-direction: column; gap: 10px; }
-          .std-item { display: flex; align-items: center; gap: 12px; }
-          .std-date-block { text-align: center; min-width: 28px; flex-shrink: 0; }
-          .std-title { font-size: 0.75rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-          .std-sub { font-size: 0.62rem; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-          /* ── SETTINGS ── */
-          .alert-strip { background: #fce8ef; border: 0.5px solid rgba(200,6,80,0.18); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; }
-          .alert-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); flex-shrink: 0; }
-          .alert-msg { font-size: 0.62rem; color: var(--brand); font-weight: 600; }
-          .settings-links { display: flex; flex-wrap: wrap; gap: 0; margin-top: 4px; align-items: center; }
-          .settings-link { font-size: 0.68rem; color: var(--muted); text-decoration: none; }
-          .settings-link:hover { color: var(--text); }
-          .settings-dot { margin: 0 6px; color: var(--borders); font-size: 0.68rem; }
-
-          /* ── TICKET CTA (top of dashboard) ── */
-          .ticket-cta { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 16px 20px 0; padding: 16px 20px; background: var(--white); border: 0.5px solid var(--borders); border-left: 3px solid var(--brand); border-radius: 12px; text-decoration: none; color: inherit; transition: box-shadow 0.15s, transform 0.15s; }
-          .ticket-cta:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); transform: translateY(-1px); }
-          .ticket-cta-left { flex: 1; min-width: 0; }
-          .ticket-cta-eyebrow { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brand); margin-bottom: 4px; }
-          .ticket-cta-title { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; color: var(--text); letter-spacing: 0.02em; line-height: 1.2; }
-          .ticket-cta-sub { font-size: 0.75rem; color: var(--muted); margin-top: 3px; line-height: 1.4; }
-          .ticket-cta-arrow { font-family: var(--serif); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brand); white-space: nowrap; flex-shrink: 0; padding: 8px 14px; border: 1px solid rgba(200,6,80,0.25); border-radius: 6px; background: rgba(200,6,80,0.04); }
-          @media (max-width: 640px) {
-            .ticket-cta { margin: 14px 16px 0; padding: 14px 16px; gap: 14px; }
-            .ticket-cta-title { font-size: 1rem; }
-            .ticket-cta-arrow { padding: 7px 11px; font-size: 0.72rem; }
-          }
-
-          /* ── CREATE CTA ── */
-          .create-card { background: var(--brand); border: 0.5px solid var(--brand); border-radius: 14px; padding: 20px 24px; display: flex; flex-direction: row; align-items: center; gap: 0; }
-          .create-left { flex-shrink: 0; margin-right: 24px; }
-          .create-eyebrow { font-size: 0.56rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(255,255,255,0.55); margin-bottom: 4px; }
-          .create-heading { font-family: var(--serif); font-size: 1.4rem; font-weight: 600; color: #fff; letter-spacing: 0.04em; line-height: 1; }
-          .create-sub { font-size: 0.68rem; color: rgba(255,255,255,0.65); margin-top: 4px; max-width: 160px; line-height: 1.4; }
-          .create-rule { width: 0.5px; background: rgba(255,255,255,0.2); align-self: stretch; margin-right: 24px; flex-shrink: 0; }
-          .create-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: 1; }
-          .create-btn { background: var(--yellow); border: none; border-radius: 8px; padding: 12px 10px; color: var(--text); font-family: var(--serif); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.04em; cursor: pointer; text-align: center; text-transform: uppercase; text-decoration: none; display: block; transition: opacity 0.15s; }
-          .create-btn:hover { opacity: 0.88; }
-
-          /* ── RESPONSIVE ── */
-          @media (max-width: 640px) {
-            .grid { grid-template-columns: 1fr; gap: 10px; padding: 0 16px 60px; }
-            .col2, .col3 { grid-column: span 1; }
-            .create-card { flex-direction: column; align-items: flex-start; gap: 16px; }
-            .create-rule { display: none; }
-            .create-left { margin-right: 0; }
-            .create-sub { max-width: 100%; }
-            .std-header { flex-direction: column; gap: 10px; }
-          }
-        `}</style>
-
-        {/* ── TOPBAR ────────────────────────────────────────────────────────── */}
-        <header className="topbar">
-          <a href="/" className="wordmark"><em>785</em>MAGAZINE</a>
-          <div style={{ marginLeft: 'auto' }}>
-            {isGuest ? (
-              <div className="topbar-guest">
-                <a href="/login"  className="btn-ghost">Sign In</a>
-                <a href="/signup" className="btn-primary">Sign Up Free</a>
-              </div>
-            ) : (
-              <AvatarMenu
-                initials={initials}
-                fullName={profile?.full_name || 'Your Account'}
-                phoneOrEmail={profile?.phone_number || profile?.email || ''}
-                avatarUrl={profile?.avatar_url || null}
-              />
-            )}
-          </div>
-        </header>
-
-        {/* ── BANNER ────────────────────────────────────────────────────────── */}
-        <div className="banner">
-          <span className="banner-pill">Notice</span>
-          <span className="banner-text">Platform announcements and featured ads will appear here.</span>
-        </div>
-
-        {/* ── GREETING ──────────────────────────────────────────────────────── */}
-        <div className="greeting">
-          <div className="greeting-eyebrow">Your 785</div>
-          <h1 className="greeting-name">
+      <div className="space-y-6">
+        {/* GREETING */}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400 mb-1">
+            Your 785
+          </p>
+          <h1 className="font-display text-3xl font-bold leading-none text-gray-900 dark:text-white mb-2">
             {isGuest ? 'Hey, Topeka' : `Hey, ${firstName}`}
           </h1>
-          <p className="greeting-sub">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             {isGuest
               ? 'Discover local artists, events, and venues — or add your own.'
-              : 'What would you like to do today?'
-            }
+              : 'What would you like to do today?'}
           </p>
         </div>
-        <hr className="hr" />
 
-        {/* ── TICKET CTA (logged-in only) ─────────────────────────────────── */}
+        {/* TICKET CTA — logged-in only */}
         {!isGuest && (
-          <a href="/dashboard/events/edit" className="ticket-cta">
-            <div className="ticket-cta-left">
-              <div className="ticket-cta-eyebrow">Sellers</div>
-              <div className="ticket-cta-title">Create and sell tickets to an event</div>
-              <div className="ticket-cta-sub">
-                Set up your event, add ticket tiers, and start taking payments — all in one place.
-              </div>
+          <Link
+            href="/dashboard/events/edit"
+            className="flex items-center justify-between gap-5 rounded-2xl border border-gray-200 border-l-[3px] border-l-brand-600 bg-white p-5 transition hover:shadow-theme-md dark:border-gray-800 dark:border-l-brand-500 dark:bg-white/[0.03]"
+          >
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand-600 dark:text-brand-400 mb-1">
+                Sellers
+              </p>
+              <h2 className="font-display text-lg font-semibold text-gray-900 dark:text-white">
+                Create and sell tickets to an event
+              </h2>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Set up your event, add ticket tiers, and start taking payments —
+                all in one place.
+              </p>
             </div>
-            <div className="ticket-cta-arrow">Create →</div>
-          </a>
+            <span className="shrink-0 rounded-md border border-brand-600/25 bg-brand-50 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-brand-600 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400">
+              Create →
+            </span>
+          </Link>
         )}
 
-        {/* ── GRID ──────────────────────────────────────────────────────────── */}
-        <div className="grid">
+        {/* GRID */}
+        <div className="grid grid-cols-12 gap-4 md:gap-6">
+          {/* MY TICKETS — 4 cols */}
+          <Link
+            href={isGuest ? '/login' : '/dashboard/tickets'}
+            className="col-span-12 sm:col-span-6 xl:col-span-4 rounded-2xl border border-gray-200 bg-white p-5 transition hover:shadow-theme-md dark:border-gray-800 dark:bg-white/[0.03]"
+          >
+            <CardLabel>Attending</CardLabel>
+            <CardTitle>MY TICKETS</CardTitle>
 
-          {/* MY TICKETS — 1 col */}
-          <a href={isGuest ? '/login' : '/dashboard/tickets'} className="card">
-            <div className="card-label">Attending</div>
-            <div className="card-title">MY TICKETS</div>
             {isGuest ? (
-              <div className="guest-state">
-                <p className="guest-text">Sign in to purchase, sell and view your tickets</p>
-                <a href="/login" className="guest-link">Sign in →</a>
-              </div>
+              <GuestSlot>Sign in to purchase, sell, and view your tickets</GuestSlot>
             ) : (
               <>
-                <div className="card-desc">Events you're going to</div>
-                <hr className="card-hr" />
+                <CardDesc>Events you&apos;re going to</CardDesc>
+                <Divider />
                 {nextTicket ? (
-                  <div className="ticket-row">
-                    <div className="ticket-date">
-                      <div className="ticket-month">{ticketMonth}</div>
-                      <div className="ticket-day">{ticketDay}</div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-center min-w-[28px] shrink-0">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">
+                        {ticketMonth}
+                      </div>
+                      <div className="font-display text-2xl font-bold leading-none text-gray-900 dark:text-white">
+                        {ticketDay}
+                      </div>
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="ticket-event">{nextTicket.event_title}</div>
-                      <div className="ticket-venue">{nextTicket.venue_name || 'Venue TBA'}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                        {nextTicket.event_title}
+                      </div>
+                      <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                        {nextTicket.venue_name || 'Venue TBA'}
+                      </div>
                     </div>
-                    <span className="badge badge-green">Confirmed</span>
+                    <Badge tone="success">Confirmed</Badge>
                   </div>
                 ) : (
-                  <div className="card-empty">
-                    No upcoming tickets — <a href="/events" style={{ color: 'var(--brand)' }}>browse events</a>
-                  </div>
+                  <EmptySlot>
+  No upcoming tickets —{' '}
+  <span className="text-brand-600 dark:text-brand-400">
+    browse events
+  </span>
+</EmptySlot>
                 )}
               </>
             )}
-          </a>
+          </Link>
 
-          {/* FOLLOWING — 2 col */}
-          <a href={isGuest ? '/login' : '/dashboard/following'} className="card col2">
-            <div className="card-label">Artists &amp; Venues</div>
-            <div className="card-title">FOLLOWING</div>
+          {/* FOLLOWING — 8 cols */}
+          <Link
+            href={isGuest ? '/login' : '/dashboard/following'}
+            className="col-span-12 xl:col-span-8 rounded-2xl border border-gray-200 bg-white p-5 transition hover:shadow-theme-md dark:border-gray-800 dark:bg-white/[0.03]"
+          >
+            <CardLabel>Artists &amp; Venues</CardLabel>
+            <CardTitle>FOLLOWING</CardTitle>
+
             {isGuest ? (
-              <div className="guest-state">
-                <p className="guest-text">Sign in to follow artists and get updates</p>
-                <a href="/login" className="guest-link">Sign in →</a>
-              </div>
+              <GuestSlot>Sign in to follow artists and get updates</GuestSlot>
             ) : (
               <>
-                <div className="card-desc">{allFollowed.length} followed</div>
-                <hr className="card-hr" />
+                <CardDesc>{allFollowed.length} followed</CardDesc>
+                <Divider />
                 {allFollowed.length > 0 ? (
-                  <div className="follow-list">
+                  <div className="flex flex-col gap-3">
                     {allFollowed.slice(0, 3).map((f: any) => (
-                      <div key={f.id} className="follow-row">
-                        <div className={`follow-av${f.kind === 'venue' ? ' venue' : ''}`}>
-                          {f.avatar_url || f.logo || f.image_url
-                            ? <img src={f.avatar_url || f.logo || f.image_url} alt={f.name} />
-                            : f.name?.[0]}
-                        </div>
+                      <div key={f.id} className="flex items-center gap-3">
+                        <Avatar kind={f.kind} name={f.name} src={f.avatar_url || f.logo || f.image_url} />
                         <div>
-                          <div className="follow-name">{f.name}</div>
-                          <div className="follow-type">
-                            {f.artist_type || (Array.isArray(f.venue_type) ? f.venue_type[0] : f.venue_type) || (f.kind === 'venue' ? 'Venue' : 'Artist')}
+                          <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {f.name}
+                          </div>
+                          <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">
+                            {f.artist_type ||
+                              (Array.isArray(f.venue_type)
+                                ? f.venue_type[0]
+                                : f.venue_type) ||
+                              (f.kind === 'venue' ? 'Venue' : 'Artist')}
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="card-empty">
-                    Not following anyone yet — <a href="/artists" style={{ color: 'var(--brand)' }}>discover artists</a>
-                  </div>
-                )}
-              </>
+                  <EmptySlot>
+  Not following anyone yet —{' '}
+  <span className="text-brand-600 dark:text-brand-400">
+    discover artists
+  </span>
+</EmptySlot>
             )}
-          </a>
+          </>
+            )}
+          </Link>
 
-          {/* MY PAGES — 1 col */}
-          <a href={isGuest ? '/login' : pageEditHref} className="card">
-            <div className="card-label">Creator</div>
-            <div className="card-title">MY PAGES</div>
+          {/* MY PAGES — 4 cols */}
+          <Link
+            href={isGuest ? '/login' : pageEditHref}
+            className="col-span-12 sm:col-span-6 xl:col-span-4 rounded-2xl border border-gray-200 bg-white p-5 transition hover:shadow-theme-md dark:border-gray-800 dark:bg-white/[0.03]"
+          >
+            <CardLabel>Creator</CardLabel>
+            <CardTitle>MY PAGES</CardTitle>
+
             {isGuest ? (
-              <div className="guest-state">
-                <p className="guest-text">Sign in to manage your artist and venue pages</p>
-                <a href="/login" className="guest-link">Sign in →</a>
-              </div>
+              <GuestSlot>Sign in to manage your artist and venue pages</GuestSlot>
             ) : (
               <>
-                <div className="card-desc">Edit, events, announcements &amp; ticket sales</div>
-                <hr className="card-hr" />
+                <CardDesc>Edit, events, announcements &amp; ticket sales</CardDesc>
+                <Divider />
                 {firstPage ? (
-                  <div className="follow-row">
-                    <div className={`follow-av${firstPage.kind === 'venue' ? ' venue' : ''}`}>
-                      {firstPage.avatar_url || firstPage.logo || firstPage.image_url
-                        ? <img src={firstPage.avatar_url || firstPage.logo || firstPage.image_url} alt={firstPage.name} />
-                        : firstPage.name?.[0]}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="follow-name">{firstPage.name}</div>
-                      <div className="follow-type">
-                        {TYPE_LABEL[firstPage.artist_type] || (Array.isArray(firstPage.venue_type) ? firstPage.venue_type[0] : firstPage.venue_type) || (firstPage.kind === 'venue' ? 'Venue' : 'Artist')}
+                  <div className="flex items-center gap-3">
+                    <Avatar kind={firstPage.kind} name={firstPage.name} src={firstPage.avatar_url || firstPage.logo || firstPage.image_url} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {firstPage.name}
+                      </div>
+                      <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">
+                        {TYPE_LABEL[firstPage.artist_type] ||
+                          (Array.isArray(firstPage.venue_type)
+                            ? firstPage.venue_type[0]
+                            : firstPage.venue_type) ||
+                          (firstPage.kind === 'venue' ? 'Venue' : 'Artist')}
                       </div>
                     </div>
-                    {!firstPage.tagline && <span className="badge badge-brand">No tagline</span>}
+                    {!firstPage.tagline && <Badge tone="brand">No tagline</Badge>}
                   </div>
                 ) : (
-                  <div className="card-empty">No pages yet — create one below</div>
+                  <EmptySlot>No pages yet — create one below</EmptySlot>
                 )}
               </>
             )}
-          </a>
+          </Link>
 
-          {/* ADVERTISE — 1 col */}
-          <a href={isGuest ? '/login' : '/dashboard/advertise'} className="card">
-            <div className="card-label">Publisher &amp; Buyer</div>
-            <div className="card-title">ADVERTISE</div>
+          {/* ADVERTISE — 4 cols */}
+          <Link
+            href={isGuest ? '/login' : '/dashboard/advertise'}
+            className="col-span-12 sm:col-span-6 xl:col-span-4 rounded-2xl border border-gray-200 bg-white p-5 transition hover:shadow-theme-md dark:border-gray-800 dark:bg-white/[0.03]"
+          >
+            <CardLabel>Publisher &amp; Buyer</CardLabel>
+            <CardTitle>ADVERTISE</CardTitle>
+
             {isGuest ? (
-              <div className="guest-state">
-                <p className="guest-text">Sign in to place and manage ads on seveneightfive.com</p>
-                <a href="/login" className="guest-link">Sign in →</a>
-              </div>
+              <GuestSlot>Sign in to place and manage ads on seveneightfive.com</GuestSlot>
             ) : (
               <>
-                <div className="card-desc">Manage your ad campaigns and view stats</div>
-                <hr className="card-hr" />
+                <CardDesc>Manage your ad campaigns and view stats</CardDesc>
+                <Divider />
                 {(ads || []).length > 0 ? (
-                  (ads || []).map((ad: any) => (
-                    <div key={ad.id} className="ad-block">
-                      <div className="ad-row">
-                        <div className="ad-name">{ad.headline || ad.title || 'Untitled Ad'}</div>
-                        <span className={`badge ${ad.status === 'active' ? 'badge-green' : 'badge-gold'}`}>
-                          {ad.status === 'active' ? 'Active' : 'Ended'}
-                        </span>
+                  <div className="flex flex-col gap-2">
+                    {(ads || []).map((ad: any, i: number) => (
+                      <div
+                        key={ad.id}
+                        className={i > 0 ? 'pt-2 border-t border-gray-100 dark:border-gray-800' : ''}
+                      >
+                        <div className="flex items-center justify-between mb-0.5">
+                          <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {ad.headline || ad.title || 'Untitled Ad'}
+                          </div>
+                          <Badge tone={ad.status === 'active' ? 'success' : 'gold'}>
+                            {ad.status === 'active' ? 'Active' : 'Ended'}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {ad.views || 0} views · {ad.clicks || 0} clicks
+                        </div>
                       </div>
-                      <div className="ad-stat">{ad.views || 0} views · {ad.clicks || 0} clicks</div>
-                    </div>
-                  ))
+                    ))}
+                  </div>
                 ) : (
-                  <div className="card-empty">No ads yet</div>
+                  <EmptySlot>No ads yet</EmptySlot>
                 )}
               </>
             )}
-          </a>
+          </Link>
 
-          {/* SETTINGS + NOTIFICATIONS — 1 col */}
-          <div className="card" style={{ cursor: 'default' }}>
-            <div className="card-label">Account</div>
-            <div className="card-title">SETTINGS + NOTIFICATIONS</div>
+          {/* SETTINGS + NOTIFICATIONS — 4 cols */}
+          <div className="col-span-12 sm:col-span-6 xl:col-span-4 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+            <CardLabel>Account</CardLabel>
+            <CardTitle>SETTINGS + NOTIFICATIONS</CardTitle>
+
             {isGuest ? (
-              <div className="guest-state">
-                <p className="guest-text">Sign in to manage your account and notifications</p>
-                <a href="/login" className="guest-link">Sign in →</a>
-              </div>
+              <GuestSlot>Sign in to manage your account and notifications</GuestSlot>
             ) : (
               <>
-                <hr className="card-hr" />
+                <Divider />
                 {isCreator && (
-                  <StripeConnectButton
-                    accountStatus={profile?.stripe_account_status ?? null}
-                    returnPath="/dashboard"
-                  />
+                  <div className="mb-3">
+                    <StripeConnectButton
+                      accountStatus={profile?.stripe_account_status ?? null}
+                      returnPath="/dashboard"
+                    />
+                  </div>
                 )}
-                <div className="settings-links">
-                  <a href="/dashboard/settings"               className="settings-link">Edit Profile</a>
-                  <span className="settings-dot">·</span>
-                  <a href="/dashboard/settings#notifications" className="settings-link">Notifications</a>
-                  <span className="settings-dot">·</span>
-                  <a href="/api/auth/signout" className="settings-link" style={{ color: 'var(--brand)' }}>Sign Out</a>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
+                  <Link
+                    href="/dashboard/settings"
+                    className="hover:text-gray-900 dark:hover:text-white"
+                  >
+                    Edit Profile
+                  </Link>
+                  <span className="text-gray-300 dark:text-gray-700">·</span>
+                  <Link
+                    href="/dashboard/settings#notifications"
+                    className="hover:text-gray-900 dark:hover:text-white"
+                  >
+                    Notifications
+                  </Link>
+                  <span className="text-gray-300 dark:text-gray-700">·</span>
+                  <Link
+                    href="/api/auth/signout"
+                    className="text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+                  >
+                    Sign Out
+                  </Link>
                 </div>
               </>
             )}
           </div>
 
-          {/* SAVE THE DATE — full width, always public */}
-          <a href="/save-the-date" className="card col3">
-            <div className="std-header">
+          {/* SAVE THE DATE — full width */}
+          <Link
+            href="/save-the-date"
+            className="col-span-12 rounded-2xl border border-gray-200 bg-white p-5 transition hover:shadow-theme-md dark:border-gray-800 dark:bg-white/[0.03]"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div>
-                <div className="card-label">Community Calendar</div>
-                <div className="card-title">SAVE THE DATE</div>
-                <div className="card-desc">Claim your date before the details are finalized — no account needed</div>
+                <CardLabel>Community Calendar</CardLabel>
+                <CardTitle>SAVE THE DATE</CardTitle>
+                <CardDesc>
+                  Claim your date before the details are finalized — no account
+                  needed
+                </CardDesc>
               </div>
-              <a
-                href="/save-the-date/new"
-                className="std-btn"
-                
-              >
+              <span className="shrink-0 inline-flex items-center self-start rounded-lg bg-brand-600 px-4 py-2 font-display text-sm font-semibold tracking-wide text-white hover:bg-brand-700">
                 + Claim a Date
-              </a>
+              </span>
             </div>
 
             {(saveDates || []).length > 0 && (
               <>
-                <hr className="card-hr" />
-                <div className="std-list">
+                <Divider />
+                <div className="flex flex-col gap-3">
                   {(saveDates as SaveTheDate[]).map((sd) => {
-                    const d   = new Date(sd.event_date + 'T12:00:00')
+                    const d = new Date(sd.event_date + 'T12:00:00')
                     const mon = d.toLocaleString('en-US', { month: 'short' }).toUpperCase()
                     const day = d.getDate()
                     return (
-                      <div key={sd.id} className="std-item">
-                        <div className="std-date-block">
-                          <div className="ticket-month">{mon}</div>
-                          <div className="ticket-day">{day}</div>
+                      <div key={sd.id} className="flex items-center gap-3">
+                        <div className="text-center min-w-[28px] shrink-0">
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">
+                            {mon}
+                          </div>
+                          <div className="font-display text-2xl font-bold leading-none text-gray-900 dark:text-white">
+                            {day}
+                          </div>
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div className="std-title">{sd.title}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                            {sd.title}
+                          </div>
                           {sd.location_name && (
-                            <div className="std-sub">{sd.location_name}</div>
+                            <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
+                              {sd.location_name}
+                            </div>
                           )}
                         </div>
                         {sd.event_type && (
-                          <span className="badge badge-gray">{sd.event_type}</span>
+                          <Badge tone="gray">{sd.event_type}</Badge>
                         )}
                       </div>
                     )
@@ -540,34 +512,180 @@ export default async function DashboardPage() {
                 </div>
               </>
             )}
-          </a>
+          </Link>
 
           {/* CREATE CTA — full width */}
-          <div className="create-card col3">
-            <div className="create-left">
-              <div className="create-eyebrow">Publish</div>
-              <div className="create-heading">CREATE</div>
-              <div className="create-sub">
-                {isGuest
-                  ? 'Add your event, artist page or venue — free, no account required to start'
-                  : 'Add something new to 785 Magazine'
-                }
+          <div className="col-span-12 rounded-2xl bg-brand-600 p-6 text-white">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
+              <div className="lg:pr-6 lg:border-r lg:border-white/20 lg:shrink-0">
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white/55">
+                  Publish
+                </p>
+                <h2 className="font-display text-2xl font-semibold tracking-wide text-white leading-none">
+                  CREATE
+                </h2>
+                <p className="mt-2 max-w-[200px] text-xs text-white/70 leading-relaxed">
+                  {isGuest
+                    ? 'Add your event, artist page or venue — free, no account required to start'
+                    : 'Add something new to 785 Magazine'}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 flex-1">
+                <CreateBtn href="/dashboard/events/edit">Event</CreateBtn>
+                <CreateBtn
+                  href={
+                    isGuest
+                      ? '/login?next=/dashboard/announcements/new'
+                      : '/dashboard/announcements/new'
+                  }
+                >
+                  Announcement
+                </CreateBtn>
+                <CreateBtn
+                  href="https://seveneightfive.fillout.com/new-artist"
+                  external
+                >
+                  Artist Page
+                </CreateBtn>
+                <CreateBtn
+                  href="https://seveneightfive.fillout.com/add-venue"
+                  external
+                >
+                  Venue Page
+                </CreateBtn>
               </div>
             </div>
-            <div className="create-rule" />
-            <div className="create-btns">
-              <a href="/dashboard/events/edit" className="create-btn">Event</a>
-              <a href={isGuest ? '/login?next=/dashboard/announcements/new' : '/dashboard/announcements/new'} className="create-btn">Announcement</a>
-              <a href="https://seveneightfive.fillout.com/new-artist"  target="_blank" rel="noopener noreferrer" className="create-btn">Artist Page</a>
-              <a href="https://seveneightfive.fillout.com/add-venue"   target="_blank" rel="noopener noreferrer" className="create-btn">Venue Page</a>
-            </div>
           </div>
-
         </div>
-      </>
+      </div>
     )
   } catch (err) {
     console.error('[dashboard] server error:', err)
     throw err
   }
+}
+
+// ─── Local card-shape helpers ────────────────────────────────────────────────
+// Kept in this file because they're only used here and consistent labeling
+// across the 6 cards is easier when the patterns live together. Promote to
+// app/dashboard/_components/ later if you start reusing them on sub-pages.
+
+function CardLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-gray-400 dark:text-gray-500 mb-1">
+      {children}
+    </p>
+  )
+}
+
+function CardTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="font-display text-xl font-semibold tracking-wider text-gray-900 dark:text-white leading-none">
+      {children}
+    </h3>
+  )
+}
+
+function CardDesc({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{children}</p>
+  )
+}
+
+function Divider() {
+  return <hr className="my-3 border-gray-100 dark:border-gray-800" />
+}
+
+function EmptySlot({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-xs italic text-gray-400 dark:text-gray-500">{children}</p>
+  )
+}
+
+function GuestSlot({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mt-2 space-y-1">
+      <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+        {children}
+      </p>
+      <span className="inline-block text-xs font-bold text-brand-600 dark:text-brand-400">
+        Sign in →
+      </span>
+    </div>
+  )
+}
+
+function Avatar({
+  kind,
+  name,
+  src,
+}: {
+  kind: 'artist' | 'venue'
+  name: string
+  src?: string | null
+}) {
+  const shape = kind === 'venue' ? 'rounded-lg' : 'rounded-full'
+  return (
+    <div
+      className={`flex items-center justify-center w-8 h-8 ${shape} bg-brand-50 text-brand-700 text-xs font-bold shrink-0 overflow-hidden dark:bg-brand-500/15 dark:text-brand-300`}
+    >
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={name} className="w-full h-full object-cover" />
+      ) : (
+        name?.[0] ?? '?'
+      )}
+    </div>
+  )
+}
+
+function Badge({
+  children,
+  tone,
+}: {
+  children: React.ReactNode
+  tone: 'success' | 'brand' | 'gold' | 'gray'
+}) {
+  const tones: Record<typeof tone, string> = {
+    success:
+      'bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400',
+    brand:
+      'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400',
+    gold:
+      'bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400',
+    gray:
+      'bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-400',
+  }
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap ${tones[tone]}`}
+    >
+      {children}
+    </span>
+  )
+}
+
+function CreateBtn({
+  href,
+  children,
+  external,
+}: {
+  href: string
+  children: React.ReactNode
+  external?: boolean
+}) {
+  const cls =
+    'block rounded-lg bg-accent-500 hover:bg-accent-600 px-3 py-3 text-center font-display text-sm font-semibold uppercase tracking-wide text-gray-900 transition'
+  if (external) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className={cls}>
+        {children}
+      </a>
+    )
+  }
+  return (
+    <Link href={href} className={cls}>
+      {children}
+    </Link>
+  )
 }

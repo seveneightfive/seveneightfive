@@ -1,206 +1,175 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabaseBrowser'
+import Link from 'next/link'
 
-type EventRow = {
+type Event = {
   id: string
   title: string
   event_date: string
   slug: string | null
-  venue_id: string | null
-  venue_name?: string | null
+  status: string
 }
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr + 'T12:00:00')
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+  return d.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 
-export default function MyEventsPage() {
+export default function EventsPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <EventsPageInner />
+    </Suspense>
+  )
+}
+
+function LoadingState() {
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex gap-2">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="h-2 w-2 animate-pulse rounded-full bg-gray-300 dark:bg-gray-700"
+            style={{ animationDelay: `${i * 0.15}s` }}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function EventsPageInner() {
   const router = useRouter()
-  const [events, setEvents] = useState<EventRow[]>([])
+  const [artistId, setArtistId] = useState<string | null>(null)
+  const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
+
   useEffect(() => {
     async function load() {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
 
-      // Get user's artist IDs and venue IDs
-      const [{ data: myArtists }, { data: myVenues }] = await Promise.all([
-        supabase.from('artists').select('id').eq('auth_user_id', user.id),
-        supabase.from('venues').select('id').eq('auth_user_id', user.id),
-      ])
-      const artistIds = (myArtists || []).map((a: any) => a.id)
-      const venueIds = (myVenues || []).map((v: any) => v.id)
+      const { data: artist } = await supabase
+        .from('artists')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single()
 
-      const EVENT_SELECT = 'id, title, event_date, slug, venue_id, venues(name)'
+      if (!artist) {
+        router.push('/dashboard')
+        return
+      }
 
-      // Fetch from all 4 sources in parallel
-      const [
-        { data: createdEvents },
-        venueEventsResult,
-        artistLinksResult,
-        { data: userEventLinks },
-      ] = await Promise.all([
-        supabase.from('events').select(EVENT_SELECT).eq('auth_user_id', user.id),
-        venueIds.length
-          ? supabase.from('events').select(EVENT_SELECT).in('venue_id', venueIds)
-          : Promise.resolve({ data: [] as any[] }),
-        artistIds.length
-          ? supabase.from('event_artists').select(`event_id, events(${EVENT_SELECT})`).in('artist_id', artistIds)
-          : Promise.resolve({ data: [] as any[] }),
-        supabase.from('event_users').select(`event_id, events(${EVENT_SELECT})`).eq('user_id', user.id),
-      ])
+      setArtistId(artist.id)
 
-      // Flatten artist-linked events
-      const linkedEvents = ((artistLinksResult.data) || []).map((l: any) => {
-        const e = Array.isArray(l.events) ? l.events[0] : l.events
-        return e
-      }).filter(Boolean)
+      const { data: userEvents } = await supabase
+        .from('events')
+        .select('id, title, event_date, slug, status')
+        .eq('artist_id', artist.id)
+        .order('event_date', { ascending: false })
 
-      // Flatten event_users-linked events
-      const userLinkedEvents = (userEventLinks || []).map((l: any) => {
-        const e = Array.isArray(l.events) ? l.events[0] : l.events
-        return e
-      }).filter(Boolean)
-
-      // Merge and deduplicate
-      const allEvents = [...(createdEvents || []), ...((venueEventsResult.data) || []), ...linkedEvents, ...userLinkedEvents]
-      const seen = new Set<string>()
-      const merged: EventRow[] = allEvents
-        .filter((e: any) => { if (seen.has(e.id)) return false; seen.add(e.id); return true })
-        .map((e: any) => ({ ...e, venue_name: Array.isArray(e.venues) ? e.venues[0]?.name : e.venues?.name }))
-        .sort((a, b) => a.event_date.localeCompare(b.event_date))
-
-      setEvents(merged)
+      setEvents((userEvents || []) as Event[])
       setLoading(false)
     }
     load()
   }, [router])
 
+  if (loading) return <LoadingState />
+
   return (
-    <>
-      <style>{`
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { background: #1a1814; color: #fff; font-family: 'DM Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-        @keyframes pulse { 0%,80%,100%{opacity:0.3;transform:scale(0.85)}40%{opacity:1;transform:scale(1)} }
-        .event-row { display: flex; align-items: center; gap: 16px; padding: 16px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; margin-bottom: 8px; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
-        .event-row:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.14); }
-        .event-date { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(200,6,80,0.8); white-space: nowrap; }
-        .event-title { font-family: 'Oswald', sans-serif; font-size: 1rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
-        .event-venue { font-size: 0.78rem; color: rgba(255,255,255,0.35); margin-top: 2px; }
-      `}</style>
-
-      <div style={{ maxWidth: 700, margin: '0 auto', padding: '0 24px 80px' }}>
-        {/* Top bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 32 }}>
-          <a href="/dashboard" style={{ fontFamily: "'Oswald', sans-serif", fontSize: '0.72rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', textDecoration: 'none' }}>
-            ← Dashboard
-          </a>
-          <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: '0.72rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)' }}>
-            My Events
-          </span>
-        </div>
-
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
-          <div>
-            <h1 style={{ fontFamily: "'Oswald', sans-serif", fontSize: '1.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              My Events
-            </h1>
-            <p style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>
-              Events you've added to the directory
-            </p>
-          </div>
-          <a
-            href="/dashboard/events/edit"
-            style={{
-              padding: '10px 18px',
-              background: 'rgba(200,6,80,0.15)',
-              border: '1.5px solid rgba(200,6,80,0.4)',
-              borderRadius: 8,
-              color: '#ff9ab0',
-              fontFamily: "'Oswald', sans-serif",
-              fontSize: '0.78rem',
-              fontWeight: 600,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              textDecoration: 'none',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            + Add Event
-          </a>
-        </div>
-
-        {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {[0, 1, 2].map(i => (
-                <span key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'block', animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />
-              ))}
-            </div>
-          </div>
-        ) : events.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: 'rgba(255,255,255,0.25)' }}>
-            <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: '1.2rem', textTransform: 'uppercase', marginBottom: 8 }}>No Events Yet</div>
-            <p style={{ fontSize: '0.85rem' }}>Add your first event to get started.</p>
-          </div>
-        ) : (
-          <div>
-            {events.map(event => (
-              <div
-                key={event.id}
-                className="event-row"
-                onClick={() => router.push(`/dashboard/events/edit?id=${event.id}`)}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="event-date">{formatDate(event.event_date)}</div>
-                  <div className="event-title">{event.title}</div>
-                  {event.venue_name && <div className="event-venue">{event.venue_name}</div>}
-                </div>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
-                  <a
-                    href={`/dashboard/events/${event.id}/tickets`}
-                    onClick={e => e.stopPropagation()}
-                    style={{
-                      padding: '5px 10px',
-                      background: 'rgba(255,206,3,0.1)',
-                      border: '1px solid rgba(255,206,3,0.3)',
-                      borderRadius: 6,
-                      color: '#FFCE03',
-                      fontFamily: "'Oswald', sans-serif",
-                      fontSize: '0.68rem',
-                      fontWeight: 600,
-                      letterSpacing: '0.1em',
-                      textTransform: 'uppercase',
-                      textDecoration: 'none',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    Tickets
-                  </a>
-                  {event.slug && (
-                    <a
-                      href={`/events/${event.slug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={e => e.stopPropagation()}
-                      style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.85rem', textDecoration: 'none' }}
-                    >
-                      ↗
-                    </a>
-                  )}
-                  <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '1rem' }}>→</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+    <div className="mx-auto max-w-2xl space-y-6">
+      {/* Page header */}
+      <div>
+        <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
+          Creator
+        </p>
+        <h1 className="mb-2 font-display text-3xl font-bold leading-none text-gray-900 dark:text-white">
+          Events
+        </h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Events you&apos;ve created and are managing.
+        </p>
       </div>
-    </>
+
+      {/* Events list */}
+      {events.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center dark:border-gray-700 dark:bg-white/[0.02]">
+          <p className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
+            No events yet
+          </p>
+          <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
+            Create an event to get started. You can manage it from here.
+          </p>
+          <Link
+            href="/dashboard/events/edit"
+            className="inline-flex rounded-lg bg-brand-600 px-5 py-2.5 font-semibold text-white transition hover:bg-brand-700"
+          >
+            Create Event
+          </Link>
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {events.map((event) => (
+            <Link
+              key={event.id}
+              href={`/dashboard/events/edit?id=${event.id}`}
+              className="group flex items-center gap-4 rounded-2xl border border-gray-200 bg-white p-4 transition hover:border-gray-300 hover:shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] dark:hover:border-gray-700"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="font-display text-sm font-semibold uppercase tracking-wide text-gray-900 dark:text-white">
+                  {event.title}
+                </div>
+                <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {formatDate(event.event_date)}
+                </div>
+                {event.status && (
+                  <div className="mt-1.5 inline-flex rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600 dark:border-gray-700 dark:bg-white/[0.05] dark:text-gray-300">
+                    {event.status}
+                  </div>
+                )}
+              </div>
+              {event.slug && (
+                <a
+                  href={`/events/${event.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 text-gray-400 transition hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                    />
+                  </svg>
+                </a>
+              )}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

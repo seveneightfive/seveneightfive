@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabaseBrowser'
+import Link from 'next/link'
+import { Loader2, Plus, Trash2, ExternalLink } from 'lucide-react'
 
 type AppearanceEvent = {
   id: string
@@ -22,7 +24,11 @@ type SearchEvent = {
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr + 'T12:00:00')
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  return d.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
 }
 
 export default function AppearancesPage() {
@@ -43,8 +49,13 @@ export default function AppearancesPage() {
   useEffect(() => {
     async function load() {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
 
       const { data: artist } = await supabase
         .from('artists')
@@ -52,7 +63,10 @@ export default function AppearancesPage() {
         .eq('auth_user_id', user.id)
         .single()
 
-      if (!artist) { router.push('/dashboard'); return }
+      if (!artist) {
+        router.push('/dashboard')
+        return
+      }
       setArtistId(artist.id)
 
       const today = new Date().toLocaleDateString('en-CA')
@@ -79,7 +93,7 @@ export default function AppearancesPage() {
 
       mapped.sort((a, b) => a.event_date.localeCompare(b.event_date))
       setAppearances(mapped)
-      setAddedIds(new Set(mapped.map(a => a.id)))
+      setAddedIds(new Set(mapped.map((a) => a.id)))
       setLoading(false)
     }
     load()
@@ -130,8 +144,10 @@ export default function AppearancesPage() {
       body: JSON.stringify({ eventId: event.id, artistId }),
     })
     if (res.ok) {
-      setAppearances(prev => [...prev, event].sort((a, b) => a.event_date.localeCompare(b.event_date)))
-      setAddedIds(prev => new Set([...prev, event.id]))
+      setAppearances((prev) =>
+        [...prev, event].sort((a, b) => a.event_date.localeCompare(b.event_date))
+      )
+      setAddedIds((prev) => new Set([...prev, event.id]))
     }
     setAdding(null)
   }
@@ -146,30 +162,26 @@ export default function AppearancesPage() {
       body: JSON.stringify({ eventId, artistId }),
     })
     if (res.ok) {
-      setAppearances(prev => prev.filter(a => a.id !== eventId))
-      setAddedIds(prev => { const s = new Set(prev); s.delete(eventId); return s })
+      setAppearances((prev) => prev.filter((a) => a.id !== eventId))
+      setAddedIds((prev) => {
+        const s = new Set(prev)
+        s.delete(eventId)
+        return s
+      })
     }
     setRemoving(null)
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '10px 14px',
-    background: 'rgba(255,255,255,0.06)',
-    border: '1.5px solid rgba(255,255,255,0.12)',
-    borderRadius: 8,
-    color: '#fff',
-    fontFamily: "'DM Sans', system-ui, sans-serif",
-    fontSize: '0.9rem',
-    outline: 'none',
-  }
-
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#1a1814', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {[0, 1, 2].map(i => (
-            <span key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'block', animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="flex gap-2">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="h-2 w-2 animate-pulse rounded-full bg-gray-300 dark:bg-gray-700"
+              style={{ animationDelay: `${i * 0.15}s` }}
+            />
           ))}
         </div>
       </div>
@@ -177,123 +189,155 @@ export default function AppearancesPage() {
   }
 
   return (
-    <>
-      <style>{`
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { background: #1a1814; color: #fff; font-family: 'DM Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-        @keyframes pulse { 0%,80%,100%{opacity:0.3;transform:scale(0.85)}40%{opacity:1;transform:scale(1)} }
-        input:focus { border-color: rgba(200,6,80,0.6) !important; }
-        .event-row { display: flex; align-items: center; gap: 16px; padding: 14px 16px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; margin-bottom: 8px; }
-        .event-date-badge { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(200,6,80,0.8); white-space: nowrap; }
-        .event-title-text { font-family: 'Oswald', sans-serif; font-size: 0.95rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
-        .event-venue-text { font-size: 0.76rem; color: rgba(255,255,255,0.3); margin-top: 2px; }
-        .btn-remove { padding: 5px 12px; background: transparent; border: 1px solid rgba(200,6,80,0.2); border-radius: 6px; color: rgba(200,6,80,0.4); font-family: 'DM Sans', sans-serif; font-size: 0.76rem; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
-        .btn-remove:hover { border-color: rgba(200,6,80,0.5); color: rgba(200,6,80,0.9); }
-        .section-head { font-family: 'Oswald', sans-serif; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(255,255,255,0.25); margin: 36px 0 16px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-        .search-result { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 6px; background: rgba(255,255,255,0.02); }
-        .btn-add { padding: 6px 14px; background: rgba(200,6,80,0.1); border: 1px solid rgba(200,6,80,0.3); border-radius: 6px; color: #ff9ab0; font-family: 'DM Sans', sans-serif; font-size: 0.76rem; font-weight: 500; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
-        .btn-add:hover { background: rgba(200,6,80,0.18); border-color: rgba(200,6,80,0.5); }
-        .btn-add:disabled { opacity: 0.4; cursor: default; }
-        .already-added { font-size: 0.72rem; color: rgba(255,255,255,0.25); white-space: nowrap; }
-      `}</style>
-
-      <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 24px 80px' }}>
-        {/* Top bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 32 }}>
-          <a href="/dashboard" style={{ fontFamily: "'Oswald', sans-serif", fontSize: '0.72rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', textDecoration: 'none' }}>
-            ← Dashboard
-          </a>
-          <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: '0.72rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)' }}>
-            Appearances
-          </span>
-        </div>
-
-        <h1 style={{ fontFamily: "'Oswald', sans-serif", fontSize: '1.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+    <div className="mx-auto max-w-2xl space-y-6">
+      {/* Page header */}
+      <div>
+        <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
+          Creator
+        </p>
+        <h1 className="mb-2 font-display text-3xl font-bold leading-none text-gray-900 dark:text-white">
           Your Appearances
         </h1>
-        <p style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.35)', marginBottom: 36 }}>
-          Upcoming events you're featured in. Search below to add yourself to any event.
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Upcoming events you&apos;re featured in. Search below to add yourself
+          to any event.
         </p>
+      </div>
 
-        {/* Upcoming appearances */}
-        <div className="section-head">Upcoming Events You're Featured In</div>
+      {/* Upcoming appearances */}
+      <div>
+        <h2 className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
+          Upcoming Events You&apos;re Featured In
+        </h2>
 
         {appearances.length === 0 ? (
-          <div style={{ padding: '32px 0', color: 'rgba(255,255,255,0.2)', fontSize: '0.88rem' }}>
-            You're not connected to any upcoming events yet. Search below to add yourself.
+          <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-10 text-center dark:border-gray-700 dark:bg-white/[0.02]">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              You&apos;re not connected to any upcoming events yet. Search below
+              to add yourself.
+            </p>
           </div>
         ) : (
-          appearances.map(event => (
-            <div key={event.id} className="event-row">
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="event-date-badge">{formatDate(event.event_date)}</div>
-                <div className="event-title-text">{event.title}</div>
-                {event.venue_name && <div className="event-venue-text">{event.venue_name}</div>}
-              </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                {event.slug && (
-                  <a
-                    href={`/events/${event.slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.8rem', textDecoration: 'none' }}
+          <div className="flex flex-col gap-2">
+            {appearances.map((event) => (
+              <div
+                key={event.id}
+                className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3.5 dark:border-gray-800 dark:bg-white/[0.03]"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-brand-600 dark:text-brand-400">
+                    {formatDate(event.event_date)}
+                  </div>
+                  <div className="mt-0.5 font-display text-sm font-semibold uppercase tracking-wide text-gray-900 dark:text-white">
+                    {event.title}
+                  </div>
+                  {event.venue_name && (
+                    <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      {event.venue_name}
+                    </div>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {event.slug && (
+                    <a
+                      href={`/events/${event.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/[0.1] dark:hover:text-gray-300"
+                      title="View event"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  )}
+                  <button
+                    onClick={() => handleRemove(event.id, event.title)}
+                    disabled={removing === event.id}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition hover:bg-brand-50 hover:text-brand-600 disabled:opacity-50 dark:hover:bg-brand-500/15 dark:hover:text-brand-400"
+                    title="Remove"
                   >
-                    ↗
-                  </a>
-                )}
-                <button
-                  className="btn-remove"
-                  onClick={() => handleRemove(event.id, event.title)}
-                  disabled={removing === event.id}
-                >
-                  {removing === event.id ? '…' : 'Remove'}
-                </button>
+                    {removing === event.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
+      </div>
 
-        {/* Search to add */}
-        <div className="section-head">Find & Add Yourself to an Event</div>
+      {/* Search to add */}
+      <div className="space-y-3">
+        <h2 className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
+          Find &amp; Add Yourself to an Event
+        </h2>
 
-        <div style={{ marginBottom: 20 }}>
-          <input
-            style={inputStyle}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search upcoming events by title..."
-          />
-        </div>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search upcoming events by title…"
+          className="w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90 dark:focus:border-brand-500 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+        />
 
         {searching && (
-          <div style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.82rem', marginBottom: 12 }}>Searching…</div>
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Searching…
+          </div>
         )}
 
         {!searching && search && searchResults.length === 0 && (
-          <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.82rem' }}>No upcoming events found for "{search}"</div>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            No upcoming events found for "{search}"
+          </p>
         )}
 
-        {searchResults.map(event => (
-          <div key={event.id} className="search-result">
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '0.68rem', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(200,6,80,0.7)', marginBottom: 2 }}>{formatDate(event.event_date)}</div>
-              <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: '0.95rem', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{event.title}</div>
-              {event.venue_name && <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>{event.venue_name}</div>}
-            </div>
-            {addedIds.has(event.id) ? (
-              <span className="already-added">Already added ✓</span>
-            ) : (
-              <button
-                className="btn-add"
-                onClick={() => handleAdd(event)}
-                disabled={adding === event.id}
+        {searchResults.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {searchResults.map((event) => (
+              <div
+                key={event.id}
+                className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3.5 dark:border-gray-800 dark:bg-white/[0.03]"
               >
-                {adding === event.id ? '…' : '+ Add me'}
-              </button>
-            )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-brand-600 dark:text-brand-400">
+                    {formatDate(event.event_date)}
+                  </div>
+                  <div className="mt-0.5 font-display text-sm font-semibold uppercase tracking-wide text-gray-900 dark:text-white">
+                    {event.title}
+                  </div>
+                  {event.venue_name && (
+                    <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      {event.venue_name}
+                    </div>
+                  )}
+                </div>
+                {addedIds.has(event.id) ? (
+                  <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-gray-400 dark:text-gray-500">
+                    Added ✓
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => handleAdd(event)}
+                    disabled={adding === event.id}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-100 disabled:opacity-50 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/15"
+                  >
+                    {adding === event.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Plus className="h-3 w-3" />
+                    )}
+                    Add me
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
-    </>
+    </div>
   )
 }

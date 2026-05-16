@@ -8,7 +8,17 @@ const withSerwist = withSerwistInit({
 })
 
 const nextConfig: NextConfig = {
-  turbopack: {},
+  turbopack: {
+    rules: {
+      // SVGR: import SVGs as React components.
+      // Required by TailAdmin's icons/index.tsx which does
+      // `import Foo from "./foo.svg"`.
+      "*.svg": {
+        loaders: ["@svgr/webpack"],
+        as: "*.js",
+      },
+    },
+  },
 }
 
 export default withSerwist(nextConfig)
