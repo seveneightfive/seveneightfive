@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { Camera, Keyboard, CheckCircle, AlertCircle, XCircle, Loader2 } from 'lucide-react'
 
 type ScanResult =
   | { state: 'idle' }
@@ -17,77 +18,6 @@ type TicketInfo = {
   amount_paid: number | null
   status: string
 }
-
-const STYLES = `
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --ink: #1a1814; --white: #fff; --accent: #C80650;
-    --surface: rgba(255,255,255,0.04); --border: rgba(255,255,255,0.08);
-    --border2: rgba(255,255,255,0.14); --dim: rgba(255,255,255,0.55);
-    --faint: rgba(255,255,255,0.25); --green: #7ecf7e; --gold: #ffce03;
-    --serif: 'Oswald', sans-serif; --sans: 'DM Sans', system-ui, sans-serif;
-  }
-  html, body { background: var(--ink); color: var(--white); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
-  .topbar { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; height: 52px; background: rgba(26,24,20,0.95); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
-  .back-link { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); text-decoration: none; }
-  .back-link:hover { color: var(--white); }
-  .page-title { font-family: var(--serif); font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
-  .content { max-width: 520px; margin: 0 auto; padding: 24px 20px 80px; }
-
-  /* Camera */
-  .camera-wrap { position: relative; width: 100%; border-radius: 14px; overflow: hidden; background: #000; aspect-ratio: 1; margin-bottom: 20px; }
-  .camera-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .camera-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-  .scan-frame { width: 60%; aspect-ratio: 1; border: 2px solid rgba(255,255,255,0.6); border-radius: 12px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.45); }
-  .camera-hint { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 0.72rem; color: rgba(255,255,255,0.5); letter-spacing: 0.05em; }
-  .camera-off { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; min-height: 200px; background: rgba(255,255,255,0.03); border: 1px dashed var(--border2); border-radius: 14px; flex-direction: column; gap: 10px; margin-bottom: 20px; padding: 24px; text-align: center; }
-  .camera-off-icon { font-size: 2rem; opacity: 0.3; }
-  .camera-off-text { font-size: 0.82rem; color: var(--dim); line-height: 1.5; }
-
-  /* Result card */
-  .result-card { border-radius: 14px; overflow: hidden; margin-bottom: 16px; }
-  .result-card.success { background: rgba(45,122,45,0.12); border: 1px solid rgba(45,122,45,0.35); }
-  .result-card.already-used { background: rgba(255,255,255,0.04); border: 1px solid var(--border2); }
-  .result-card.error { background: rgba(200,6,80,0.08); border: 1px solid rgba(200,6,80,0.3); }
-  .result-header { padding: 16px 18px 12px; display: flex; align-items: center; gap: 12px; }
-  .result-icon { font-size: 1.5rem; flex-shrink: 0; }
-  .result-title { font-family: var(--serif); font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
-  .result-sub { font-size: 0.75rem; color: var(--dim); margin-top: 2px; }
-  .result-body { padding: 0 18px 16px; display: flex; flex-direction: column; gap: 8px; }
-  .result-row { display: flex; justify-content: space-between; align-items: baseline; }
-  .result-label { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
-  .result-value { font-size: 0.85rem; color: var(--white); text-align: right; }
-
-  /* Manual entry */
-  .manual-section { margin-top: 8px; }
-  .manual-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); margin-bottom: 8px; }
-  .manual-row { display: flex; gap: 8px; }
-  .manual-input { flex: 1; background: var(--surface); border: 1px solid var(--border2); border-radius: 8px; padding: 11px 14px; color: var(--white); font-family: monospace; font-size: 0.8rem; outline: none; transition: border-color 0.15s; }
-  .manual-input:focus { border-color: rgba(255,255,255,0.35); }
-  .manual-input::placeholder { color: var(--faint); }
-  .btn { padding: 11px 18px; border-radius: 8px; font-family: var(--sans); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; border: none; cursor: pointer; transition: opacity 0.15s; white-space: nowrap; }
-  .btn:hover { opacity: 0.82; }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-ghost { background: rgba(255,255,255,0.07); color: var(--dim); border: 1px solid var(--border2); }
-  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-
-  /* Next scan */
-  .next-btn { display: block; width: 100%; margin-top: 14px; padding: 13px; border-radius: 10px; background: rgba(255,255,255,0.07); border: 1px solid var(--border2); color: var(--dim); font-family: var(--sans); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; text-align: center; cursor: pointer; transition: background 0.15s; }
-  .next-btn:hover { background: rgba(255,255,255,0.11); color: var(--white); }
-
-  /* Tab toggle */
-  .tabs { display: flex; gap: 4px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 10px; padding: 4px; margin-bottom: 20px; }
-  .tab { flex: 1; padding: 8px; border-radius: 7px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; text-align: center; cursor: pointer; transition: background 0.15s, color 0.15s; color: var(--faint); background: transparent; border: none; font-family: var(--sans); }
-  .tab.active { background: rgba(255,255,255,0.1); color: var(--white); }
-
-  /* Spinner */
-  .spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* Scanning pulse */
-  .scan-pulse { animation: pulse 1.5s ease-in-out infinite; }
-  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-`
 
 export default function ScanPage() {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -129,12 +59,17 @@ export default function ScanPage() {
         setResult({ state: 'success', ticket: data.ticket, fresh: true })
       }
     } catch {
-      setResult({ state: 'error', message: 'Network error — check connection' })
+      setResult({
+        state: 'error',
+        message: 'Network error — check connection',
+      })
     } finally {
       setValidating(false)
       // Prevent re-scanning the same code for 4 seconds
       cooldownRef.current = true
-      setTimeout(() => { cooldownRef.current = false }, 4000)
+      setTimeout(() => {
+        cooldownRef.current = false
+      }, 4000)
     }
   }, [validating])
 
@@ -178,7 +113,11 @@ export default function ScanPage() {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 1280 } },
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 1280 },
+        },
       })
       streamRef.current = stream
       if (videoRef.current) {
@@ -186,7 +125,9 @@ export default function ScanPage() {
         await videoRef.current.play()
       }
 
-      detectorRef.current = new (window as any).BarcodeDetector({ formats: ['qr_code'] })
+      detectorRef.current = new (window as any).BarcodeDetector({
+        formats: ['qr_code'],
+      })
       setCameraActive(true)
       startScanLoop()
     } catch (err: any) {
@@ -200,7 +141,7 @@ export default function ScanPage() {
   const stopCamera = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop())
+      streamRef.current.getTracks().forEach((t) => t.stop())
       streamRef.current = null
     }
     setCameraActive(false)
@@ -221,156 +162,283 @@ export default function ScanPage() {
     } else {
       stopCamera()
     }
-    return () => { stopCamera() }
+    return () => {
+      stopCamera()
+    }
   }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const formatDate = (d: string | null) =>
-    d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null
+    d
+      ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })
+      : null
 
   const isIdle = result.state === 'idle'
   const isSuccess = result.state === 'success'
   const isError = result.state === 'error'
 
   return (
-    <>
-      <style>{STYLES}</style>
-
-      <div className="topbar">
-        <a href="/dashboard" className="back-link">← Dashboard</a>
-        <span className="page-title">Scan Tickets</span>
-        <div style={{ width: 80 }} />
+    <div className="mx-auto max-w-2xl space-y-6">
+      {/* Page header */}
+      <div>
+        <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
+          Operations
+        </p>
+        <h1 className="mb-2 font-display text-3xl font-bold leading-none text-gray-900 dark:text-white">
+          Scan Tickets
+        </h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Validate attendee tickets at the door using QR codes.
+        </p>
       </div>
 
-      <div className="content">
+      {/* Tabs */}
+      <div className="flex gap-2 rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-800 dark:bg-white/[0.02]">
+        <button
+          type="button"
+          onClick={() => {
+            setTab('camera')
+            setResult({ state: 'idle' })
+          }}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold uppercase transition ${
+            tab === 'camera'
+              ? 'bg-white text-gray-900 shadow-sm dark:bg-white/[0.1] dark:text-white'
+              : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+          }`}
+        >
+          <Camera className="h-3.5 w-3.5" />
+          Camera
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setTab('manual')
+            setResult({ state: 'idle' })
+          }}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold uppercase transition ${
+            tab === 'manual'
+              ? 'bg-white text-gray-900 shadow-sm dark:bg-white/[0.1] dark:text-white'
+              : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+          }`}
+        >
+          <Keyboard className="h-3.5 w-3.5" />
+          Manual
+        </button>
+      </div>
 
-        <div className="tabs">
-          <button className={`tab ${tab === 'camera' ? 'active' : ''}`} onClick={() => { setTab('camera'); setResult({ state: 'idle' }) }}>
-            Camera
-          </button>
-          <button className={`tab ${tab === 'manual' ? 'active' : ''}`} onClick={() => { setTab('manual'); setResult({ state: 'idle' }) }}>
-            Manual Entry
-          </button>
-        </div>
-
-        {/* Camera view */}
-        {tab === 'camera' && (
-          cameraActive ? (
-            <div className="camera-wrap">
-              <video ref={videoRef} playsInline muted />
-              <div className="camera-overlay">
-                <div className={`scan-frame ${result.state === 'scanning' ? 'scan-pulse' : ''}`} />
+      {/* Camera view */}
+      {tab === 'camera' && (
+        <>
+          {cameraActive ? (
+            <div className="relative overflow-hidden rounded-2xl bg-black">
+              <video
+                ref={videoRef}
+                playsInline
+                muted
+                className="block aspect-square w-full object-cover"
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div
+                  className={`h-3/5 w-3/5 border-2 border-white/60 rounded-xl shadow-lg ${
+                    result.state === 'scanning' ? 'animate-pulse' : ''
+                  }`}
+                />
               </div>
-              <div className="camera-hint">
-                {result.state === 'scanning' ? 'Validating…' : 'Point at ticket QR code'}
+              <div className="absolute bottom-4 left-0 right-0 text-center text-xs text-white/50">
+                {result.state === 'scanning'
+                  ? 'Validating…'
+                  : 'Point at ticket QR code'}
               </div>
             </div>
           ) : (
-            <div className="camera-off">
-              <div className="camera-off-icon">📷</div>
-              <div className="camera-off-text">
+            <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 bg-white px-6 py-16 dark:border-gray-700 dark:bg-white/[0.02]">
+              <Camera className="mb-3 h-8 w-8 text-gray-400 dark:text-gray-600" />
+              <p className="text-center text-sm text-gray-500 dark:text-gray-400">
                 {cameraSupported
                   ? 'Starting camera…'
                   : 'Camera not available on this browser.\nUse Manual Entry instead.'}
-              </div>
+              </p>
             </div>
-          )
-        )}
+          )}
+        </>
+      )}
 
-        {/* Manual entry */}
-        {tab === 'manual' && (
-          <div className="manual-section">
-            <div className="manual-label">Paste or type ticket ID</div>
-            <div className="manual-row">
-              <input
-                className="manual-input"
-                type="text"
-                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                value={manualToken}
-                onChange={e => setManualToken(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') validate(manualToken) }}
-                autoFocus
-              />
-              <button
-                className="btn btn-primary"
-                onClick={() => validate(manualToken)}
-                disabled={validating || !manualToken.trim()}
-              >
-                {validating ? <span className="spinner" /> : 'Check In'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Result */}
-        {(isSuccess || isError) && (
-          <>
-            {isSuccess && result.state === 'success' && (
-              <div className={`result-card ${result.fresh ? 'success' : 'already-used'}`}>
-                <div className="result-header">
-                  <span className="result-icon">{result.fresh ? '✅' : '⚠️'}</span>
-                  <div>
-                    <div className="result-title">
-                      {result.fresh ? 'Checked In!' : 'Already Used'}
-                    </div>
-                    <div className="result-sub">
-                      {result.fresh
-                        ? 'Ticket is valid — welcome!'
-                        : 'This ticket was already scanned'}
-                    </div>
-                  </div>
-                </div>
-                <div className="result-body">
-                  <div className="result-row">
-                    <span className="result-label">Name</span>
-                    <span className="result-value">{result.ticket.buyer_name}</span>
-                  </div>
-                  {result.ticket.tier_name && (
-                    <div className="result-row">
-                      <span className="result-label">Tier</span>
-                      <span className="result-value">{result.ticket.tier_name}</span>
-                    </div>
-                  )}
-                  {result.ticket.event_title && (
-                    <div className="result-row">
-                      <span className="result-label">Event</span>
-                      <span className="result-value" style={{ maxWidth: '60%' }}>{result.ticket.event_title}</span>
-                    </div>
-                  )}
-                  {result.ticket.event_date && (
-                    <div className="result-row">
-                      <span className="result-label">Date</span>
-                      <span className="result-value">{formatDate(result.ticket.event_date)}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {isError && result.state === 'error' && (
-              <div className="result-card error">
-                <div className="result-header">
-                  <span className="result-icon">❌</span>
-                  <div>
-                    <div className="result-title">Invalid Ticket</div>
-                    <div className="result-sub">{result.message}</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <button className="next-btn" onClick={reset}>
-              Scan Next Ticket
-            </button>
-          </>
-        )}
-
-        {isIdle && tab === 'manual' && (
-          <p style={{ marginTop: 20, fontSize: '0.78rem', color: 'var(--faint)', lineHeight: 1.6 }}>
-            Enter the ticket ID shown below the QR code on the attendee's ticket.
+      {/* Manual entry */}
+      {tab === 'manual' && (
+        <div>
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-600 dark:text-gray-300">
+            Paste or type ticket ID
           </p>
-        )}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              value={manualToken}
+              onChange={(e) => setManualToken(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') validate(manualToken)
+              }}
+              autoFocus
+              className="flex-1 rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 font-mono text-sm text-gray-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90 dark:focus:border-brand-500 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+            />
+            <button
+              type="button"
+              onClick={() => validate(manualToken)}
+              disabled={validating || !manualToken.trim()}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2.5 font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {validating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                'Check In'
+              )}
+            </button>
+          </div>
+        </div>
+      )}
 
-      </div>
-    </>
+      {/* Result */}
+      {(isSuccess || isError) && (
+        <>
+          {isSuccess && result.state === 'success' && (
+            <div
+              className={`rounded-2xl border p-4 ${
+                result.fresh
+                  ? 'border-success-200 bg-success-50 dark:border-success-500/30 dark:bg-success-500/10'
+                  : 'border-warning-200 bg-warning-50 dark:border-warning-500/30 dark:bg-warning-500/10'
+              }`}
+            >
+              <div className="mb-3 flex items-start gap-3">
+                {result.fresh ? (
+                  <CheckCircle className="h-5 w-5 shrink-0 text-success-600 dark:text-success-400" />
+                ) : (
+                  <AlertCircle className="h-5 w-5 shrink-0 text-warning-600 dark:text-warning-400" />
+                )}
+                <div>
+                  <p
+                    className={`font-semibold ${
+                      result.fresh
+                        ? 'text-success-900 dark:text-success-300'
+                        : 'text-warning-900 dark:text-warning-300'
+                    }`}
+                  >
+                    {result.fresh ? 'Checked In!' : 'Already Used'}
+                  </p>
+                  <p
+                    className={`mt-0.5 text-xs ${
+                      result.fresh
+                        ? 'text-success-700 dark:text-success-400'
+                        : 'text-warning-700 dark:text-warning-400'
+                    }`}
+                  >
+                    {result.fresh
+                      ? 'Ticket is valid — welcome!'
+                      : 'This ticket was already scanned'}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-1.5 text-sm">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-gray-400">
+                    Name
+                  </span>
+                  <span
+                    className={
+                      result.fresh
+                        ? 'text-success-900 dark:text-success-200'
+                        : 'text-warning-900 dark:text-warning-200'
+                    }
+                  >
+                    {result.ticket.buyer_name}
+                  </span>
+                </div>
+                {result.ticket.tier_name && (
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-gray-400">
+                      Tier
+                    </span>
+                    <span
+                      className={
+                        result.fresh
+                          ? 'text-success-900 dark:text-success-200'
+                          : 'text-warning-900 dark:text-warning-200'
+                      }
+                    >
+                      {result.ticket.tier_name}
+                    </span>
+                  </div>
+                )}
+                {result.ticket.event_title && (
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-gray-400">
+                      Event
+                    </span>
+                    <span
+                      className={`max-w-[60%] text-right ${
+                        result.fresh
+                          ? 'text-success-900 dark:text-success-200'
+                          : 'text-warning-900 dark:text-warning-200'
+                      }`}
+                    >
+                      {result.ticket.event_title}
+                    </span>
+                  </div>
+                )}
+                {result.ticket.event_date && (
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-gray-400">
+                      Date
+                    </span>
+                    <span
+                      className={
+                        result.fresh
+                          ? 'text-success-900 dark:text-success-200'
+                          : 'text-warning-900 dark:text-warning-200'
+                      }
+                    >
+                      {formatDate(result.ticket.event_date)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {isError && result.state === 'error' && (
+            <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4 dark:border-brand-500/30 dark:bg-brand-500/10">
+              <div className="flex items-start gap-3">
+                <XCircle className="h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400" />
+                <div>
+                  <p className="font-semibold text-brand-900 dark:text-brand-300">
+                    Invalid Ticket
+                  </p>
+                  <p className="mt-0.5 text-xs text-brand-700 dark:text-brand-400">
+                    {result.message}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={reset}
+            className="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
+          >
+            Scan Next Ticket
+          </button>
+        </>
+      )}
+
+      {isIdle && tab === 'manual' && (
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Enter the ticket ID shown below the QR code on the attendee&apos;s
+          ticket.
+        </p>
+      )}
+    </div>
   )
 }

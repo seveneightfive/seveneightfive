@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabaseBrowser'
 import ImageUpload from '@/app/dashboard/edit/ImageUpload'
-import { Suspense } from 'react'
 import TicketTiersEditor from '@/app/components/TicketTiersEditor'
+import { Loader2, AlertCircle, Check, X, Trash2 } from 'lucide-react'
 
 const EVENT_TYPES = [
   'Live Music', 'Art', 'Entertainment', 'Lifestyle',
@@ -71,14 +71,12 @@ function EventEditInner() {
   const [userId, setUserId] = useState<string | null>(null)
   const [stripeAccountStatus, setStripeAccountStatus] = useState<string | null>(null)
 
-  // Venue picker
   const [venueSearch, setVenueSearch] = useState('')
   const [venueOptions, setVenueOptions] = useState<VenueOption[]>([])
   const [selectedVenueName, setSelectedVenueName] = useState('')
   const [venueDropOpen, setVenueDropOpen] = useState(false)
   const venueDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Artist management
   const [linkedArtists, setLinkedArtists] = useState<LinkedArtist[]>([])
   const [artistSearch, setArtistSearch] = useState('')
   const [artistOptions, setArtistOptions] = useState<{ id: string; name: string }[]>([])
@@ -100,7 +98,6 @@ function EventEditInner() {
       if (!user) { router.push('/login'); return }
       setUserId(user.id)
 
-      // Fetch stripe status for ticket tier editor
       const { data: profile } = await supabase
         .from('profiles')
         .select('stripe_account_status')
@@ -117,7 +114,6 @@ function EventEditInner() {
 
         if (!data) { router.push('/dashboard/events'); return }
 
-        // Check access: creator, venue owner, or featured artist
         let hasAccess = data.auth_user_id === user.id
         if (!hasAccess && data.venue_id) {
           const { data: ownedVenue } = await supabase
@@ -155,7 +151,6 @@ function EventEditInner() {
           venue_id: data.venue_id || '',
         })
 
-        // Load linked artists
         const { data: links } = await supabase
           .from('event_artists')
           .select('artist_id, artists(name, slug)')
@@ -173,7 +168,6 @@ function EventEditInner() {
     load()
   }, [isNew, eventId, router])
 
-  // Venue search
   useEffect(() => {
     if (!venueSearch.trim() || venueSearch === selectedVenueName) {
       setVenueOptions([])
@@ -193,7 +187,6 @@ function EventEditInner() {
     }, 250)
   }, [venueSearch, selectedVenueName])
 
-  // Artist search
   useEffect(() => {
     if (!artistSearch.trim()) {
       setArtistOptions([])
@@ -220,7 +213,6 @@ function EventEditInner() {
     setArtistSearch('')
 
     if (!form.id && isNew) {
-      // If event not saved yet, queue to link after save
       setLinkedArtists(prev => [...prev, { artist_id: artistId, name: artistName, slug: null }])
       return
     }
@@ -280,7 +272,6 @@ function EventEditInner() {
       newEventId = json.id
       setForm(f => ({ ...f, id: json.id }))
 
-      // Link queued artists
       for (const a of linkedArtists) {
         await fetch('/api/event/artist', {
           method: 'POST',
@@ -300,13 +291,10 @@ function EventEditInner() {
 
     setSaving(false)
     setSaved(true)
-    // For a brand-new event, redirect to the edit page so tier editor appears
     if (newEventId) {
       router.push(`/dashboard/events/edit?id=${newEventId}`)
       return
     }
-    // For an existing event, keep success banner visible — user sees it
-    // and can navigate using the buttons that now appear
   }
     
   const handleDelete = async () => {
@@ -318,407 +306,250 @@ function EventEditInner() {
     router.push('/dashboard/events')
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '10px 14px',
-    background: 'rgba(255,255,255,0.06)',
-    border: '1.5px solid rgba(255,255,255,0.12)',
-    borderRadius: 8,
-    color: '#fff',
-    fontFamily: "'DM Sans', system-ui, sans-serif",
-    fontSize: '0.9rem',
-    outline: 'none',
-  }
+  if (loading) return <LoadingState />
 
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    fontSize: '0.68rem',
-    fontWeight: 600,
-    letterSpacing: '0.14em',
-    textTransform: 'uppercase',
-    color: 'rgba(255,255,255,0.35)',
-    marginBottom: 6,
-  }
-
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#1a1814', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {[0, 1, 2].map(i => (
-            <span key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'block', animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />
-          ))}
-        </div>
-      </div>
-    )
-  }
+  const inputCls = 'w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90 dark:focus:border-brand-500 placeholder:text-gray-400 dark:placeholder:text-gray-500'
 
   return (
-    <>
-      <style>{`
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { background: #1a1814; color: #fff; font-family: 'DM Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-        @keyframes pulse { 0%,80%,100%{opacity:0.3;transform:scale(0.85)}40%{opacity:1;transform:scale(1)} }
-        input:focus, select:focus, textarea:focus { border-color: rgba(200,6,80,0.6) !important; }
-        select option { background: #2a2420; }
-        .type-chip { padding: 6px 14px; border-radius: 100px; border: 1.5px solid rgba(255,255,255,0.12); background: transparent; font-family: 'DM Sans', sans-serif; font-size: 0.76rem; font-weight: 500; color: rgba(255,255,255,0.4); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
-        .type-chip.active { background: rgba(200,6,80,0.15); border-color: rgba(200,6,80,0.5); color: #FFCE03; }
-        .dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #2a2420; border: 1.5px solid rgba(255,255,255,0.12); border-radius: 8px; z-index: 50; overflow: hidden; }
-        .dropdown-item { padding: 10px 14px; cursor: pointer; font-size: 0.88rem; transition: background 0.1s; }
-        .dropdown-item:hover { background: rgba(255,255,255,0.08); }
-        .artist-tag { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 100px; font-size: 0.8rem; color: rgba(255,255,255,0.7); margin: 4px; }
-        .artist-tag button { background: none; border: none; color: rgba(255,255,255,0.3); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0; }
-        .artist-tag button:hover { color: rgba(200,6,80,0.8); }
-        .section-head { font-family: 'Oswald', sans-serif; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(255,255,255,0.25); margin: 32px 0 16px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-      `}</style>
-
-      <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 24px 80px' }}>
-        {/* Top bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 32 }}>
-          <a href="/dashboard/events" style={{ fontFamily: "'Oswald', sans-serif", fontSize: '0.72rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', textDecoration: 'none' }}>
-            ← My Events
-          </a>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: '0.72rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)' }}>
-              {isNew ? 'Add Event' : 'Edit Event'}
-            </span>
-            {!isNew && (
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                style={{
-                  padding: '5px 12px',
-                  background: 'transparent',
-                  border: '1px solid rgba(200,6,80,0.25)',
-                  borderRadius: 6,
-                  color: 'rgba(200,6,80,0.45)',
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontSize: '0.72rem',
-                  cursor: deleting ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.15s',
-                }}
-              >
-                {deleting ? '…' : 'Delete'}
-              </button>
-            )}
-          </div>
+    <div className="mx-auto max-w-3xl space-y-6">
+      {/* Sticky header */}
+      <div className="sticky top-[72px] z-30 -mx-4 flex items-center justify-between gap-4 border-b border-gray-200 bg-white/95 px-4 py-4 backdrop-blur md:-mx-6 md:px-6 dark:border-gray-800 dark:bg-gray-900/95">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
+            Creator
+          </p>
+          <h1 className="font-display text-2xl font-bold leading-none text-gray-900 dark:text-white">
+            {isNew ? 'Add Event' : 'Edit Event'}
+          </h1>
         </div>
-
-        <h1 style={{ fontFamily: "'Oswald', sans-serif", fontSize: '1.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
-          {isNew ? 'Add New Event' : form.title || 'Edit Event'}
-        </h1>
-        <p style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.35)', marginBottom: 36 }}>
-          {isNew ? 'Fill in the details below. Changes will be live on the public events directory.' : 'Update event details below.'}
-        </p>
-
-        {/* ── BASICS ── */}
-        <div className="section-head">Event Details</div>
-
-        <div style={{ marginBottom: 20 }}>
-          <label style={labelStyle}>Event Title *</label>
-          <input style={inputStyle} value={form.title} onChange={e => set('title', e.target.value)} placeholder="e.g. Jazz Night at The Gem" />
-        </div>
-
-        <div style={{ marginBottom: 20 }}>
-          <label style={labelStyle}>Description</label>
-          <textarea
-            style={{ ...inputStyle, minHeight: 100, resize: 'vertical', lineHeight: 1.5 }}
-            value={form.description}
-            onChange={e => set('description', e.target.value)}
-            placeholder="Short description of the event..."
-          />
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 20 }}>
-          <div>
-            <label style={labelStyle}>Date *</label>
-            <input style={inputStyle} type="date" value={form.event_date} onChange={e => set('event_date', e.target.value)} />
-          </div>
-          <div>
-            <label style={labelStyle}>Start Time</label>
-            <input style={inputStyle} type="time" value={form.event_start_time} onChange={e => set('event_start_time', e.target.value)} />
-          </div>
-          <div>
-            <label style={labelStyle}>End Time</label>
-            <input style={inputStyle} type="time" value={form.event_end_time} onChange={e => set('event_end_time', e.target.value)} />
-          </div>
-        </div>
-
-        {/* Venue Picker */}
-        <div style={{ marginBottom: 20, position: 'relative' }}>
-          <label style={labelStyle}>Venue</label>
-          <input
-            style={inputStyle}
-            value={venueSearch}
-            onChange={e => { setVenueSearch(e.target.value); if (!e.target.value) { set('venue_id', ''); setSelectedVenueName('') } }}
-            placeholder="Search venues..."
-            autoComplete="off"
-          />
-          {venueDropOpen && venueOptions.length > 0 && (
-            <div className="dropdown">
-              {venueOptions.map(v => (
-                <div
-                  key={v.id}
-                  className="dropdown-item"
-                  onClick={() => {
-                    set('venue_id', v.id)
-                    setSelectedVenueName(v.name)
-                    setVenueSearch(v.name)
-                    setVenueDropOpen(false)
-                  }}
-                >
-                  <span style={{ fontWeight: 500 }}>{v.name}</span>
-                  {v.neighborhood && <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', marginLeft: 8 }}>{v.neighborhood}</span>}
-                </div>
-              ))}
-            </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          {!isNew && (
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="inline-flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5 font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/15"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Delete
+            </button>
           )}
         </div>
+      </div>
 
-        {/* ── EVENT TYPES ── */}
-        <div className="section-head">Event Type</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+      {/* Page intro */}
+      <div>
+        <h2 className="mb-1 font-display text-xl font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+          {isNew ? 'Create New Event' : form.title || 'Edit Event'}
+        </h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          {isNew ? 'Fill in the details. Changes will be live on the public events directory.' : 'Update event details below.'}
+        </p>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div className="flex gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {error}
+        </div>
+      )}
+
+      {/* Card: Event Details */}
+      <Card>
+        <h3 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+          Event Details
+        </h3>
+
+        <Field label="Event Title *">
+          <input type="text" value={form.title} onChange={e => set('title', e.target.value)} placeholder="e.g. Jazz Night at The Gem" className={inputCls} />
+        </Field>
+
+        <Field label="Description">
+          <textarea value={form.description} onChange={e => set('description', e.target.value)} placeholder="Short description…" rows={4} className={`${inputCls} resize-y leading-relaxed`} />
+        </Field>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Field label="Date *">
+            <input type="date" value={form.event_date} onChange={e => set('event_date', e.target.value)} className={inputCls} />
+          </Field>
+          <Field label="Start Time">
+            <input type="time" value={form.event_start_time} onChange={e => set('event_start_time', e.target.value)} className={inputCls} />
+          </Field>
+          <Field label="End Time">
+            <input type="time" value={form.event_end_time} onChange={e => set('event_end_time', e.target.value)} className={inputCls} />
+          </Field>
+        </div>
+
+        <Field label="Venue">
+          <div className="relative">
+            <input type="text" value={venueSearch} onChange={e => { setVenueSearch(e.target.value); if (!e.target.value) { set('venue_id', ''); setSelectedVenueName('') } }} placeholder="Search venues…" autoComplete="off" className={inputCls} />
+            {venueDropOpen && venueOptions.length > 0 && (
+              <div className="absolute top-[calc(100%+4px)] left-0 right-0 z-50 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
+                {venueOptions.map(v => (
+                  <button key={v.id} type="button" onClick={() => { set('venue_id', v.id); setSelectedVenueName(v.name); setVenueSearch(v.name); setVenueDropOpen(false); }} className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 dark:hover:bg-white/[0.05]">
+                    <span className="font-semibold text-gray-900 dark:text-white">{v.name}</span>
+                    {v.neighborhood && <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">{v.neighborhood}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </Field>
+      </Card>
+
+      {/* Card: Event Types */}
+      <Card>
+        <h3 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+          Event Type
+        </h3>
+        <div className="flex flex-wrap gap-2">
           {EVENT_TYPES.map(t => (
-            <button
-              key={t}
-              type="button"
-              className={`type-chip ${form.event_types.includes(t) ? 'active' : ''}`}
-              onClick={() => toggleType(t)}
-            >
+            <button key={t} type="button" onClick={() => toggleType(t)} className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${form.event_types.includes(t) ? 'border-brand-600 bg-brand-600 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-400 dark:hover:border-gray-600'}`}>
               {t}
             </button>
           ))}
         </div>
+      </Card>
 
-        {/* ── IMAGE ── */}
-        <div className="section-head">Event Image</div>
-        <div style={{ marginBottom: 20 }}>
-          {form.image_url && (
-            <img src={form.image_url} alt="" style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', borderRadius: 8, marginBottom: 8, opacity: 0.8 }} />
-          )}
-          <input
-            style={{ ...inputStyle, marginBottom: 6 }}
-            placeholder="https://... or upload below"
-            value={form.image_url}
-            onChange={e => set('image_url', e.target.value)}
-          />
-          <ImageUpload
-            artistId={userId || 'event'}
-            field="event"
-            currentUrl={form.image_url}
-            onUploaded={url => set('image_url', url)}
-            bucket="event-images"
-          />
+      {/* Card: Image */}
+      <Card>
+        <h3 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+          Event Image
+        </h3>
+        {form.image_url && <img src={form.image_url} alt="" className="mb-3 block aspect-video w-full rounded-lg bg-gray-100 object-cover dark:bg-white/[0.04]" />}
+        <input type="url" value={form.image_url} onChange={e => set('image_url', e.target.value)} placeholder="https://… or upload below" className={`${inputCls} mb-2`} />
+        <ImageUpload artistId={userId || 'event'} field="event" currentUrl={form.image_url} onUploaded={url => set('image_url', url)} bucket="event-images" />
+      </Card>
+
+      {/* Card: Tickets & Links */}
+      <Card>
+        <h3 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+          Tickets & Links
+        </h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Ticket Price ($)">
+            <input type="number" min="0" step="0.01" value={form.ticket_price} onChange={e => set('ticket_price', e.target.value)} placeholder="0 = Free" className={inputCls} />
+          </Field>
+          <Field label="Ticket URL">
+            <input type="url" value={form.ticket_url} onChange={e => set('ticket_url', e.target.value)} placeholder="https://…" className={inputCls} />
+          </Field>
         </div>
-
-        {/* ── TICKETS & LINKS ── */}
-        <div className="section-head">Tickets & Links</div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginBottom: 20 }}>
-          <div>
-            <label style={labelStyle}>Ticket Price ($)</label>
-            <input
-              style={inputStyle}
-              type="number"
-              min="0"
-              step="0.01"
-              value={form.ticket_price}
-              onChange={e => set('ticket_price', e.target.value)}
-              placeholder="0 = Free"
-            />
+        <Field label="Learn More / Website">
+          <input type="url" value={form.learnmore_link} onChange={e => set('learnmore_link', e.target.value)} placeholder="https://…" className={inputCls} />
+        </Field>
+        <label className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-white/[0.02]">
+          <input type="checkbox" checked={form.star} onChange={e => set('star', e.target.checked)} className="h-4 w-4 accent-brand-600" />
+          <div className="flex-1">
+            <span className="text-sm font-semibold text-gray-900 dark:text-white">Feature this event</span>
+            <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">Shows in Featured section</span>
           </div>
-          <div>
-            <label style={labelStyle}>Ticket URL</label>
-            <input style={inputStyle} type="url" value={form.ticket_url} onChange={e => set('ticket_url', e.target.value)} placeholder="https://..." />
-          </div>
-        </div>
+        </label>
+      </Card>
 
-        <div style={{ marginBottom: 20 }}>
-          <label style={labelStyle}>Learn More / Website Link</label>
-          <input style={inputStyle} type="url" value={form.learnmore_link} onChange={e => set('learnmore_link', e.target.value)} placeholder="https://..." />
-        </div>
-
-        {/* Star toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, padding: '12px 16px', background: 'rgba(255,255,255,0.04)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)' }}>
-          <input
-            type="checkbox"
-            id="star"
-            checked={form.star}
-            onChange={e => set('star', e.target.checked)}
-            style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#C80650' }}
-          />
-          <label htmlFor="star" style={{ cursor: 'pointer', fontSize: '0.88rem', color: 'rgba(255,255,255,0.6)' }}>
-            <span style={{ fontWeight: 500 }}>Feature this event</span>
-            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.78rem', marginLeft: 8 }}>Shows in the Featured Events section</span>
-          </label>
-        </div>
-
-        {/* ── ARTISTS ── */}
-        <div className="section-head">Featured Artists</div>
-
+      {/* Card: Featured Artists */}
+      <Card>
+        <h3 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+          Featured Artists
+        </h3>
         {linkedArtists.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
+          <div className="mb-3 flex flex-wrap gap-1.5">
             {linkedArtists.map(a => (
-              <span key={a.artist_id} className="artist-tag">
+              <span key={a.artist_id} className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs dark:border-gray-800 dark:bg-white/[0.03]">
                 {a.name}
-                <button type="button" onClick={() => removeArtist(a.artist_id)}>×</button>
+                <button type="button" onClick={() => removeArtist(a.artist_id)} className="text-gray-400 hover:text-brand-600 dark:hover:text-brand-400">
+                  <X className="h-3 w-3" />
+                </button>
               </span>
             ))}
           </div>
         )}
-
-        <div style={{ position: 'relative', marginBottom: 20 }}>
-          <input
-            style={inputStyle}
-            value={artistSearch}
-            onChange={e => setArtistSearch(e.target.value)}
-            placeholder="Search artist name to add..."
-            autoComplete="off"
-          />
+        <div className="relative">
+          <input type="text" value={artistSearch} onChange={e => setArtistSearch(e.target.value)} placeholder="Search artist name…" autoComplete="off" className={inputCls} />
           {artistDropOpen && artistOptions.length > 0 && (
-            <div className="dropdown">
+            <div className="absolute top-[calc(100%+4px)] left-0 right-0 z-50 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
               {artistOptions.map(a => (
-                <div key={a.id} className="dropdown-item" onClick={() => addArtist(a.id, a.name)}>
+                <button key={a.id} type="button" onClick={() => addArtist(a.id, a.name)} className="w-full px-4 py-2.5 text-left text-sm text-gray-900 hover:bg-gray-50 dark:text-white dark:hover:bg-white/[0.05]">
                   {a.name}
-                </div>
+                </button>
               ))}
             </div>
           )}
         </div>
+      </Card>
 
-        {/* ── 785 TICKETS ── only on existing events */}
-        {!isNew && (form.id || eventId) && (
-          <>
-            <div className="section-head">785 Tickets</div>
-            <TicketTiersEditor
-              eventId={form.id || eventId!}
-              stripeAccountStatus={stripeAccountStatus}
-            />
-          </>
-        )}
+      {/* Ticket Tiers — only on existing events */}
+      {!isNew && (form.id || eventId) && (
+        <Card>
+          <h3 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+            785 Tickets
+          </h3>
+          <TicketTiersEditor eventId={form.id || eventId!} stripeAccountStatus={stripeAccountStatus} />
+        </Card>
+      )}
 
-        {error && (
-          <div style={{ padding: '12px 16px', background: 'rgba(200,6,80,0.12)', border: '1px solid rgba(200,6,80,0.3)', borderRadius: 8, color: '#FFCE03', fontSize: '0.85rem', marginBottom: 20 }}>
-            {error}
+      {/* Success banner */}
+      {saved && !isNew && (
+        <div className="rounded-lg border border-success-200 bg-success-50 p-4 dark:border-success-500/30 dark:bg-success-500/10">
+          <p className="mb-3 font-semibold text-success-900 dark:text-success-300">✓ Event saved</p>
+          <div className="flex flex-wrap gap-2">
+            <a href={`/dashboard/events/${form.id || eventId}/tickets`} className="inline-flex items-center gap-2 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-700 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-400">
+              Manage Tickets →
+            </a>
+            <a href="/dashboard/events" className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300">
+              All Events
+            </a>
+            <button type="button" onClick={() => setSaved(false)} className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300">
+              Keep Editing
+            </button>
           </div>
-        )}
+        </div>
+      )}
 
-        {saved && !isNew && (
-          <div style={{
-            padding: '14px 16px',
-            background: 'rgba(45,122,45,0.12)',
-            border: '1px solid rgba(126,207,126,0.4)',
-            borderRadius: 10,
-            marginBottom: 16,
-          }}>
-            <div style={{
-              color: '#7ecf7e',
-              fontFamily: "'Oswald', sans-serif",
-              fontSize: '0.78rem',
-              fontWeight: 600,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              marginBottom: 10,
-            }}>
-              ✓ Event saved
-            </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <a
-                href={`/dashboard/events/${form.id || eventId}/tickets`}
-                style={{
-                  padding: '8px 14px',
-                  background: 'rgba(255,206,3,0.12)',
-                  border: '1px solid rgba(255,206,3,0.35)',
-                  borderRadius: 6,
-                  color: '#FFCE03',
-                  fontFamily: "'Oswald', sans-serif",
-                  fontSize: '0.72rem',
-                  fontWeight: 600,
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                  textDecoration: 'none',
-                }}
-              >
-                Manage Tickets →
-              </a>
-              <a
-                href="/dashboard/events"
-                style={{
-                  padding: '8px 14px',
-                  background: 'transparent',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  borderRadius: 6,
-                  color: 'rgba(255,255,255,0.55)',
-                  fontFamily: "'Oswald', sans-serif",
-                  fontSize: '0.72rem',
-                  fontWeight: 600,
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                  textDecoration: 'none',
-                }}
-              >
-                All Events
-              </a>
-              <button
-                type="button"
-                onClick={() => setSaved(false)}
-                style={{
-                  padding: '8px 14px',
-                  background: 'transparent',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  borderRadius: 6,
-                  color: 'rgba(255,255,255,0.55)',
-                  fontFamily: "'Oswald', sans-serif",
-                  fontSize: '0.72rem',
-                  fontWeight: 600,
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                }}
-              >
-                Keep Editing
-              </button>
-            </div>
-          </div>
-        )}
-
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          style={{
-            width: '100%',
-            padding: '14px',
-            background: saved ? 'rgba(45,122,45,0.2)' : 'rgba(200,6,80,0.15)',
-            border: `1.5px solid ${saved ? 'rgba(45,122,45,0.4)' : 'rgba(200,6,80,0.4)'}`,
-            borderRadius: 10,
-            color: saved ? '#7ecf7e' : '#FFCE03',
-            fontFamily: "'Oswald', sans-serif",
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            cursor: saving ? 'not-allowed' : 'pointer',
-            transition: 'all 0.2s',
-          }}
-        >
-          {saving ? 'Saving…' : saved ? 'Saved ✓' : isNew ? 'Create Event' : 'Save Changes'}
-        </button>
-      </div>
-    </>
+      {/* Bottom save button */}
+      <button onClick={handleSave} disabled={saving} className="w-full rounded-lg bg-brand-600 px-4 py-3.5 font-display text-sm font-semibold uppercase tracking-wider text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50">
+        {saving ? 'Saving…' : isNew ? 'Create Event' : 'Save Changes'}
+      </button>
+    </div>
   )
 }
 
 export default function EventEditPage() {
   return (
-    <Suspense fallback={
-      <div style={{ minHeight: '100vh', background: '#1a1814', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {[0, 1, 2].map(i => (
-            <span key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'block' }} />
-          ))}
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<LoadingState />}>
       <EventEditInner />
     </Suspense>
+  )
+}
+
+// ─── Components ───────────────────────────────────────────────────────────
+
+function Card({ children }: { children: React.ReactNode }) {
+  return <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">{children}</div>
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
+        {label}
+      </label>
+      {children}
+    </div>
+  )
+}
+
+function LoadingState() {
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+    </div>
   )
 }

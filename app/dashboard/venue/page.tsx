@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabaseBrowser'
 import ImageUpload from '@/app/dashboard/edit/ImageUpload'
+import { Check, Image as ImageIcon } from 'lucide-react'
 
 type Venue = {
   id: string
@@ -18,20 +19,45 @@ type Venue = {
 }
 
 const VENUE_TYPES = [
-  'Bar / Lounge', 'Concert Venue', 'Restaurant', 'Art Gallery',
-  'Outdoor / Park', 'Theater', 'Community Space', 'Brewery / Taproom',
-  'Hotel / Event Space', 'Club / Nightclub', 'Coffee Shop', 'Other',
+  'Bar / Lounge',
+  'Concert Venue',
+  'Restaurant',
+  'Art Gallery',
+  'Outdoor / Park',
+  'Theater',
+  'Community Space',
+  'Brewery / Taproom',
+  'Hotel / Event Space',
+  'Club / Nightclub',
+  'Coffee Shop',
+  'Other',
 ]
 
-export default function VenueDashboard() {
+export default function VenuePage() {
   return (
-    <Suspense fallback={<div style={{ minHeight: '100vh', background: '#1a1814' }} />}>
-      <VenueDashboardInner />
+    <Suspense fallback={<LoadingState />}>
+      <VenuePageInner />
     </Suspense>
   )
 }
 
-function VenueDashboardInner() {
+function LoadingState() {
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex gap-2">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="h-2 w-2 animate-pulse rounded-full bg-gray-300 dark:bg-gray-700"
+            style={{ animationDelay: `${i * 0.15}s` }}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function VenuePageInner() {
   const router = useRouter()
   const params = useSearchParams()
   const venueId = params.get('id')
@@ -45,29 +71,39 @@ function VenueDashboardInner() {
   useEffect(() => {
     async function load() {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
 
       const query = supabase
         .from('venues')
-        .select('id, name, address, neighborhood, city, state, website, venue_type, image_url')
+        .select(
+          'id, name, address, neighborhood, city, state, website, venue_type, image_url'
+        )
         .eq('auth_user_id', user.id)
 
       const { data } = venueId
         ? await query.eq('id', venueId).single()
         : await query.single()
 
-      if (!data) { router.push('/dashboard'); return }
+      if (!data) {
+        router.push('/dashboard')
+        return
+      }
 
       setVenue(data as Venue)
       setForm(data as Venue)
       setLoading(false)
     }
     load()
-  }, [router])
+  }, [router, venueId])
 
   const set = (field: keyof Venue, value: string | string[] | null) =>
-    setForm(f => f ? { ...f, [field]: value } : f)
+    setForm((f) => (f ? { ...f, [field]: value } : f))
 
   const handleSave = async () => {
     if (!form) return
@@ -91,102 +127,70 @@ function VenueDashboardInner() {
     }
   }
 
-  if (loading || !form) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#1a1814', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {[0, 1, 2].map(i => (
-            <span key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'block', animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '10px 14px',
-    background: 'rgba(255,255,255,0.06)',
-    border: '1.5px solid rgba(255,255,255,0.12)',
-    borderRadius: 8,
-    color: '#fff',
-    fontFamily: "'DM Sans', system-ui, sans-serif",
-    fontSize: '0.9rem',
-    outline: 'none',
-  }
-
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    fontSize: '0.68rem',
-    fontWeight: 600,
-    letterSpacing: '0.14em',
-    textTransform: 'uppercase',
-    color: 'rgba(255,255,255,0.35)',
-    marginBottom: 6,
-  }
-
-  const fieldStyle: React.CSSProperties = { marginBottom: 20 }
+  if (loading || !form) return <LoadingState />
 
   return (
-    <>
-      <style>{`
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { background: #1a1814; color: #fff; font-family: 'DM Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-        @keyframes pulse { 0%,80%,100%{opacity:0.3;transform:scale(0.85)}40%{opacity:1;transform:scale(1)} }
-        input:focus, select:focus, textarea:focus { border-color: rgba(200,6,80,0.6) !important; }
-        select option { background: #2a2420; }
-      `}</style>
-
-      <div style={{ maxWidth: 600, margin: '0 auto', padding: '0 24px 80px' }}>
-        {/* Top bar */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 32 }}>
-          <a href="/dashboard" style={{ fontFamily: "'Oswald', sans-serif", fontSize: '0.72rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', textDecoration: 'none' }}>
-            ← Dashboard
-          </a>
-          <span style={{ fontFamily: "'Oswald', sans-serif", fontSize: '0.72rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)' }}>
-            Venue Editor
-          </span>
-        </div>
-
-        <h1 style={{ fontFamily: "'Oswald', sans-serif", fontSize: '1.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
+    <div className="mx-auto max-w-2xl space-y-6">
+      {/* Page header */}
+      <div>
+        <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
+          Creator
+        </p>
+        <h1 className="mb-2 font-display text-3xl font-bold leading-none text-gray-900 dark:text-white">
           {venue?.name}
         </h1>
-        <p style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.35)', marginBottom: 40 }}>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           Edit your venue details. Changes appear on the public venues directory.
         </p>
+      </div>
 
+      {/* Form */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
         {/* Image */}
-        <div style={fieldStyle}>
-          <span style={labelStyle}>Venue Image</span>
+        <Field label="Venue Image" hint="Full-width image (recommended: landscape, 1200px+ wide)">
           {form.image_url && (
-            <img src={form.image_url} alt="" style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', borderRadius: 8, marginBottom: 8, opacity: 0.8 }} />
+            <img
+              src={form.image_url}
+              alt=""
+              className="mb-2 block aspect-video w-full rounded-lg bg-gray-100 object-cover dark:bg-white/[0.04]"
+            />
           )}
           <input
-            style={{ ...inputStyle, marginBottom: 6 }}
-            placeholder="https://... or upload below"
+            type="url"
+            placeholder="https://… or upload below"
             value={form.image_url || ''}
-            onChange={e => set('image_url', e.target.value)}
+            onChange={(e) => set('image_url', e.target.value)}
+            className={inputCls}
           />
-          <ImageUpload
-            artistId={form.id}
-            field="hero"
-            currentUrl={form.image_url || ''}
-            onUploaded={url => set('image_url', url)}
-            bucket="venue-images"
-          />
-        </div>
+          <div className="mt-2">
+            <ImageUpload
+              artistId={form.id}
+              field="hero"
+              currentUrl={form.image_url || ''}
+              onUploaded={(url) => set('image_url', url)}
+              bucket="venue-images"
+            />
+          </div>
+        </Field>
+
+        <Divider />
 
         {/* Name */}
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Venue Name</label>
-          <input style={inputStyle} value={form.name} onChange={e => set('name', e.target.value)} />
-        </div>
+        <Field label="Venue Name">
+          <input
+            type="text"
+            value={form.name}
+            onChange={(e) => set('name', e.target.value)}
+            className={inputCls}
+          />
+        </Field>
+
+        <Divider />
 
         {/* Venue Type */}
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Venue Type <span style={{ fontWeight: 400, color: '#999' }}>(select all that apply)</span></label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-            {VENUE_TYPES.map(t => {
+        <Field label="Venue Type" hint="Select all that apply">
+          <div className="flex flex-wrap gap-2">
+            {VENUE_TYPES.map((t) => {
               const selected = form.venue_type?.includes(t) ?? false
               return (
                 <button
@@ -194,80 +198,135 @@ function VenueDashboardInner() {
                   type="button"
                   onClick={() => {
                     const current = form.venue_type || []
-                    set('venue_type', selected ? current.filter(v => v !== t) : [...current, t])
+                    set(
+                      'venue_type',
+                      selected ? current.filter((v) => v !== t) : [...current, t]
+                    )
                   }}
-                  style={{
-                    padding: '6px 14px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 500,
-                    cursor: 'pointer', border: selected ? '1.5px solid #1a1814' : '1.5px solid #ddd',
-                    background: selected ? '#1a1814' : '#fff', color: selected ? '#fff' : '#555',
-                    transition: 'all 0.15s',
-                  }}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                    selected
+                      ? 'border-brand-600 bg-brand-600 text-white'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-400 dark:hover:border-gray-600'
+                  }`}
                 >
                   {t}
                 </button>
               )
             })}
           </div>
-        </div>
+        </Field>
+
+        <Divider />
 
         {/* Address */}
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Street Address</label>
-          <input style={inputStyle} value={form.address || ''} onChange={e => set('address', e.target.value)} />
-        </div>
+        <Field label="Street Address">
+          <input
+            type="text"
+            value={form.address || ''}
+            onChange={(e) => set('address', e.target.value)}
+            className={inputCls}
+          />
+        </Field>
 
         {/* Neighborhood */}
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Neighborhood / Area</label>
-          <input style={inputStyle} value={form.neighborhood || ''} onChange={e => set('neighborhood', e.target.value)} />
-        </div>
+        <Field label="Neighborhood / Area">
+          <input
+            type="text"
+            value={form.neighborhood || ''}
+            onChange={(e) => set('neighborhood', e.target.value)}
+            className={inputCls}
+          />
+        </Field>
 
         {/* City / State */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12, marginBottom: 20 }}>
-          <div>
-            <label style={labelStyle}>City</label>
-            <input style={inputStyle} value={form.city || ''} onChange={e => set('city', e.target.value)} />
-          </div>
-          <div>
-            <label style={labelStyle}>State</label>
-            <input style={inputStyle} value={form.state || ''} onChange={e => set('state', e.target.value)} />
-          </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[2fr_1fr]">
+          <Field label="City">
+            <input
+              type="text"
+              value={form.city || ''}
+              onChange={(e) => set('city', e.target.value)}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="State">
+            <input
+              type="text"
+              value={form.state || ''}
+              onChange={(e) => set('state', e.target.value)}
+              className={inputCls}
+            />
+          </Field>
         </div>
 
         {/* Website */}
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Website</label>
-          <input style={inputStyle} type="url" value={form.website || ''} onChange={e => set('website', e.target.value)} placeholder="https://..." />
-        </div>
+        <Field label="Website">
+          <input
+            type="url"
+            value={form.website || ''}
+            onChange={(e) => set('website', e.target.value)}
+            placeholder="https://…"
+            className={inputCls}
+          />
+        </Field>
 
+        {/* Error */}
         {error && (
-          <div style={{ padding: '12px 16px', background: 'rgba(200,6,80,0.12)', border: '1px solid rgba(200,6,80,0.3)', borderRadius: 8, color: '#ff9ab0', fontSize: '0.85rem', marginBottom: 20 }}>
+          <div className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400">
             {error}
           </div>
         )}
 
+        {/* Save button */}
         <button
           onClick={handleSave}
           disabled={saving}
-          style={{
-            width: '100%',
-            padding: '14px',
-            background: saved ? 'rgba(45,122,45,0.2)' : 'rgba(200,6,80,0.15)',
-            border: `1.5px solid ${saved ? 'rgba(45,122,45,0.4)' : 'rgba(200,6,80,0.4)'}`,
-            borderRadius: 10,
-            color: saved ? '#7ecf7e' : '#ff9ab0',
-            fontFamily: "'Oswald', sans-serif",
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            cursor: saving ? 'not-allowed' : 'pointer',
-            transition: 'all 0.2s',
-          }}
+          className={`w-full rounded-lg px-4 py-3.5 font-display text-sm font-semibold uppercase tracking-wider text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
+            saved ? 'bg-success-600 hover:bg-success-700' : 'bg-brand-600 hover:bg-brand-700'
+          }`}
         >
-          {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save Changes'}
+          {saving ? (
+            'Saving…'
+          ) : saved ? (
+            <>
+              <Check className="mb-0.5 inline mr-1.5 h-4 w-4" />
+              Saved
+            </>
+          ) : (
+            'Save Changes'
+          )}
         </button>
       </div>
-    </>
+    </div>
   )
+}
+
+// ─── Bits ────────────────────────────────────────────────────────────────────
+
+const inputCls =
+  'w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90 dark:focus:border-brand-500 placeholder:text-gray-400 dark:placeholder:text-gray-500'
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string
+  hint?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
+        {label}
+      </label>
+      {children}
+      {hint && (
+        <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">{hint}</p>
+      )}
+    </div>
+  )
+}
+
+function Divider() {
+  return <hr className="border-t border-gray-100 dark:border-gray-800" />
 }
