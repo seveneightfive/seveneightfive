@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabaseBrowser'
-import ImageUpload from '@/app/dashboard/edit/ImageUpload'
+import EventImagePicker from './EventImagePicker'
 import TicketTiersEditor from '@/app/components/TicketTiersEditor'
 import { Loader2, AlertCircle, Check, X, Trash2 } from 'lucide-react'
 
@@ -420,14 +420,17 @@ function EventEditInner() {
       </Card>
 
       {/* Card: Image */}
-      <Card>
-        <h3 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
-          Event Image
-        </h3>
-        {form.image_url && <img src={form.image_url} alt="" className="mb-3 block aspect-video w-full rounded-lg bg-gray-100 object-cover dark:bg-white/[0.04]" />}
-        <input type="url" value={form.image_url} onChange={e => set('image_url', e.target.value)} placeholder="https://… or upload below" className={`${inputCls} mb-2`} />
-        <ImageUpload artistId={userId || 'event'} field="event" currentUrl={form.image_url} onUploaded={url => set('image_url', url)} bucket="event-images" />
-      </Card>
+<Card>
+  <h3 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+    Event Image
+  </h3>
+  <EventImagePicker
+    currentUrl={form.image_url}
+    userId={userId || 'event'}
+    onUploaded={url => set('image_url', url)}
+    onClear={() => set('image_url', '')}
+  />
+</Card>
 
       {/* Card: Tickets & Links */}
       <Card>
