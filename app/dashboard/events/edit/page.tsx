@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback, Suspense } from 'react'
+import { useEffect, useRef, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabaseBrowser'
 import EventImagePicker from './EventImagePicker'
@@ -14,6 +14,8 @@ const EVENT_TYPES = [
   'Comedy Night', 'Open Mic', 'Poetry Reading', 'Trivia Night',
   'Bingo', 'Workshop / Class', 'Film / Screening', 'Dance', 'Theater',
 ]
+
+type TicketMode = 'free' | 'external' | '785'
 
 type EventForm = {
   id?: string
@@ -63,6 +65,9 @@ function EventEditInner() {
   const isNew = !eventId
 
   const [form, setForm] = useState<EventForm>(EMPTY)
+  // Default new events to '785' since that's the most common path you want to push.
+  // For existing events, we re-infer from saved data once loaded.
+  const [ticketMode, setTicketMode] = useState<TicketMode>('785')
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -150,6 +155,13 @@ function EventEditInner() {
           star: data.star || false,
           venue_id: data.venue_id || '',
         })
+
+        // Infer ticket mode from saved data:
+        // - URL present → external
+        // - Otherwise default to 785 (user can switch to Free if no tiers)
+        setTicketMode(
+          data.ticket_url && String(data.ticket_url).trim() ? 'external' : '785'
+        )
 
         const { data: links } = await supabase
           .from('event_artists')
@@ -241,8 +253,31 @@ function EventEditInner() {
       setError('Title and date are required.')
       return
     }
+
+    // Lightweight per-mode validation
+    if (ticketMode === 'external' && !form.ticket_url.trim()) {
+      setError('Please add a Ticket URL, or switch to a different ticket option.')
+      return
+    }
+
     setSaving(true)
     setError('')
+
+    // Persist only the ticket fields relevant to the chosen mode.
+    // This prevents stale data (e.g. an old ticket_url) lingering after a mode switch.
+    const ticketFields =
+      ticketMode === 'free'
+        ? { ticket_price: 0, ticket_url: null }
+        : ticketMode === 'external'
+          ? {
+              ticket_price: form.ticket_price !== '' ? Number(form.ticket_price) : null,
+              ticket_url: form.ticket_url || null,
+            }
+          : {
+              // 785 mode: pricing comes from tiers, so clear top-level price/URL.
+              ticket_price: null,
+              ticket_url: null,
+            }
 
     const payload = {
       title: form.title,
@@ -251,8 +286,7 @@ function EventEditInner() {
       event_start_time: form.event_start_time || null,
       event_end_time: form.event_end_time || null,
       image_url: form.image_url || null,
-      ticket_price: form.ticket_price !== '' ? Number(form.ticket_price) : null,
-      ticket_url: form.ticket_url || null,
+      ...ticketFields,
       learnmore_link: form.learnmore_link || null,
       event_types: form.event_types,
       star: form.star,
@@ -296,7 +330,7 @@ function EventEditInner() {
       return
     }
   }
-    
+
   const handleDelete = async () => {
     if (!form.id) return
     if (!confirm(`Delete "${form.title}"? This cannot be undone.`)) return
@@ -420,39 +454,103 @@ function EventEditInner() {
       </Card>
 
       {/* Card: Image */}
-<Card>
-  <h3 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
-    Event Image
-  </h3>
-  <EventImagePicker
-    currentUrl={form.image_url}
-    userId={userId || 'event'}
-    onUploaded={url => set('image_url', url)}
-    onClear={() => set('image_url', '')}
-  />
-</Card>
-
-      {/* Card: Tickets & Links */}
       <Card>
         <h3 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
-          Tickets & Links
+          Event Image
         </h3>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Ticket Price ($)">
-            <input type="number" min="0" step="0.01" value={form.ticket_price} onChange={e => set('ticket_price', e.target.value)} placeholder="0 = Free" className={inputCls} />
-          </Field>
-          <Field label="Ticket URL">
-            <input type="url" value={form.ticket_url} onChange={e => set('ticket_url', e.target.value)} placeholder="https://…" className={inputCls} />
-          </Field>
+        <EventImagePicker
+          currentUrl={form.image_url}
+          userId={userId || 'event'}
+          onUploaded={url => set('image_url', url)}
+          onClear={() => set('image_url', '')}
+        />
+      </Card>
+
+      {/* Card: Tickets */}
+      <Card>
+        <h3 className="mb-1 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+          Tickets
+        </h3>
+        <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+          How are tickets handled for this event?
+        </p>
+
+        {/* Mode selector */}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {([
+            { id: 'free', label: 'Free Event', desc: 'No tickets needed' },
+            { id: 'external', label: 'Sold Elsewhere', desc: 'Eventbrite, venue site, etc.' },
+            { id: '785', label: 'Sell on 785', desc: 'Built-in ticketing' },
+          ] as const).map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => setTicketMode(opt.id)}
+              className={`rounded-lg border p-3 text-left transition ${
+                ticketMode === opt.id
+                  ? 'border-brand-600 bg-brand-50 ring-2 ring-brand-500/20 dark:bg-brand-500/10'
+                  : 'border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-white/[0.03] dark:hover:border-gray-600'
+              }`}
+            >
+              <div className="text-sm font-semibold text-gray-900 dark:text-white">{opt.label}</div>
+              <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{opt.desc}</div>
+            </button>
+          ))}
         </div>
+
+        {/* Mode-specific content */}
+        {ticketMode === 'external' && (
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Display Price ($)">
+              <input type="number" min="0" step="0.01" value={form.ticket_price} onChange={e => set('ticket_price', e.target.value)} placeholder="Optional" className={inputCls} />
+            </Field>
+            <Field label="Ticket URL *">
+              <input type="url" value={form.ticket_url} onChange={e => set('ticket_url', e.target.value)} placeholder="https://…" className={inputCls} />
+            </Field>
+          </div>
+        )}
+
+        {ticketMode === '785' && (
+          <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm dark:border-gray-700 dark:bg-white/[0.02]">
+            {isNew ? (
+              <p className="text-gray-600 dark:text-gray-400">
+                <span className="font-semibold text-gray-900 dark:text-white">Save the event first</span> — once it's created, you'll be able to add ticket tiers (General Admission, VIP, etc.) below.
+              </p>
+            ) : (
+              <p className="text-gray-600 dark:text-gray-400">
+                Ticket tiers are managed in the <span className="font-semibold text-gray-900 dark:text-white">785 Ticketing</span> section below.
+              </p>
+            )}
+          </div>
+        )}
+
+        {ticketMode === 'free' && (
+          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+            No ticket fields needed. Attendees can just show up.
+          </p>
+        )}
+      </Card>
+
+      {/* Card: Links */}
+      <Card>
+        <h3 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+          Links
+        </h3>
         <Field label="Learn More / Website">
           <input type="url" value={form.learnmore_link} onChange={e => set('learnmore_link', e.target.value)} placeholder="https://…" className={inputCls} />
         </Field>
+      </Card>
+
+      {/* Card: Visibility */}
+      <Card>
+        <h3 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+          Visibility
+        </h3>
         <label className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-white/[0.02]">
           <input type="checkbox" checked={form.star} onChange={e => set('star', e.target.checked)} className="h-4 w-4 accent-brand-600" />
           <div className="flex-1">
             <span className="text-sm font-semibold text-gray-900 dark:text-white">Feature this event</span>
-            <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">Shows in Featured section</span>
+            <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">Shows in the Featured section</span>
           </div>
         </label>
       </Card>
@@ -488,12 +586,15 @@ function EventEditInner() {
         </div>
       </Card>
 
-      {/* Ticket Tiers — only on existing events */}
-      {!isNew && (form.id || eventId) && (
+      {/* 785 Ticketing — only when the event is saved AND user picked 785 mode */}
+      {!isNew && (form.id || eventId) && ticketMode === '785' && (
         <Card>
-          <h3 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
-            785 Tickets
+          <h3 className="mb-1 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+            785 Ticketing
           </h3>
+          <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+            Set up ticket tiers (General Admission, VIP, etc.) for this event.
+          </p>
           <TicketTiersEditor eventId={form.id || eventId!} stripeAccountStatus={stripeAccountStatus} />
         </Card>
       )}
@@ -503,9 +604,11 @@ function EventEditInner() {
         <div className="rounded-lg border border-success-200 bg-success-50 p-4 dark:border-success-500/30 dark:bg-success-500/10">
           <p className="mb-3 font-semibold text-success-900 dark:text-success-300">✓ Event saved</p>
           <div className="flex flex-wrap gap-2">
-            <a href={`/dashboard/events/${form.id || eventId}/tickets`} className="inline-flex items-center gap-2 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-700 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-400">
-              Manage Tickets →
-            </a>
+            {ticketMode === '785' && (
+              <a href={`/dashboard/events/${form.id || eventId}/tickets`} className="inline-flex items-center gap-2 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-700 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-400">
+                Manage Tickets →
+              </a>
+            )}
             <a href="/dashboard/events" className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300">
               All Events
             </a>
