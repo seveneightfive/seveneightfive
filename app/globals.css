@@ -36,10 +36,10 @@
   --text-title-sm--line-height: 38px;
   --text-theme-xl: 20px;
   --text-theme-xl--line-height: 30px;
-  --text-theme-sm: 14px;
-  --text-theme-sm--line-height: 20px;
-  --text-theme-xs: 12px;
-  --text-theme-xs--line-height: 18px;
+  --text-theme-sm: 16px;
+  --text-theme-sm--line-height: 22px;
+  --text-theme-xs: 14px;
+  --text-theme-xs--line-height: 20px;
 
   --color-current: currentColor;
   --color-transparent: transparent;
