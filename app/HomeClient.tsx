@@ -223,7 +223,7 @@ export default function HomeClient({
           </p>
           <Link href="/events" className={styles.annCta}>Get Early Access</Link>
         </div>
-        */}
+      
 
         {/* ── Advertisement ── */}
         <div className={styles.adBlock}>
@@ -235,7 +235,7 @@ export default function HomeClient({
           </a>
           <div className={styles.adDeco}>♪</div>
         </div>
-        */}
+      
 
         <div className={styles.footerRule} />
         <p className={styles.footerText}>© seveneightfive magazine — Events & times subject to change</p>
