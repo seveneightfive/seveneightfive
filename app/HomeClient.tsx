@@ -215,23 +215,25 @@ export default function HomeClient({
 
         {/* ── Announcement ── */}
         <div className={styles.announcement}>
-          <h3>Summer<br />Festival <span>2026</span><br />Lineup Drops</h3>
+          <h3>Sell<br />Event <span>Tickets</span><br />Now on 785</h3>
           <p>
-            Our biggest event of the year returns June 12–14. Expect three stages, 60+ artists,
-            and the city&apos;s most vibrant outdoor experience. Early bird passes on sale March 1st
-            — limited quantities available.
+            We are proud to offer a local ticketing option to you. Save money, keep money local 
+            and receive your funds quicker then with those "other" guys. 
+            Go to "MY 785" and start the simple onboarding process. Takes about 10 minutes.
           </p>
-          <Link href="/events" className={styles.annCta}>Get Early Access</Link>
+          <Link href="/shop" className={styles.annCta}>Learn More</Link>
         </div>
       
 
         {/* ── Advertisement ── */}
         <div className={styles.adBlock}>
           <div className={styles.adEyebrow}>Sponsored</div>
-          <h3>Sound<br />Better<br />Live</h3>
-          <p>Rent professional PA systems, lighting rigs, and stage equipment from City Sound Co — starting at $99/night.</p>
-          <a href="https://example.com" target="_blank" rel="noopener noreferrer" className={styles.adBtn}>
-            Book Equipment
+          <h3>Promote<br />Your<br />Business</h3>
+          <p>Online ads for $10 a week; the perfect way to promote your upcoming event, 
+            business or service. Only available for locally owned businesses in the Topeka area. 
+          </p>
+          <a href="/advertise" target="_blank" rel="noopener noreferrer" className={styles.adBtn}>
+            Promote
           </a>
           <div className={styles.adDeco}>♪</div>
         </div>
