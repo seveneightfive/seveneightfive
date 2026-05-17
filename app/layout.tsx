@@ -28,7 +28,7 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   title: 'seveneightfive',
-  description: 'Topeka City Guide + Kansas Artists Directory',
+  description: 'Topeka Arts and Entertainment Magazine featuring Calendar of Events and Artists Directory',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
