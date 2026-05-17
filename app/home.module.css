@@ -14,7 +14,7 @@
 }
 
 .hero::before {
-  content: 'PULSE';
+  content: '785';
   position: absolute;
   right: -10px;
   top: -20px;
@@ -101,7 +101,7 @@
 
 .sectionHeader a {
   font-family: 'Oswald', sans-serif;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
   letter-spacing: 2px;
   text-transform: uppercase;
@@ -139,7 +139,7 @@
 }
 
 .eventDate {
-  min-width: 52px;
+  min-width: 50px;
   background: #0A0A0A;
   color: #ffffff;
   display: flex;
@@ -188,12 +188,12 @@
 
 .eventMeta {
   font-size: 12px;
-  font-weight: 300;
+  font-weight: 500;
   color: #AAAAAA;
 }
 
 .eventThumb {
-  width: 72px;
+  width: 137px;
   height: 72px;
   flex-shrink: 0;
   align-self: center;
@@ -264,14 +264,14 @@
 
 .artistUpcoming {
   font-size: 12px;
-  font-weight: 400;
+  font-weight: 600;
   color: #AAAAAA;
   margin-top: 2px;
 }
 
 .artistName {
   font-family: 'Oswald', sans-serif;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -320,7 +320,7 @@
 .nbhLabel {
   font-family: 'Oswald', sans-serif;
   font-size: 11px;
-  font-weight: 400;
+  font-weight: 500;
   letter-spacing: 2px;
   text-transform: uppercase;
   color: #FFCE03;
