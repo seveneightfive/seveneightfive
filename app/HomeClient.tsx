@@ -32,10 +32,10 @@ type Artist = {
 }
 
 const STATIC_NEIGHBORHOODS = [
-  { large: false, label: 'Nightlife',   name: 'Midtown Strip',     count: '18 bars',    bg: 'linear-gradient(160deg, #1a1a1a, #3d3d3d)' },
-  { large: false, label: 'Culture',     name: 'East Side',         count: '9 galleries',bg: 'linear-gradient(160deg, #2a4000, #4a7000)' },
+  { large: false, label: 'Nightlife',   name: 'Local Pubs',     count: '18 bars',    bg: 'linear-gradient(160deg, #1a1a1a, #3d3d3d)' },
+  { large: false, label: 'Culture',     name: 'The Golden Mile',         count: '9 galleries',bg: 'linear-gradient(160deg, #2a4000, #4a7000)' },
   { large: false, label: 'Visual Galleries', name: 'Art Galleries',  count: '38 galleries', href: '/topeka-art-galleries', bg: 'linear-gradient(160deg, #003c5a, #006090)' },
-  { large: false, label: 'Food & Drinks', name: 'La Plaza',        count: '22 spots',   bg: 'linear-gradient(160deg, #FFCE03, #e0a800)' },
+  { large: false, label: 'Food & Drinks', name: 'Local Flavor',        count: '22 spots',   bg: 'linear-gradient(160deg, #FFCE03, #e0a800)' },
 ]
 
 export default function HomeClient({
@@ -213,7 +213,7 @@ export default function HomeClient({
           </div>
         </section>
 
-        {/* ── Announcement ── (hidden)
+        {/* ── Announcement ── */}
         <div className={styles.announcement}>
           <h3>Summer<br />Festival <span>2026</span><br />Lineup Drops</h3>
           <p>
@@ -225,7 +225,7 @@ export default function HomeClient({
         </div>
         */}
 
-        {/* ── Advertisement ── (hidden)
+        {/* ── Advertisement ── */}
         <div className={styles.adBlock}>
           <div className={styles.adEyebrow}>Sponsored</div>
           <h3>Sound<br />Better<br />Live</h3>
