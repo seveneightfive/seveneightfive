@@ -246,7 +246,7 @@ export default function SettingsPage() {
       setUploading(false)
       return
     }
-    const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+    const { data } = supabase.storage.from('profiles').getPublicUrl(path)
     setAvatarUrl(data.publicUrl)
     setUploading(false)
     if (fileInputRef.current) fileInputRef.current.value = ''

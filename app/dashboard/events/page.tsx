@@ -65,26 +65,37 @@ function EventsPageInner() {
       }
 
       const { data: artist } = await supabase
-        .from('artists')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single()
+  .from('artists')
+  .select('id')
+  .eq('auth_user_id', user.id)
+  .single()
 
-      if (!artist) {
-        router.push('/dashboard')
-        return
-      }
+if (!artist) {
+  router.push('/dashboard')
+  return
+}
 
-      setArtistId(artist.id)
+setArtistId(artist.id)
 
-      const { data: userEvents } = await supabase
-        .from('events')
-        .select('id, title, event_date, slug, status')
-        .eq('artist_id', artist.id)
-        .order('event_date', { ascending: false })
+// Get the event IDs this artist is linked to
+const { data: links } = await supabase
+  .from('event_artists')
+  .select('event_id')
+  .eq('artist_id', artist.id)
 
-      setEvents((userEvents || []) as Event[])
-      setLoading(false)
+const eventIds = links?.map(l => l.event_id) ?? []
+
+// Then fetch those events
+const { data: userEvents } = eventIds.length
+  ? await supabase
+      .from('events')
+      .select('id, title, event_date, slug, status')
+      .in('id', eventIds)
+      .order('event_date', { ascending: false })
+  : { data: [] as Event[] }
+
+setEvents((userEvents || []) as Event[])
+setLoading(false)
     }
     load()
   }, [router])
