@@ -38,9 +38,9 @@ export function ticketConfirmationEmail(args: SendTicketEmailArgs & {
     : null
 
   const venueLine = [event.venueName, event.venueAddress, event.venueCityState]
-    .filter(Boolean)
-    .map(escapeHtml)
-    .join(' · ')
+  .filter((s): s is string => Boolean(s))
+  .map(escapeHtml)
+  .join(' · ')
 
   const heroImg = event.image_url
     ? `<img src="${escapeHtml(event.image_url)}" alt="${escapeHtml(event.title)}" width="600" style="display:block;width:100%;max-width:600px;height:auto;border-radius:12px 12px 0 0;border:0;" />`
