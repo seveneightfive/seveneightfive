@@ -1,448 +1,309 @@
-import { redirect, notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabaseServerAuth'
-import { createClient as createAdmin } from '@/lib/supabaseServer'
-import TicketTiersEditor from '@/app/components/TicketTiersEditor'
-import {
-  Ticket,
-  CheckCircle2,
-  DollarSign,
-  Wallet,
-  AlertCircle,
-  ArrowUpRight,
-  ScanLine,
-} from 'lucide-react'
+'use client'
 
-/**
- * /dashboard/events/[id]/tickets
- *
- * Per-event ticket management surface. Lives inside the dashboard shell
- * (so users keep sidebar nav) and uses Tailwind to match the rest of
- * /dashboard/*.
- *
- * Access: must be the event creator OR a venue owner whose venue hosts the
- * event OR an artist linked to the event.
- */
+import { useEffect, useState, Suspense } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabaseBrowser'
+import Link from 'next/link'
+import { Calendar, ExternalLink, Plus, Ticket, Music } from 'lucide-react'
 
-type Params = { params: Promise<{ id: string }> }
+type EventRow = {
+  id: string
+  title: string
+  event_date: string
+  slug: string | null
+  status: string
+  ticketing_enabled: boolean | null
+  source: 'created' | 'venue' | 'artist'
+}
 
-export default async function EventTicketsPage({ params }: Params) {
-  const { id: eventId } = await params
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr + 'T12:00:00')
+  return d.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect(`/login?next=/dashboard/events/${eventId}/tickets`)
-
-  const admin = createAdmin()
-
-  // Load event + verify access
-  const { data: event } = await admin
-    .from('events')
-    .select(
-      `
-      id, title, slug, event_date, ticketing_enabled,
-      auth_user_id, venue_id,
-      venues(id, name, auth_user_id)
-    `
-    )
-    .eq('id', eventId)
-    .maybeSingle()
-
-  if (!event) notFound()
-
-  let hasAccess = event.auth_user_id === user.id
-  if (!hasAccess && event.venue_id) {
-    const venue = Array.isArray(event.venues) ? event.venues[0] : event.venues
-    if (venue?.auth_user_id === user.id) hasAccess = true
-  }
-  if (!hasAccess) {
-    const { data: myArtists } = await admin
-      .from('artists')
-      .select('id')
-      .eq('auth_user_id', user.id)
-    const myArtistIds = (myArtists || []).map((a: any) => a.id)
-    if (myArtistIds.length) {
-      const { data: link } = await admin
-        .from('event_artists')
-        .select('artist_id')
-        .eq('event_id', eventId)
-        .in('artist_id', myArtistIds)
-        .limit(1)
-        .maybeSingle()
-      if (link) hasAccess = true
-    }
-  }
-  if (!hasAccess) redirect('/dashboard/events')
-
-  const { data: profile } = await admin
-    .from('profiles')
-    .select('stripe_account_status')
-    .eq('id', user.id)
-    .single()
-
-  const [{ data: tiers }, { data: tickets }] = await Promise.all([
-    admin
-      .from('ticket_tiers')
-      .select('id, name, price, quantity, quantity_sold, is_active')
-      .eq('event_id', eventId)
-      .order('sort_order'),
-    admin
-      .from('tickets')
-      .select(
-        `
-        id, buyer_name, buyer_email, amount_paid, status, payment_status,
-        created_at, ticket_tier_id,
-        ticket_tiers(name)
-      `
-      )
-      .eq('event_id', eventId)
-      .eq('payment_status', 'paid')
-      .order('created_at', { ascending: false }),
-  ])
-
-  const eventTickets = tickets || []
-  const eventTiers = tiers || []
-  const totalSold = eventTickets.length
-  const totalRevenue = eventTickets.reduce(
-    (sum, t) => sum + (parseFloat(t.amount_paid as any) || 0),
-    0
+export default function EventsPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <EventsPageInner />
+    </Suspense>
   )
-  const totalPayout = eventTickets.reduce((sum, t) => {
-    const price = parseFloat(t.amount_paid as any) || 0
-    return sum + (price - price * 0.029 - 1.0)
-  }, 0)
-  const checkedIn = eventTickets.filter((t) => t.status === 'used').length
+}
 
-  const stripeReady = profile?.stripe_account_status === 'enabled'
+function LoadingState() {
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex gap-2">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="h-2 w-2 animate-pulse rounded-full bg-gray-300 dark:bg-gray-700"
+            style={{ animationDelay: `${i * 0.15}s` }}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
 
-  const formatDate = (d: string) =>
-    new Date(d + 'T12:00:00').toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
+function EventsPageInner() {
+  const router = useRouter()
+  const [events, setEvents] = useState<EventRow[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const formatTime = (d: string) =>
-    new Date(d).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    })
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
+
+      // Fetch in parallel:
+      //   1. Events the user CREATED (events.auth_user_id = user.id)
+      //   2. Venues the user OWNS — so we can look up events at those venues
+      //   3. Artist records the user OWNS — so we can look up events linked to them
+      const [createdRes, venuesRes, artistsRes] = await Promise.all([
+        supabase
+          .from('events')
+          .select('id, title, event_date, slug, status, ticketing_enabled')
+          .eq('auth_user_id', user.id),
+        supabase.from('venues').select('id').eq('auth_user_id', user.id),
+        supabase.from('artists').select('id').eq('auth_user_id', user.id),
+      ])
+
+      const created = createdRes.data || []
+      const myVenueIds = (venuesRes.data || []).map((v) => v.id)
+      const myArtistIds = (artistsRes.data || []).map((a) => a.id)
+
+      // Events at my venues (only if I own venues)
+      const venueEventsRes = myVenueIds.length
+        ? await supabase
+            .from('events')
+            .select('id, title, event_date, slug, status, ticketing_enabled')
+            .in('venue_id', myVenueIds)
+        : { data: [] as any[] }
+      const venueEvents = venueEventsRes.data || []
+
+      // Events linked to my artist records (only if I have any)
+      let artistEvents: any[] = []
+      if (myArtistIds.length) {
+        const linksRes = await supabase
+          .from('event_artists')
+          .select('event_id')
+          .in('artist_id', myArtistIds)
+        const linkedIds = (linksRes.data || []).map((l) => l.event_id)
+        if (linkedIds.length) {
+          const r = await supabase
+            .from('events')
+            .select('id, title, event_date, slug, status, ticketing_enabled')
+            .in('id', linkedIds)
+          artistEvents = r.data || []
+        }
+      }
+
+      // Merge + dedupe by event id. Prefer 'created' > 'venue' > 'artist'
+      // for the source label so we show the strongest relationship.
+      const byId = new Map<string, EventRow>()
+
+      for (const e of artistEvents) {
+        byId.set(e.id, { ...e, source: 'artist' })
+      }
+      for (const e of venueEvents) {
+        byId.set(e.id, { ...e, source: 'venue' })
+      }
+      for (const e of created) {
+        byId.set(e.id, { ...e, source: 'created' })
+      }
+
+      // Sort: upcoming first (ascending), then past (descending)
+      const today = new Date().toISOString().slice(0, 10)
+      const all = Array.from(byId.values()).sort((a, b) => {
+        const aUpcoming = a.event_date >= today
+        const bUpcoming = b.event_date >= today
+        if (aUpcoming && !bUpcoming) return -1
+        if (!aUpcoming && bUpcoming) return 1
+        return aUpcoming
+          ? a.event_date.localeCompare(b.event_date)
+          : b.event_date.localeCompare(a.event_date)
+      })
+
+      setEvents(all)
+      setLoading(false)
+    }
+    load()
+  }, [router])
+
+  if (loading) return <LoadingState />
+
+  const today = new Date().toISOString().slice(0, 10)
+  const upcoming = events.filter((e) => e.event_date >= today)
+  const past = events.filter((e) => e.event_date < today)
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      {/* Header */}
+    <div className="mx-auto max-w-3xl space-y-6">
+      {/* Page header */}
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
+        <div>
           <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
-            Creator · Tickets
+            Creator
           </p>
-          <h1 className="mb-2 font-display text-3xl font-bold leading-tight text-gray-900 dark:text-white">
-            {event.title}
+          <h1 className="mb-2 font-display text-3xl font-bold leading-none text-gray-900 dark:text-white">
+            Events
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {formatDate(event.event_date)}
-            {' · '}
-            {event.ticketing_enabled ? '785 Tickets enabled' : '785 Tickets disabled'}
+            {events.length === 0
+              ? "You haven't created any events yet."
+              : `${upcoming.length} upcoming · ${past.length} past`}
           </p>
         </div>
-
-        <div className="flex shrink-0 flex-wrap gap-2">
-          <a
-            href={`/dashboard/events/edit?id=${eventId}`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
-          >
-            Edit Event
-          </a>
-          {event.slug && (
-            <a
-              href={`/events/${event.slug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
-            >
-              View
-              <ArrowUpRight className="h-3.5 w-3.5" />
-            </a>
-          )}
-          <a
-            href="/dashboard/scan"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-warning-500 px-3 py-2 text-xs font-bold uppercase tracking-wider text-warning-950 transition hover:bg-warning-400 dark:bg-warning-500/20 dark:text-warning-300 dark:hover:bg-warning-500/30"
-          >
-            <ScanLine className="h-3.5 w-3.5" />
-            Scan
-          </a>
-        </div>
+        <Link
+          href="/dashboard/events/edit"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+        >
+          <Plus className="h-4 w-4" />
+          New Event
+        </Link>
       </div>
 
-      {/* Stripe not ready warning */}
-      {!stripeReady && event.ticketing_enabled && (
-        <div className="flex gap-2 rounded-lg border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          <span>
-            Your Stripe account isn&apos;t connected yet. You can save tier settings,
-            but no one can buy tickets until you{' '}
-            <a
-              href="/dashboard/payouts"
-              className="font-semibold underline hover:text-warning-800 dark:hover:text-warning-300"
-            >
-              finish Stripe Connect
-            </a>
-            .
-          </span>
+      {/* Empty state */}
+      {events.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center dark:border-gray-700 dark:bg-white/[0.02]">
+          <Calendar className="mx-auto mb-3 h-8 w-8 text-gray-400" />
+          <p className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">
+            No events yet
+          </p>
+          <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
+            Create your first event to get started.
+          </p>
+          <Link
+            href="/dashboard/events/edit"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-5 py-2.5 font-semibold text-white transition hover:bg-brand-700"
+          >
+            <Plus className="h-4 w-4" />
+            Create Event
+          </Link>
         </div>
       )}
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard
-          icon={<Ticket className="h-4 w-4" />}
-          label="Tickets Sold"
-          value={String(totalSold)}
-          tone="brand"
-        />
-        <StatCard
-          icon={<CheckCircle2 className="h-4 w-4" />}
-          label="Checked In"
-          value={String(checkedIn)}
-          tone="neutral"
-        />
-        <StatCard
-          icon={<DollarSign className="h-4 w-4" />}
-          label="Gross Revenue"
-          value={`$${totalRevenue.toFixed(2)}`}
-          tone="success"
-        />
-        <StatCard
-          icon={<Wallet className="h-4 w-4" />}
-          label="Est. Payout"
-          value={`$${Math.max(0, totalPayout).toFixed(2)}`}
-          tone="neutral"
-        />
-      </div>
-
-      {/* Tier editor */}
-      <Card>
-        <h2 className="mb-1 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
-          Ticket Tiers
-        </h2>
-        <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
-          Set up tier names, prices, and limits. Buyers see active tiers on the
-          public event page.
-        </p>
-        <TicketTiersEditor
-          eventId={eventId}
-          stripeAccountStatus={profile?.stripe_account_status || null}
-        />
-      </Card>
-
-      {/* Tier performance (read-only summary) */}
-      {eventTiers.length > 0 && (
-        <Card>
-          <h2 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
-            Tier Performance
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-800">
-                  <Th>Tier</Th>
-                  <Th>Price</Th>
-                  <Th>Sold</Th>
-                  <Th>Remaining</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {eventTiers.map((tier) => {
-                  const remaining =
-                    tier.quantity != null ? tier.quantity - tier.quantity_sold : null
-                  const pct = tier.quantity
-                    ? (tier.quantity_sold / tier.quantity) * 100
-                    : 0
-                  return (
-                    <tr
-                      key={tier.id}
-                      className="border-b border-gray-100 last:border-0 dark:border-gray-800/60"
-                    >
-                      <Td>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {tier.name}
-                        </span>
-                      </Td>
-                      <Td>
-                        {Number(tier.price) === 0
-                          ? 'Free'
-                          : `$${Number(tier.price).toFixed(2)}`}
-                      </Td>
-                      <Td>
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {tier.quantity_sold}
-                          </span>
-                          {tier.quantity != null && (
-                            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
-                              <div
-                                className="h-full rounded-full bg-brand-600"
-                                style={{ width: `${Math.min(pct, 100)}%` }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </Td>
-                      <Td>{remaining != null ? remaining : '∞'}</Td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+      {/* Upcoming */}
+      {upcoming.length > 0 && (
+        <Section label="Upcoming">
+          {upcoming.map((event) => (
+            <EventCard key={event.id} event={event} />
+          ))}
+        </Section>
       )}
 
-      {/* Attendees */}
-      <Card>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
-            Attendees
-          </h2>
-          {totalSold > 0 && (
-            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-              {totalSold} total
-            </span>
-          )}
-        </div>
-
-        {eventTickets.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-white/[0.02] dark:text-gray-400">
-            No tickets sold yet.
-            {!event.slug && ' Save the event with a slug so it has a public URL.'}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {eventTickets.map((t) => {
-              const tierName = Array.isArray(t.ticket_tiers)
-                ? t.ticket_tiers[0]?.name
-                : (t.ticket_tiers as any)?.name
-              return (
-                <div
-                  key={t.id}
-                  className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-white/[0.03]"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-semibold text-gray-900 dark:text-white">
-                        {t.buyer_name || 'Guest'}
-                      </span>
-                      <StatusPill status={t.status} />
-                    </div>
-                    <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
-                      {t.buyer_email}
-                    </div>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <div className="font-display text-sm font-bold text-success-700 dark:text-success-400">
-                      {t.amount_paid
-                        ? `$${parseFloat(t.amount_paid as any).toFixed(2)}`
-                        : 'Free'}
-                    </div>
-                    <div className="mt-0.5 text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                      {tierName}
-                    </div>
-                    <div className="text-[10px] text-gray-400 dark:text-gray-500">
-                      {formatTime(t.created_at)}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </Card>
+      {/* Past */}
+      {past.length > 0 && (
+        <Section label="Past">
+          {past.map((event) => (
+            <EventCard key={event.id} event={event} dimmed />
+          ))}
+        </Section>
+      )}
     </div>
   )
 }
 
-// ─── Small UI primitives ───────────────────────────────────────────────────
-
-function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-      {children}
-    </div>
-  )
-}
-
-function StatCard({
-  icon,
+function Section({
   label,
-  value,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <div>
+      <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">
+        {label}
+      </p>
+      <div className="flex flex-col gap-2.5">{children}</div>
+    </div>
+  )
+}
+
+function EventCard({
+  event,
+  dimmed = false,
+}: {
+  event: EventRow
+  dimmed?: boolean
+}) {
+  return (
+    <Link
+      href={`/dashboard/events/edit?id=${event.id}`}
+      className={`group flex items-center gap-4 rounded-2xl border border-gray-200 bg-white p-4 transition hover:border-gray-300 hover:shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] dark:hover:border-gray-700 ${
+        dimmed ? 'opacity-60' : ''
+      }`}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-display text-sm font-semibold uppercase tracking-wide text-gray-900 dark:text-white">
+          {event.title}
+        </div>
+        <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          {formatDate(event.event_date)}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {event.status && event.status !== 'published' && (
+            <Pill tone="gray">{event.status}</Pill>
+          )}
+          {event.ticketing_enabled && (
+            <Pill tone="brand">
+              <Ticket className="h-2.5 w-2.5" />
+              785 Tickets
+            </Pill>
+          )}
+          {event.source === 'venue' && <Pill tone="gray">At my venue</Pill>}
+          {event.source === 'artist' && (
+            <Pill tone="gray">
+              <Music className="h-2.5 w-2.5" />
+              I&apos;m performing
+            </Pill>
+          )}
+        </div>
+      </div>
+      {event.slug && (
+        <a
+          href={`/events/${event.slug}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 text-gray-400 transition hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+          onClick={(e) => e.stopPropagation()}
+          aria-label="View public event page"
+        >
+          <ExternalLink className="h-4 w-4" />
+        </a>
+      )}
+    </Link>
+  )
+}
+
+function Pill({
+  children,
   tone,
 }: {
-  icon: React.ReactNode
-  label: string
-  value: string
-  tone: 'brand' | 'success' | 'neutral'
+  children: React.ReactNode
+  tone: 'brand' | 'gray'
 }) {
-  const valueClass =
+  const cls =
     tone === 'brand'
-      ? 'text-brand-600 dark:text-brand-400'
-      : tone === 'success'
-        ? 'text-success-700 dark:text-success-400'
-        : 'text-gray-900 dark:text-white'
+      ? 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400'
+      : 'border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-white/[0.05] dark:text-gray-300'
 
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
-      <div className="mb-2 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-gray-600 dark:bg-white/[0.05] dark:text-gray-400">
-        {icon}
-      </div>
-      <div className={`font-display text-2xl font-bold leading-none ${valueClass}`}>
-        {value}
-      </div>
-      <div className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
-        {label}
-      </div>
-    </div>
-  )
-}
-
-function Th({ children }: { children: React.ReactNode }) {
-  return (
-    <th className="px-3 pb-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
-      {children}
-    </th>
-  )
-}
-
-function Td({ children }: { children: React.ReactNode }) {
-  return (
-    <td className="px-3 py-2.5 text-sm text-gray-600 dark:text-gray-400">{children}</td>
-  )
-}
-
-function StatusPill({ status }: { status: string }) {
-  const map: Record<string, { label: string; cls: string }> = {
-    valid: {
-      label: 'Valid',
-      cls: 'bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-400',
-    },
-    used: {
-      label: 'Checked in',
-      cls: 'bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400',
-    },
-    refunded: {
-      label: 'Refunded',
-      cls: 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400',
-    },
-  }
-  const m = map[status] ?? map.valid
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] ${m.cls}`}
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${cls}`}
     >
-      {m.label}
+      {children}
     </span>
   )
 }
