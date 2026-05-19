@@ -458,13 +458,13 @@ function PayoutsPageInner() {
               </ul>
 
               <div className="flex gap-2 flex-wrap">
-                
+                <a
                   href="/dashboard/events"
                   className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
                 >
                   Manage your events
                 </a>
-                
+                <a
                   href="/dashboard/advertise"
                   className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
                 >
