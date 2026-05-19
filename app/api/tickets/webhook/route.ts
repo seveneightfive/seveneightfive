@@ -255,8 +255,67 @@ export async function POST(request: NextRequest) {
           break
         }
 
-        /**
- * Look up event + venue + tier names + organizer info and dispatch the 
+        try {
+          await sendTicketConfirmation({
+            admin,
+            buyerEmail: buyerInfo.email,
+            buyerName: buyerInfo.name,
+            eventId: meta.event_id,
+            tierId: meta.tier_id,
+            ticketRows: insertedFallback,
+            amountPaid: pi.amount_received ? pi.amount_received / 100 : null,
+            orderRef: pi.id,
+          })
+        } catch (emailErr) {
+          console.error('[webhook] fallback ticket email send failed:', emailErr)
+        }
+        break
+      }
+
+      // ── charge.refunded ──────────────────────────────────────────────
+      case 'charge.refunded': {
+        const charge = event.data.object as import('stripe').Stripe.Charge
+        const piId =
+          typeof charge.payment_intent === 'string'
+            ? charge.payment_intent
+            : charge.payment_intent?.id
+
+        if (!piId) break
+
+        await admin
+          .from('tickets')
+          .update({ payment_status: 'refunded', status: 'refunded' })
+          .eq('stripe_payment_intent_id', piId)
+
+        break
+      }
+
+      // ── account.updated ──────────────────────────────────────────────
+      case 'account.updated': {
+        const account = event.data.object as import('stripe').Stripe.Account
+
+        try {
+          await syncStripeAccountToProfile(admin, account.id)
+          console.log(`[webhook] synced Connect account ${account.id}`)
+        } catch (err) {
+          console.error('[webhook] account.updated sync failed:', err)
+        }
+        break
+      }
+
+      default:
+        break
+    }
+
+    return NextResponse.json({ received: true })
+  } catch (err: any) {
+    console.error('[webhook] handler error:', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+/**
+ * Look up event + venue + tier names + organizer info and dispatch the
  * confirmation email via Resend.
  */
 async function sendTicketConfirmation(args: {
@@ -327,7 +386,7 @@ async function sendTicketConfirmation(args: {
       image_url: ev.image_url,
       venueName: venue?.name || null,
       venueAddress: venue?.address || null,
-      // Don't include city/state here — it's already in the address
+      // Don't include city/state — it's already in the address
       venueCityState: null,
     },
     tickets: ticketRows.map((t) => ({
@@ -339,126 +398,6 @@ async function sendTicketConfirmation(args: {
     // Organizer contact info
     organizerName: creatorProfile?.full_name || null,
     organizerEmail: creatorProfile?.email || null,
-  })
-}
-
-
-      // ── charge.refunded ──────────────────────────────────────────────
-      case 'charge.refunded': {
-        const charge = event.data.object as import('stripe').Stripe.Charge
-        const piId =
-          typeof charge.payment_intent === 'string'
-            ? charge.payment_intent
-            : charge.payment_intent?.id
-
-        if (!piId) break
-
-        await admin
-          .from('tickets')
-          .update({ payment_status: 'refunded', status: 'refunded' })
-          .eq('stripe_payment_intent_id', piId)
-
-        break
-      }
-
-      // ── account.updated ──────────────────────────────────────────────
-      case 'account.updated': {
-        const account = event.data.object as import('stripe').Stripe.Account
-
-        try {
-          await syncStripeAccountToProfile(admin, account.id)
-          console.log(`[webhook] synced Connect account ${account.id}`)
-        } catch (err) {
-          console.error('[webhook] account.updated sync failed:', err)
-        }
-        break
-      }
-
-      default:
-        break
-    }
-
-    return NextResponse.json({ received: true })
-  } catch (err: any) {
-    console.error('[webhook] handler error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
-}
-
-/**
- * Look up event + venue + tier names and dispatch the confirmation
- * email via Resend.
- */
-async function sendTicketConfirmation(args: {
-  admin: ReturnType<typeof createClient>
-  buyerEmail: string
-  buyerName: string | null
-  eventId: string
-  tierId: string
-  ticketRows: { id: string; qr_token: string }[]
-  amountPaid: number | null
-  orderRef: string
-}) {
-  const { admin, buyerEmail, buyerName, eventId, tierId, ticketRows, amountPaid, orderRef } =
-    args
-
-  // Pull event + venue
-  const { data: ev, error: evErr } = await admin
-    .from('events')
-    .select(`
-      title,
-      slug,
-      image_url,
-      event_date,
-      event_start_time,
-      event_end_time,
-      description,
-      venues (
-        name,
-        address,
-        city,
-        state
-      )
-    `)
-    .eq('id', eventId)
-    .single()
-
-  if (evErr || !ev) {
-    console.error('[webhook] could not load event for email:', evErr)
-    return
-  }
-
-  const venue = Array.isArray(ev.venues) ? ev.venues[0] : ev.venues
-
-  // Pull tier name (one query, used for every ticket in this batch)
-  const { data: tier } = await admin
-    .from('ticket_tiers')
-    .select('name')
-    .eq('id', tierId)
-    .single()
-
-  const tierName = tier?.name || 'Ticket'
-
-  await sendTicketEmail({
-    to: buyerEmail,
-    buyerName,
-    event: {
-      title: ev.title,
-      slug: ev.slug,
-      date: ev.event_date,
-      startTime: ev.event_start_time,
-      endTime: ev.event_end_time,
-      image_url: ev.image_url,
-      venueName: venue?.name || null,
-      venueAddress: venue?.address || null,
-      venueCityState: [venue?.city, venue?.state].filter(Boolean).join(', ') || null,
-    },
-    tickets: ticketRows.map((t) => ({
-      qr_token: t.qr_token,
-      ticket_tier_name: tierName,
-    })),
-    amountPaid,
-    orderRef,
   })
 }
 
