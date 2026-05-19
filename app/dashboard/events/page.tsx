@@ -4,7 +4,14 @@ import { useEffect, useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabaseBrowser'
 import Link from 'next/link'
-import { Calendar, ExternalLink, Plus, Ticket, Music } from 'lucide-react'
+import {
+  Calendar,
+  ExternalLink,
+  Plus,
+  Ticket,
+  Music,
+  Pencil,
+} from 'lucide-react'
 
 type EventRow = {
   id: string
@@ -83,7 +90,6 @@ function EventsPageInner() {
       const myVenueIds = (venuesRes.data || []).map((v) => v.id)
       const myArtistIds = (artistsRes.data || []).map((a) => a.id)
 
-      // Events at my venues (only if I own venues)
       const venueEventsRes = myVenueIds.length
         ? await supabase
             .from('events')
@@ -92,7 +98,6 @@ function EventsPageInner() {
         : { data: [] as any[] }
       const venueEvents = venueEventsRes.data || []
 
-      // Events linked to my artist records (only if I have any)
       let artistEvents: any[] = []
       if (myArtistIds.length) {
         const linksRes = await supabase
@@ -109,21 +114,13 @@ function EventsPageInner() {
         }
       }
 
-      // Merge + dedupe by event id. Prefer 'created' > 'venue' > 'artist'
-      // for the source label so we show the strongest relationship.
+      // Merge + dedupe. Prefer 'created' > 'venue' > 'artist' for the source
+      // label so we show the strongest relationship.
       const byId = new Map<string, EventRow>()
+      for (const e of artistEvents) byId.set(e.id, { ...e, source: 'artist' })
+      for (const e of venueEvents) byId.set(e.id, { ...e, source: 'venue' })
+      for (const e of created) byId.set(e.id, { ...e, source: 'created' })
 
-      for (const e of artistEvents) {
-        byId.set(e.id, { ...e, source: 'artist' })
-      }
-      for (const e of venueEvents) {
-        byId.set(e.id, { ...e, source: 'venue' })
-      }
-      for (const e of created) {
-        byId.set(e.id, { ...e, source: 'created' })
-      }
-
-      // Sort: upcoming first (ascending), then past (descending)
       const today = new Date().toISOString().slice(0, 10)
       const all = Array.from(byId.values()).sort((a, b) => {
         const aUpcoming = a.event_date >= today
@@ -238,10 +235,12 @@ function EventCard({
   event: EventRow
   dimmed?: boolean
 }) {
+  // Card click → manage view (tickets/sales). Most operator visits are
+  // ops, not setup. Edit lives on the icon button below.
   return (
     <Link
-      href={`/dashboard/events/edit?id=${event.id}`}
-      className={`group flex items-center gap-4 rounded-2xl border border-gray-200 bg-white p-4 transition hover:border-gray-300 hover:shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] dark:hover:border-gray-700 ${
+      href={`/dashboard/events/${event.id}/tickets`}
+      className={`group flex items-center gap-3 rounded-2xl border border-gray-200 bg-white p-4 transition hover:border-gray-300 hover:shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] dark:hover:border-gray-700 ${
         dimmed ? 'opacity-60' : ''
       }`}
     >
@@ -271,19 +270,56 @@ function EventCard({
           )}
         </div>
       </div>
-      {event.slug && (
-        <a
-          href={`/events/${event.slug}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="shrink-0 text-gray-400 transition hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-          onClick={(e) => e.stopPropagation()}
-          aria-label="View public event page"
+
+      {/* Action icons. Each stops propagation so they don't fire the
+          card-level link. */}
+      <div className="flex shrink-0 items-center gap-1">
+        <IconButton
+          href={`/dashboard/events/edit?id=${event.id}`}
+          label="Edit event"
         >
-          <ExternalLink className="h-4 w-4" />
-        </a>
-      )}
+          <Pencil className="h-4 w-4" />
+        </IconButton>
+        {event.slug && (
+          <IconButton
+            href={`/events/${event.slug}`}
+            label="View public event page"
+            external
+          >
+            <ExternalLink className="h-4 w-4" />
+          </IconButton>
+        )}
+      </div>
     </Link>
+  )
+}
+
+function IconButton({
+  href,
+  label,
+  external = false,
+  children,
+}: {
+  href: string
+  label: string
+  external?: boolean
+  children: React.ReactNode
+}) {
+  // Important: nested anchor + stopPropagation. Without stopPropagation
+  // the parent <Link> swallows the click and you'd never reach this href.
+  return (
+    <a
+      href={href}
+      {...(external
+        ? { target: '_blank', rel: 'noopener noreferrer' }
+        : {})}
+      onClick={(e) => e.stopPropagation()}
+      aria-label={label}
+      title={label}
+      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
+    >
+      {children}
+    </a>
   )
 }
 
