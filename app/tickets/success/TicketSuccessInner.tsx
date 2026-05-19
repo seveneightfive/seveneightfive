@@ -138,13 +138,12 @@ export default function TicketSuccessInner() {
             <div className="check">✓</div>
             <div className="heading">Payment Complete</div>
             <p className="sub">
-              Your ticket is being processed. If this page doesn&apos;t update in
-              a minute, your ticket has still been recorded — refresh, or contact
-              the event organizer with your receipt.
+              Your ticket is being processed. You will receive an email receipt as
+              well as an email with your ticket. This is your ticket to the event.
             </p>
             <div className="actions">
               <a href="/events" className="btn btn-ghost">
-                Browse Events
+                Browse More Events
               </a>
             </div>
           </div>
