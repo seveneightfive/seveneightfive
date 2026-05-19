@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { createClient } from '@/lib/supabaseBrowser'
 import QRCode from 'qrcode'
 
 type Ticket = {
@@ -11,6 +10,8 @@ type Ticket = {
   status: string
   payment_status: string
   amount_paid: number | null
+  buyer_email: string
+  buyer_name: string | null
   event_title: string
   event_date: string
   event_start_time: string | null
@@ -29,34 +30,43 @@ export default function TicketSuccessInner() {
   const [qrDataUrls, setQrDataUrls] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    if (!sessionId) { setLoading(false); return }
+    if (!sessionId) {
+      setLoading(false)
+      return
+    }
 
-    // Poll for the ticket — webhook may take a few seconds
+    // Poll the lookup endpoint — webhook may take a few seconds to mint
     let tries = 0
     const poll = async () => {
       tries++
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('my_tickets')
-        .select('*')
-        .eq('payment_status', 'paid')
-        .order('created_at', { ascending: false })
-        .limit(4)
+      try {
+        const res = await fetch(`/api/tickets/lookup?session_id=${encodeURIComponent(sessionId)}`)
+        const json = await res.json()
+        const data: Ticket[] = json.tickets || []
 
-      if (data && data.length > 0) {
-        setTickets(data)
-        // Generate QR data URLs for each ticket
-        const urls: Record<string, string> = {}
-        await Promise.all(data.map(async (t: Ticket) => {
-          urls[t.id] = await QRCode.toDataURL(t.qr_token, { width: 200, margin: 2 })
-        }))
-        setQrDataUrls(urls)
-        setLoading(false)
-      } else if (tries < 8) {
-        setAttempts(tries)
-        setTimeout(poll, 1500)
-      } else {
-        setLoading(false)
+        if (data.length > 0) {
+          setTickets(data)
+          // Generate QR codes for each ticket using the qr_token
+          const urls: Record<string, string> = {}
+          await Promise.all(
+            data.map(async (t) => {
+              urls[t.id] = await QRCode.toDataURL(t.qr_token, { width: 200, margin: 2 })
+            })
+          )
+          setQrDataUrls(urls)
+          setLoading(false)
+        } else if (tries < 10) {
+          setAttempts(tries)
+          setTimeout(poll, 1500)
+        } else {
+          setLoading(false)
+        }
+      } catch {
+        if (tries < 10) {
+          setTimeout(poll, 1500)
+        } else {
+          setLoading(false)
+        }
       }
     }
     poll()
@@ -87,6 +97,12 @@ export default function TicketSuccessInner() {
     .qr-img { width: 160px; height: 160px; border-radius: 8px; display: block; }
     .qr-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(255,255,255,0.35); margin-bottom: 4px; text-align: center; }
     .qr-token { font-family: monospace; font-size: 0.65rem; color: rgba(255,255,255,0.35); word-break: break-all; text-align: center; }
+    .save-callout {
+      padding: 14px 16px; margin-bottom: 16px; border-radius: 8px;
+      background: rgba(255,206,3,0.08); border: 1px solid rgba(255,206,3,0.2);
+      font-size: 0.82rem; color: rgba(255,206,3,0.9); line-height: 1.5;
+    }
+    .save-callout strong { color: rgba(255,206,3,1); }
     .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 24px; }
     .btn { display: block; width: 100%; padding: 13px; border-radius: 8px; font-family: var(--sans); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; text-align: center; text-decoration: none; cursor: pointer; transition: opacity 0.15s; border: none; }
     .btn-primary { background: var(--accent); color: #fff; }
@@ -105,9 +121,7 @@ export default function TicketSuccessInner() {
             <div className="loading-spinner" />
             <div className="heading">Confirming</div>
             <p className="sub">
-              {attempts > 2
-                ? 'Almost there, just a moment…'
-                : 'Processing your payment…'}
+              {attempts > 2 ? 'Almost there, just a moment…' : 'Processing your payment…'}
             </p>
           </div>
         </div>
@@ -124,12 +138,14 @@ export default function TicketSuccessInner() {
             <div className="check">✓</div>
             <div className="heading">Payment Complete</div>
             <p className="sub">
-              Your ticket is being processed. You'll receive a confirmation email shortly.
-              You can also view your tickets in your dashboard.
+              Your ticket is being processed. If this page doesn&apos;t update in
+              a minute, your ticket has still been recorded — refresh, or contact
+              the event organizer with your receipt.
             </p>
             <div className="actions">
-              <a href="/dashboard" className="btn btn-primary">Go to Dashboard</a>
-              <a href="/events" className="btn btn-ghost">Browse Events</a>
+              <a href="/events" className="btn btn-ghost">
+                Browse Events
+              </a>
             </div>
           </div>
         </div>
@@ -139,7 +155,12 @@ export default function TicketSuccessInner() {
 
   const formatDate = (d: string) => {
     const date = new Date(d + 'T12:00:00')
-    return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    })
   }
 
   return (
@@ -148,13 +169,19 @@ export default function TicketSuccessInner() {
       <div className="wrap">
         <div className="card">
           <div className="check">🎟</div>
-          <div className="heading">You're In!</div>
+          <div className="heading">You&apos;re In!</div>
           <p className="sub">
             Your {tickets.length === 1 ? 'ticket is' : 'tickets are'} confirmed.
             Show your QR code at the door.
           </p>
 
-          {tickets.map(ticket => (
+          <div className="save-callout">
+            <strong>Save this page or bookmark it.</strong> Your tickets are
+            tied to <strong>{tickets[0].buyer_email}</strong>. You can also screenshot
+            the QR codes below to keep them handy.
+          </div>
+
+          {tickets.map((ticket) => (
             <div className="ticket-card" key={ticket.id}>
               <div className="ticket-stripe" />
               <div className="ticket-body">
@@ -162,15 +189,29 @@ export default function TicketSuccessInner() {
                 <div className="ticket-meta">
                   {formatDate(ticket.event_date)}
                   {ticket.event_start_time && ` · ${ticket.event_start_time}`}
-                  {ticket.venue_name && <><br />{ticket.venue_name}</>}
-                  {ticket.venue_address && <><br />{ticket.venue_address}</>}
+                  {ticket.venue_name && (
+                    <>
+                      <br />
+                      {ticket.venue_name}
+                    </>
+                  )}
+                  {ticket.venue_address && (
+                    <>
+                      <br />
+                      {ticket.venue_address}
+                    </>
+                  )}
                 </div>
                 <span className="ticket-tier">{ticket.tier_name}</span>
               </div>
               <div className="qr-wrap">
                 {qrDataUrls[ticket.id] && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={qrDataUrls[ticket.id]} alt="Ticket QR code" className="qr-img" />
+                  <img
+                    src={qrDataUrls[ticket.id]}
+                    alt="Ticket QR code"
+                    className="qr-img"
+                  />
                 )}
                 <div className="qr-label">Show this at the door</div>
                 <div className="qr-token">{ticket.qr_token}</div>
@@ -179,8 +220,9 @@ export default function TicketSuccessInner() {
           ))}
 
           <div className="actions">
-            <a href="/dashboard/tickets" className="btn btn-primary">View All My Tickets</a>
-            <a href="/events" className="btn btn-ghost">Browse More Events</a>
+            <a href="/events" className="btn btn-ghost">
+              Browse More Events
+            </a>
           </div>
         </div>
       </div>
