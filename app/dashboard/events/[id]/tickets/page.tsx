@@ -2,22 +2,25 @@ import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabaseServerAuth'
 import { createClient as createAdmin } from '@/lib/supabaseServer'
 import TicketTiersEditor from '@/app/components/TicketTiersEditor'
+import {
+  Ticket,
+  CheckCircle2,
+  DollarSign,
+  Wallet,
+  AlertCircle,
+  ArrowUpRight,
+  ScanLine,
+} from 'lucide-react'
 
 /**
  * /dashboard/events/[id]/tickets
  *
- * Dedicated per-event ticket management surface.
+ * Per-event ticket management surface. Lives inside the dashboard shell
+ * (so users keep sidebar nav) and uses Tailwind to match the rest of
+ * /dashboard/*.
  *
- * Combines:
- *   - Stripe Connect status reminder (if not enabled)
- *   - The TicketTiersEditor for this event
- *   - Focused sales stats (just this event)
- *   - Tier breakdown with progress
- *   - Attendee list
- *   - Quick links to scanner and public event page
- *
- * Access: must be the event creator OR a venue owner whose venue hosts the event
- * OR an artist linked to the event.
+ * Access: must be the event creator OR a venue owner whose venue hosts the
+ * event OR an artist linked to the event.
  */
 
 type Params = { params: Promise<{ id: string }> }
@@ -26,7 +29,9 @@ export default async function EventTicketsPage({ params }: Params) {
   const { id: eventId } = await params
 
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) redirect(`/login?next=/dashboard/events/${eventId}/tickets`)
 
   const admin = createAdmin()
@@ -34,17 +39,18 @@ export default async function EventTicketsPage({ params }: Params) {
   // Load event + verify access
   const { data: event } = await admin
     .from('events')
-    .select(`
+    .select(
+      `
       id, title, slug, event_date, ticketing_enabled,
       auth_user_id, venue_id,
       venues(id, name, auth_user_id)
-    `)
+    `
+    )
     .eq('id', eventId)
     .maybeSingle()
 
   if (!event) notFound()
 
-  // Access check
   let hasAccess = event.auth_user_id === user.id
   if (!hasAccess && event.venue_id) {
     const venue = Array.isArray(event.venues) ? event.venues[0] : event.venues
@@ -52,7 +58,9 @@ export default async function EventTicketsPage({ params }: Params) {
   }
   if (!hasAccess) {
     const { data: myArtists } = await admin
-      .from('artists').select('id').eq('auth_user_id', user.id)
+      .from('artists')
+      .select('id')
+      .eq('auth_user_id', user.id)
     const myArtistIds = (myArtists || []).map((a: any) => a.id)
     if (myArtistIds.length) {
       const { data: link } = await admin
@@ -67,14 +75,12 @@ export default async function EventTicketsPage({ params }: Params) {
   }
   if (!hasAccess) redirect('/dashboard/events')
 
-  // Load profile for stripe status
   const { data: profile } = await admin
     .from('profiles')
     .select('stripe_account_status')
     .eq('id', user.id)
     .single()
 
-  // Load tiers + sold tickets for this event
   const [{ data: tiers }, { data: tickets }] = await Promise.all([
     admin
       .from('ticket_tiers')
@@ -83,11 +89,13 @@ export default async function EventTicketsPage({ params }: Params) {
       .order('sort_order'),
     admin
       .from('tickets')
-      .select(`
+      .select(
+        `
         id, buyer_name, buyer_email, amount_paid, status, payment_status,
         created_at, ticket_tier_id,
         ticket_tiers(name)
-      `)
+      `
+      )
       .eq('event_id', eventId)
       .eq('payment_status', 'paid')
       .order('created_at', { ascending: false }),
@@ -97,218 +105,344 @@ export default async function EventTicketsPage({ params }: Params) {
   const eventTiers = tiers || []
   const totalSold = eventTickets.length
   const totalRevenue = eventTickets.reduce(
-    (sum, t) => sum + (parseFloat(t.amount_paid as any) || 0), 0
+    (sum, t) => sum + (parseFloat(t.amount_paid as any) || 0),
+    0
   )
   const totalPayout = eventTickets.reduce((sum, t) => {
     const price = parseFloat(t.amount_paid as any) || 0
-    return sum + (price - (price * 0.029) - 1.00)
+    return sum + (price - price * 0.029 - 1.0)
   }, 0)
-  const checkedIn = eventTickets.filter(t => t.status === 'used').length
-
-  const formatDate = (d: string) =>
-    new Date(d + 'T12:00:00').toLocaleDateString('en-US', {
-      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
-    })
-  const formatTime = (d: string) =>
-    new Date(d).toLocaleString('en-US', {
-      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-    })
+  const checkedIn = eventTickets.filter((t) => t.status === 'used').length
 
   const stripeReady = profile?.stripe_account_status === 'enabled'
 
-  return (
-    <>
-      <style>{`
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        :root {
-          --ink: #1a1814; --white: #fff; --accent: #C80650;
-          --surface: rgba(255,255,255,0.04); --border: rgba(255,255,255,0.08);
-          --border2: rgba(255,255,255,0.14); --dim: rgba(255,255,255,0.55);
-          --faint: rgba(255,255,255,0.25); --gold: #ffce03; --green: #7ecf7e;
-          --serif: 'Oswald', sans-serif; --sans: 'DM Sans', system-ui, sans-serif;
-        }
-        html, body { background: var(--ink); color: var(--white); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
-        .topbar { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; height: 52px; background: rgba(26,24,20,0.95); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
-        .back-link { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); text-decoration: none; transition: color 0.15s; }
-        .back-link:hover { color: var(--white); }
-        .page-title { font-family: var(--serif); font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
-        .actions-bar { display: flex; gap: 10px; }
-        .action-btn { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 5px 10px; border-radius: 6px; text-decoration: none; transition: opacity 0.15s; }
-        .action-btn.scan { background: rgba(255,206,3,0.12); color: var(--gold); border: 1px solid rgba(255,206,3,0.3); }
-        .action-btn.public { color: var(--accent); border: 1px solid rgba(200,6,80,0.3); }
-        .content { max-width: 720px; margin: 0 auto; padding: 24px 20px 80px; }
-        .header { padding-bottom: 18px; border-bottom: 1px solid var(--border2); margin-bottom: 24px; }
-        .event-name { font-family: var(--serif); font-size: 1.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; line-height: 1.1; }
-        .event-meta { font-size: 0.8rem; color: var(--dim); margin-top: 6px; }
-        .stripe-warn { padding: 14px 16px; background: rgba(255,206,3,0.06); border: 1px solid rgba(255,206,3,0.25); border-radius: 10px; font-size: 0.85rem; color: rgba(255,206,3,0.9); margin-bottom: 24px; line-height: 1.5; }
-        .stripe-warn a { color: var(--gold); font-weight: 700; }
-        .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 28px; }
-        .stat { padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
-        .stat-val { font-family: var(--serif); font-size: 1.5rem; font-weight: 700; line-height: 1; }
-        .stat-val.gold { color: var(--gold); }
-        .stat-val.green { color: var(--green); }
-        .stat-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); margin-top: 4px; }
-        .section-head { font-family: var(--serif); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); margin: 32px 0 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
-        .tiers-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 0.82rem; }
-        .tiers-table th { text-align: left; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); padding: 0 12px 8px; border-bottom: 1px solid var(--border); }
-        .tiers-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--dim); }
-        .tier-name { font-weight: 500; color: var(--white); }
-        .progress-bar { width: 100%; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; margin-top: 4px; }
-        .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; }
-        .buyer-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; }
-        .buyer-name { font-size: 0.88rem; font-weight: 500; }
-        .buyer-email { font-size: 0.72rem; color: var(--faint); margin-top: 1px; }
-        .buyer-right { text-align: right; }
-        .buyer-amount { font-family: var(--serif); font-size: 0.95rem; font-weight: 600; color: var(--green); }
-        .buyer-tier { font-size: 0.65rem; color: var(--faint); margin-top: 2px; }
-        .buyer-status { display: inline-block; font-size: 0.55rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; margin-left: 6px; }
-        .buyer-status.used { background: rgba(126,207,126,0.12); color: var(--green); }
-        .buyer-status.valid { background: rgba(255,255,255,0.06); color: var(--faint); }
-        .empty-state { padding: 30px 20px; text-align: center; color: var(--faint); font-size: 0.85rem; }
-        @media (max-width: 640px) {
-          .stats-row { grid-template-columns: repeat(2, 1fr); }
-        }
-      `}</style>
+  const formatDate = (d: string) =>
+    new Date(d + 'T12:00:00').toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
 
-      <div className="topbar">
-        <a href={`/dashboard/events/edit?id=${eventId}`} className="back-link">← Back to Event</a>
-        <span className="page-title">Tickets</span>
-        <div className="actions-bar">
+  const formatTime = (d: string) =>
+    new Date(d).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+
+  return (
+    <div className="mx-auto max-w-4xl space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
+            Creator · Tickets
+          </p>
+          <h1 className="mb-2 font-display text-3xl font-bold leading-tight text-gray-900 dark:text-white">
+            {event.title}
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {formatDate(event.event_date)}
+            {' · '}
+            {event.ticketing_enabled ? '785 Tickets enabled' : '785 Tickets disabled'}
+          </p>
+        </div>
+
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <a
+            href={`/dashboard/events/edit?id=${eventId}`}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
+          >
+            Edit Event
+          </a>
           {event.slug && (
             <a
               href={`/events/${event.slug}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="action-btn public"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
             >
-              View ↗
+              View
+              <ArrowUpRight className="h-3.5 w-3.5" />
             </a>
           )}
-          <a href="/dashboard/scan" className="action-btn scan">Scan</a>
+          <a
+            href="/dashboard/scan"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-warning-500 px-3 py-2 text-xs font-bold uppercase tracking-wider text-warning-950 transition hover:bg-warning-400 dark:bg-warning-500/20 dark:text-warning-300 dark:hover:bg-warning-500/30"
+          >
+            <ScanLine className="h-3.5 w-3.5" />
+            Scan
+          </a>
         </div>
       </div>
 
-      <div className="content">
-        <div className="header">
-          <div className="event-name">{event.title}</div>
-          <div className="event-meta">
-            {formatDate(event.event_date)}
-            {' · '}
-            {event.ticketing_enabled ? '785 Tickets enabled' : '785 Tickets disabled'}
-          </div>
+      {/* Stripe not ready warning */}
+      {!stripeReady && event.ticketing_enabled && (
+        <div className="flex gap-2 rounded-lg border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>
+            Your Stripe account isn&apos;t connected yet. You can save tier settings,
+            but no one can buy tickets until you{' '}
+            <a
+              href="/dashboard/payouts"
+              className="font-semibold underline hover:text-warning-800 dark:hover:text-warning-300"
+            >
+              finish Stripe Connect
+            </a>
+            .
+          </span>
         </div>
+      )}
 
-        {!stripeReady && event.ticketing_enabled && (
-          <div className="stripe-warn">
-            ⚠ Your Stripe account isn't connected yet. You can save tier
-            settings, but no one can buy tickets until you{' '}
-            <a href="/dashboard/settings/payouts">finish Stripe Connect →</a>
-          </div>
-        )}
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard
+          icon={<Ticket className="h-4 w-4" />}
+          label="Tickets Sold"
+          value={String(totalSold)}
+          tone="brand"
+        />
+        <StatCard
+          icon={<CheckCircle2 className="h-4 w-4" />}
+          label="Checked In"
+          value={String(checkedIn)}
+          tone="neutral"
+        />
+        <StatCard
+          icon={<DollarSign className="h-4 w-4" />}
+          label="Gross Revenue"
+          value={`$${totalRevenue.toFixed(2)}`}
+          tone="success"
+        />
+        <StatCard
+          icon={<Wallet className="h-4 w-4" />}
+          label="Est. Payout"
+          value={`$${Math.max(0, totalPayout).toFixed(2)}`}
+          tone="neutral"
+        />
+      </div>
 
-        {/* Headline stats */}
-        <div className="stats-row">
-          <div className="stat">
-            <div className="stat-val gold">{totalSold}</div>
-            <div className="stat-label">Tickets Sold</div>
-          </div>
-          <div className="stat">
-            <div className="stat-val">{checkedIn}</div>
-            <div className="stat-label">Checked In</div>
-          </div>
-          <div className="stat">
-            <div className="stat-val green">${totalRevenue.toFixed(2)}</div>
-            <div className="stat-label">Gross Revenue</div>
-          </div>
-          <div className="stat">
-            <div className="stat-val">${Math.max(0, totalPayout).toFixed(2)}</div>
-            <div className="stat-label">Est. Payout</div>
-          </div>
-        </div>
-
-        {/* Tier editor */}
+      {/* Tier editor */}
+      <Card>
+        <h2 className="mb-1 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+          Ticket Tiers
+        </h2>
+        <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+          Set up tier names, prices, and limits. Buyers see active tiers on the
+          public event page.
+        </p>
         <TicketTiersEditor
           eventId={eventId}
           stripeAccountStatus={profile?.stripe_account_status || null}
         />
+      </Card>
 
-        {/* Tier breakdown (read-only mirror of sold counts) */}
-        {eventTiers.length > 0 && (
-          <>
-            <div className="section-head">Tier Performance</div>
-            <table className="tiers-table">
+      {/* Tier performance (read-only summary) */}
+      {eventTiers.length > 0 && (
+        <Card>
+          <h2 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+            Tier Performance
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
               <thead>
-                <tr>
-                  <th>Tier</th>
-                  <th>Price</th>
-                  <th>Sold</th>
-                  <th>Remaining</th>
+                <tr className="border-b border-gray-200 dark:border-gray-800">
+                  <Th>Tier</Th>
+                  <Th>Price</Th>
+                  <Th>Sold</Th>
+                  <Th>Remaining</Th>
                 </tr>
               </thead>
               <tbody>
-                {eventTiers.map(tier => {
-                  const remaining = tier.quantity != null
-                    ? tier.quantity - tier.quantity_sold
-                    : null
+                {eventTiers.map((tier) => {
+                  const remaining =
+                    tier.quantity != null ? tier.quantity - tier.quantity_sold : null
                   const pct = tier.quantity
                     ? (tier.quantity_sold / tier.quantity) * 100
                     : 0
                   return (
-                    <tr key={tier.id}>
-                      <td><span className="tier-name">{tier.name}</span></td>
-                      <td>{Number(tier.price) === 0 ? 'Free' : `$${Number(tier.price).toFixed(2)}`}</td>
-                      <td>
-                        {tier.quantity_sold}
-                        {tier.quantity != null && (
-                          <div className="progress-bar">
-                            <div className="progress-fill" style={{ width: `${Math.min(pct, 100)}%` }} />
-                          </div>
-                        )}
-                      </td>
-                      <td>{remaining != null ? remaining : '∞'}</td>
+                    <tr
+                      key={tier.id}
+                      className="border-b border-gray-100 last:border-0 dark:border-gray-800/60"
+                    >
+                      <Td>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {tier.name}
+                        </span>
+                      </Td>
+                      <Td>
+                        {Number(tier.price) === 0
+                          ? 'Free'
+                          : `$${Number(tier.price).toFixed(2)}`}
+                      </Td>
+                      <Td>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-700 dark:text-gray-300">
+                            {tier.quantity_sold}
+                          </span>
+                          {tier.quantity != null && (
+                            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
+                              <div
+                                className="h-full rounded-full bg-brand-600"
+                                style={{ width: `${Math.min(pct, 100)}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </Td>
+                      <Td>{remaining != null ? remaining : '∞'}</Td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
-          </>
-        )}
+          </div>
+        </Card>
+      )}
 
-        {/* Attendees */}
-        <div className="section-head">Attendees</div>
+      {/* Attendees */}
+      <Card>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+            Attendees
+          </h2>
+          {totalSold > 0 && (
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+              {totalSold} total
+            </span>
+          )}
+        </div>
+
         {eventTickets.length === 0 ? (
-          <div className="empty-state">
+          <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-white/[0.02] dark:text-gray-400">
             No tickets sold yet.
             {!event.slug && ' Save the event with a slug so it has a public URL.'}
           </div>
         ) : (
-          eventTickets.map(t => {
-            const tierName = Array.isArray(t.ticket_tiers)
-              ? t.ticket_tiers[0]?.name
-              : (t.ticket_tiers as any)?.name
-            return (
-              <div className="buyer-row" key={t.id}>
-                <div>
-                  <div className="buyer-name">
-                    {t.buyer_name || 'Guest'}
-                    <span className={`buyer-status ${t.status === 'used' ? 'used' : 'valid'}`}>
-                      {t.status === 'used' ? 'Checked in' : 'Valid'}
-                    </span>
+          <div className="flex flex-col gap-2">
+            {eventTickets.map((t) => {
+              const tierName = Array.isArray(t.ticket_tiers)
+                ? t.ticket_tiers[0]?.name
+                : (t.ticket_tiers as any)?.name
+              return (
+                <div
+                  key={t.id}
+                  className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-white/[0.03]"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                        {t.buyer_name || 'Guest'}
+                      </span>
+                      <StatusPill status={t.status} />
+                    </div>
+                    <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
+                      {t.buyer_email}
+                    </div>
                   </div>
-                  <div className="buyer-email">{t.buyer_email}</div>
-                </div>
-                <div className="buyer-right">
-                  <div className="buyer-amount">
-                    {t.amount_paid ? `$${parseFloat(t.amount_paid as any).toFixed(2)}` : 'Free'}
+                  <div className="shrink-0 text-right">
+                    <div className="font-display text-sm font-bold text-success-700 dark:text-success-400">
+                      {t.amount_paid
+                        ? `$${parseFloat(t.amount_paid as any).toFixed(2)}`
+                        : 'Free'}
+                    </div>
+                    <div className="mt-0.5 text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                      {tierName}
+                    </div>
+                    <div className="text-[10px] text-gray-400 dark:text-gray-500">
+                      {formatTime(t.created_at)}
+                    </div>
                   </div>
-                  <div className="buyer-tier">{tierName}</div>
-                  <div className="buyer-tier">{formatTime(t.created_at)}</div>
                 </div>
-              </div>
-            )
-          })
+              )
+            })}
+          </div>
         )}
+      </Card>
+    </div>
+  )
+}
+
+// ─── Small UI primitives ───────────────────────────────────────────────────
+
+function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+      {children}
+    </div>
+  )
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string
+  tone: 'brand' | 'success' | 'neutral'
+}) {
+  const valueClass =
+    tone === 'brand'
+      ? 'text-brand-600 dark:text-brand-400'
+      : tone === 'success'
+        ? 'text-success-700 dark:text-success-400'
+        : 'text-gray-900 dark:text-white'
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+      <div className="mb-2 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-gray-600 dark:bg-white/[0.05] dark:text-gray-400">
+        {icon}
       </div>
-    </>
+      <div className={`font-display text-2xl font-bold leading-none ${valueClass}`}>
+        {value}
+      </div>
+      <div className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
+        {label}
+      </div>
+    </div>
+  )
+}
+
+function Th({ children }: { children: React.ReactNode }) {
+  return (
+    <th className="px-3 pb-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
+      {children}
+    </th>
+  )
+}
+
+function Td({ children }: { children: React.ReactNode }) {
+  return (
+    <td className="px-3 py-2.5 text-sm text-gray-600 dark:text-gray-400">{children}</td>
+  )
+}
+
+function StatusPill({ status }: { status: string }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    valid: {
+      label: 'Valid',
+      cls: 'bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-400',
+    },
+    used: {
+      label: 'Checked in',
+      cls: 'bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400',
+    },
+    refunded: {
+      label: 'Refunded',
+      cls: 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400',
+    },
+  }
+  const m = map[status] ?? map.valid
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] ${m.cls}`}
+    >
+      {m.label}
+    </span>
   )
 }

@@ -44,6 +44,21 @@ const fieldLabelCls =
 
 const hintCls = 'mt-1 text-[11px] text-gray-400 dark:text-gray-500'
 
+/**
+ * Browsers (especially mobile Safari) sometimes return `YYYY-MM-DD` from a
+ * <input type="datetime-local"> when the user fills only the date portion.
+ * That bare date stores as NULL via `value || null`, which surprises users
+ * who think they set a window. Pad to start-of-day or end-of-day so the
+ * sale window actually saves.
+ */
+function expandSaleTime(value: string, kind: 'start' | 'end'): string | null {
+  if (!value || !value.trim()) return null
+  // Already has a time component → use as-is
+  if (value.includes('T')) return value
+  // Bare YYYY-MM-DD → pad to start/end of day
+  return kind === 'start' ? `${value}T00:00:00` : `${value}T23:59:59`
+}
+
 export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Props) {
   const [tiers, setTiers] = useState<Tier[]>([])
   const [enabled, setEnabled] = useState(false)
@@ -119,8 +134,8 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
           quantity: t.quantity !== '' ? parseInt(t.quantity) : null,
           sort_order: i,
           is_active: t.is_active,
-          sale_starts_at: t.sale_starts_at || null,
-          sale_ends_at: t.sale_ends_at || null,
+          sale_starts_at: expandSaleTime(t.sale_starts_at, 'start'),
+          sale_ends_at: expandSaleTime(t.sale_ends_at, 'end'),
         }
 
         if (t.id) {
@@ -298,7 +313,7 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
                     }
                     className={inputCls}
                   />
-                  <p className={hintCls}>Leave blank to sell immediately</p>
+                  <p className={hintCls}>Leave blank to sell immediately. Date only = midnight that day.</p>
                 </div>
                 <div>
                   <label className={fieldLabelCls}>Sale Ends</label>
@@ -310,7 +325,7 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
                     }
                     className={inputCls}
                   />
-                  <p className={hintCls}>Leave blank to sell until event</p>
+                  <p className={hintCls}>Leave blank to sell until event. Date only = end of that day.</p>
                 </div>
               </div>
 
