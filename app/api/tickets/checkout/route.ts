@@ -85,6 +85,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Ticket tier not found' }, { status: 404 })
     }
 
+    console.log(JSON.stringify(tier, null, 2))
+
     const event = Array.isArray(tier.events) ? tier.events[0] : (tier.events as any)
     const creatorProfile = Array.isArray(event?.profiles)
       ? event.profiles[0]
