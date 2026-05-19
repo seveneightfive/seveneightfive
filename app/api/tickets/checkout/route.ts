@@ -1,7 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabaseServerAuth'
 import { createClient as createAdminClient } from '@/lib/supabaseServer'
-import { stripe, platformFeeAmount } from '@/lib/stripe'
+import {
+  stripe,
+  serviceFeeAmount,
+  applicationFeeAmount,
+} from '@/lib/stripe'
 
 /**
  * POST /api/tickets/checkout
@@ -16,12 +20,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    const {
-      tierId,
-      eventId,
-      quantity = 1,
-      guest,
-    } = body
+    const { tierId, eventId, quantity = 1, guest } = body
 
     if (!tierId || !eventId) {
       return NextResponse.json(
@@ -52,10 +51,7 @@ export async function POST(request: NextRequest) {
     const origin = request.nextUrl.origin
 
     /**
-     * Load:
-     * - ticket tier
-     * - event
-     * - event creator profile stripe info
+     * Load ticket tier + event + creator's Stripe Connect status.
      */
     const { data: tier, error: tierError } = await admin
       .from('ticket_tiers')
@@ -92,31 +88,14 @@ export async function POST(request: NextRequest) {
 
     if (tierError || !tier) {
       console.error('[tickets/checkout] tier query error:', tierError)
-
-      return NextResponse.json(
-        { error: 'Ticket tier not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Ticket tier not found' }, { status: 404 })
     }
 
-    console.log(
-      '[tickets/checkout] tier:',
-      JSON.stringify(tier, null, 2)
-    )
-
     // Supabase nested joins can return object OR array
-    const event = Array.isArray(tier.events)
-      ? tier.events[0]
-      : tier.events
-
+    const event = Array.isArray(tier.events) ? tier.events[0] : tier.events
     const creatorProfile = Array.isArray(event?.profiles)
       ? event.profiles[0]
       : event?.profiles
-
-    console.log(
-      '[tickets/checkout] creator profile:',
-      creatorProfile
-    )
 
     /**
      * Validate ticket tier
@@ -129,37 +108,24 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date()
-
-    if (
-      tier.sale_starts_at &&
-      new Date(tier.sale_starts_at) > now
-    ) {
+    if (tier.sale_starts_at && new Date(tier.sale_starts_at) > now) {
       return NextResponse.json(
         { error: 'Ticket sales have not started yet' },
         { status: 400 }
       )
     }
-
-    if (
-      tier.sale_ends_at &&
-      new Date(tier.sale_ends_at) < now
-    ) {
+    if (tier.sale_ends_at && new Date(tier.sale_ends_at) < now) {
       return NextResponse.json(
         { error: 'Ticket sales have ended' },
         { status: 400 }
       )
     }
 
-    // Capacity validation
     if (tier.quantity !== null) {
-      const remaining =
-        tier.quantity - tier.quantity_sold
-
+      const remaining = tier.quantity - tier.quantity_sold
       if (remaining < quantity) {
         return NextResponse.json(
-          {
-            error: `Only ${remaining} ticket(s) remaining`,
-          },
+          { error: `Only ${remaining} ticket(s) remaining` },
           { status: 400 }
         )
       }
@@ -168,33 +134,18 @@ export async function POST(request: NextRequest) {
     /**
      * Validate organizer Stripe setup
      */
-    const stripeAccountId =
-      creatorProfile?.stripe_account_id
-
-    const stripeStatus =
-      creatorProfile?.stripe_account_status
-
-    console.log('[tickets/checkout] stripe:', {
-      stripeAccountId,
-      stripeStatus,
-    })
+    const stripeAccountId = creatorProfile?.stripe_account_id
+    const stripeStatus = creatorProfile?.stripe_account_status
 
     if (!stripeAccountId) {
       return NextResponse.json(
-        {
-          error:
-            'Event creator has not connected Stripe',
-        },
+        { error: 'Event creator has not connected Stripe' },
         { status: 400 }
       )
     }
-
     if (stripeStatus !== 'enabled') {
       return NextResponse.json(
-        {
-          error:
-            'Event creator has not completed payment setup',
-        },
+        { error: 'Event creator has not completed payment setup' },
         { status: 400 }
       )
     }
@@ -203,186 +154,140 @@ export async function POST(request: NextRequest) {
      * Buyer / customer handling
      */
     let customerId: string
-
     let buyerEmail: string
     let buyerName: string | null
     let buyerPhone: string | null
     let buyerUserId: string | null
 
-    // Logged-in buyer
     if (user) {
       const { data: buyerProfile } = await admin
         .from('profiles')
-        .select(`
-          email,
-          full_name,
-          phone_number,
-          stripe_customer_id
-        `)
+        .select('email, full_name, phone_number, stripe_customer_id')
         .eq('id', user.id)
         .single()
 
-      buyerEmail =
-        buyerProfile?.email || user.email || ''
-
-      buyerName =
-        buyerProfile?.full_name || null
-
-      buyerPhone =
-        buyerProfile?.phone_number || null
-
+      buyerEmail = buyerProfile?.email || user.email || ''
+      buyerName = buyerProfile?.full_name || null
+      buyerPhone = buyerProfile?.phone_number || null
       buyerUserId = user.id
 
-      let existingCustomerId =
-        buyerProfile?.stripe_customer_id
+      let existingCustomerId = buyerProfile?.stripe_customer_id
 
-      // Create Stripe customer if missing
       if (!existingCustomerId) {
-        const customer =
-          await stripe.customers.create({
-            email: buyerEmail,
-            name: buyerName || undefined,
-            phone: buyerPhone || undefined,
-            metadata: {
-              supabase_user_id: user.id,
-            },
-          })
-
-        existingCustomerId = customer.id
-
-        await admin
-          .from('profiles')
-          .update({
-            stripe_customer_id:
-              existingCustomerId,
-          })
-          .eq('id', user.id)
-      }
-
-      customerId = existingCustomerId
-    } else {
-      // Guest checkout
-      buyerEmail = guest.email
-        .trim()
-        .toLowerCase()
-
-      buyerName = guest.name.trim()
-
-      buyerPhone = guest.phone || null
-
-      buyerUserId = null
-
-      const customer =
-        await stripe.customers.create({
+        const customer = await stripe.customers.create({
           email: buyerEmail,
           name: buyerName || undefined,
           phone: buyerPhone || undefined,
-          metadata: {
-            guest_checkout: 'true',
-          },
+          metadata: { supabase_user_id: user.id },
         })
+        existingCustomerId = customer.id
+        await admin
+          .from('profiles')
+          .update({ stripe_customer_id: existingCustomerId })
+          .eq('id', user.id)
+      }
+      customerId = existingCustomerId
+    } else {
+      buyerEmail = guest.email.trim().toLowerCase()
+      buyerName = guest.name.trim()
+      buyerPhone = guest.phone || null
+      buyerUserId = null
 
+      const customer = await stripe.customers.create({
+        email: buyerEmail,
+        name: buyerName || undefined,
+        phone: buyerPhone || undefined,
+        metadata: { guest_checkout: 'true' },
+      })
       customerId = customer.id
     }
 
     /**
-     * Pricing
+     * Pricing — buyer absorbs Stripe fees.
+     *
+     * unitAmount         = ticket face value (cents)
+     * serviceFeePerTicket = dime-rounded Stripe fee estimate (buyer side)
+     * appFeePerTicket    = serviceFeePerTicket + $0.70 platform margin
+     *                      (pulled from organizer's transfer)
      */
-    const unitAmount = Math.round(
-      Number(tier.price) * 100
-    )
-
-    const applicationFeeAmount =
-      platformFeeAmount(unitAmount) * quantity
+    const unitAmount = Math.round(Number(tier.price) * 100)
+    const serviceFeePerTicket = serviceFeeAmount(unitAmount)
+    const appFeePerTicket = applicationFeeAmount(unitAmount)
+    const applicationFeeAmountTotal = appFeePerTicket * quantity
 
     /**
-     * Metadata for webhook
+     * Metadata for webhook + reporting
      */
-    const sessionMetadata: Record<
-      string,
-      string
-    > = {
+    const sessionMetadata: Record<string, string> = {
       tier_id: tierId,
       event_id: eventId,
       quantity: String(quantity),
       buyer_email: buyerEmail,
       buyer_name: buyerName || '',
       buyer_phone: buyerPhone || '',
+      ticket_unit_amount: String(unitAmount),
+      service_fee_per_ticket: String(serviceFeePerTicket),
+      application_fee_per_ticket: String(appFeePerTicket),
     }
+    if (buyerUserId) sessionMetadata.buyer_user_id = buyerUserId
 
-    if (buyerUserId) {
-      sessionMetadata.buyer_user_id =
-        buyerUserId
+    /**
+     * Build line items so buyer sees the fee broken out on Stripe's
+     * hosted checkout page:
+     *   1. Ticket(s) at face value
+     *   2. Service fee (one line, total across all tickets)
+     */
+    const lineItems: import('stripe').Stripe.Checkout.SessionCreateParams.LineItem[] = [
+      {
+        price_data: {
+          currency: 'usd',
+          unit_amount: unitAmount,
+          product_data: {
+            name: `${tier.name} — ${event.title}`,
+            description: tier.description || undefined,
+            metadata: { tier_id: tier.id, event_id: eventId },
+          },
+        },
+        quantity,
+      },
+    ]
+
+    if (serviceFeePerTicket > 0) {
+      lineItems.push({
+        price_data: {
+          currency: 'usd',
+          unit_amount: serviceFeePerTicket * quantity,
+          product_data: {
+            name: 'Service fee',
+            description: 'Covers payment processing.',
+          },
+        },
+        quantity: 1,
+      })
     }
 
     /**
      * Create Stripe Checkout Session
      */
-    const session =
-      await stripe.checkout.sessions.create({
-      
-        payment_method_types: ['card'],
-
-        mode: 'payment',
-
-        line_items: [
-          {
-            price_data: {
-              currency: 'usd',
-
-              unit_amount: unitAmount,
-
-              product_data: {
-                name: `${tier.name} — ${event.title}`,
-
-                description:
-                  tier.description || undefined,
-
-                metadata: {
-                  tier_id: tier.id,
-                  event_id: eventId,
-                },
-              },
-            },
-
-            quantity,
-          },
-        ],
-
-        payment_intent_data: {
-          application_fee_amount:
-            applicationFeeAmount,
-
-          transfer_data: {
-            destination: stripeAccountId,
-          },
-
-          metadata: sessionMetadata,
-        },
-
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode: 'payment',
+      line_items: lineItems,
+      payment_intent_data: {
+        application_fee_amount: applicationFeeAmountTotal,
+        transfer_data: { destination: stripeAccountId },
         metadata: sessionMetadata,
-
-        success_url: `${origin}/tickets/success?session_id={CHECKOUT_SESSION_ID}`,
-
-        cancel_url: `${origin}/events/${event.slug}?ticket_cancelled=1`,
-      })
-
-    return NextResponse.json({
-      url: session.url,
-      sessionId: session.id,
-    })
-  } catch (err: any) {
-    console.error(
-      '[tickets/checkout] error:',
-      err
-    )
-
-    return NextResponse.json(
-      {
-        error:
-          err?.message ||
-          'Failed to create checkout session',
       },
+      metadata: sessionMetadata,
+      success_url: `${origin}/tickets/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/events/${event.slug}?ticket_cancelled=1`,
+    })
+
+    return NextResponse.json({ url: session.url, sessionId: session.id })
+  } catch (err: any) {
+    console.error('[tickets/checkout] error:', err)
+    return NextResponse.json(
+      { error: err?.message || 'Failed to create checkout session' },
       { status: 500 }
     )
   }
