@@ -1,149 +1,215 @@
-import { Resend } from 'resend'
-import QRCode from 'qrcode'
-import { ticketConfirmationEmail } from './emails/ticketConfirmation'
-
-export const resend = new Resend(process.env.RESEND_API_KEY)
-
-export function siteUrl(): string {
-  const explicit = process.env.NEXT_PUBLIC_SITE_URL
-  if (explicit) return explicit.replace(/\/$/, '')
-
-  const vercel = process.env.NEXT_PUBLIC_VERCEL_URL || process.env.VERCEL_URL
-  if (vercel) return `https://${vercel.replace(/\/$/, '')}`
-
-  return 'https://seveneightfive.com'
-}
-
-const TICKET_FROM = '785 Tickets <noreply@seveneightfive.com>'
-
-export type TicketEmailTicket = {
-  qr_token: string
-  ticket_tier_name: string
-}
-
-export type SendTicketEmailArgs = {
-  to: string
-  buyerName: string | null
-  event: {
-    title: string
-    date: string | null // ISO yyyy-mm-dd
-    startTime: string | null // HH:MM or HH:MM:SS
-    endTime: string | null
-    image_url: string | null
-    slug: string
-    venueName: string | null
-    venueAddress: string | null
-    venueCityState: string | null
-  }
-  tickets: TicketEmailTicket[]
-  amountPaid: number | null
-  orderRef: string // session id or payment intent id
-  // Organizer contact info
-  organizerName: string | null
-  organizerEmail: string | null
-}
+import type { SendTicketEmailArgs } from '../email'
+import { formatDate, formatTime } from '../email'
 
 /**
- * Send a single confirmation email to the buyer containing one QR code
- * per ticket purchased.
+ * Build the HTML body for a ticket confirmation email.
  *
- * QR codes are generated via qr.io service (URL-based, works in all clients).
- * Organizer contact info is included at the bottom so buyers can reach out
- * with questions.
+ * Hand-rolled HTML with inline styles — no React Email or build step.
+ * QR codes are generated via qr.io service (URL-based, reliable in all clients).
+ * Organizer contact pulled from the event creator's profile.
  */
-export async function sendTicketEmail(args: SendTicketEmailArgs) {
-  // Generate dummy data URIs (we don't actually use them, but the function
-  // signature still expects them for backward compatibility)
-  const qrDataUris = args.tickets.map(() => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==')
+export function ticketConfirmationEmail(args: SendTicketEmailArgs & {
+  qrDataUris: string[] // Still passed in but we'll use URLs instead
+  siteUrl: string
+  organizerName: string | null
+  organizerEmail: string | null
+}): string {
+  const {
+    buyerName,
+    event,
+    tickets,
+    amountPaid,
+    orderRef,
+    siteUrl,
+    organizerName,
+    organizerEmail,
+  } = args
 
-  const html = ticketConfirmationEmail({
-    ...args,
-    qrDataUris,
-    siteUrl: siteUrl(),
-  })
+  const greeting = buyerName ? `Thanks, ${escapeHtml(buyerName)}!` : 'Thanks!'
 
-  const text = buildPlainText(args)
+  const dateStr = event.date ? formatDate(event.date) : null
+  const timeStr = event.startTime ? formatTime(event.startTime) : null
+  const endTimeStr = event.endTime ? formatTime(event.endTime) : null
+  const timeDisplay = timeStr
+    ? endTimeStr
+      ? `${timeStr} – ${endTimeStr}`
+      : timeStr
+    : null
 
-  return resend.emails.send({
-    from: TICKET_FROM,
-    to: args.to,
-    subject: `Your ticket${args.tickets.length > 1 ? 's' : ''} for ${args.event.title}`,
-    html,
-    text,
-    tags: [
-      { name: 'category', value: 'ticket_confirmation' },
-      { name: 'event_slug', value: args.event.slug },
-    ],
-  })
-}
-
-function buildPlainText(args: SendTicketEmailArgs): string {
-  const url = siteUrl()
-  const lines: string[] = [
-    `Thanks${args.buyerName ? `, ${args.buyerName}` : ''}!`,
-    '',
-    `You're confirmed for ${args.event.title}.`,
-    '',
-  ]
-
-  if (args.event.date) lines.push(`DATE: ${formatDate(args.event.date)}`)
-  if (args.event.startTime) lines.push(`TIME: ${formatTime(args.event.startTime)}`)
-  
-  const venueLine = [args.event.venueName, args.event.venueAddress]
-    .filter(Boolean)
+  // Type guard narrows (string | null)[] -> string[] for TS strict mode.
+  // Venue address already contains city/state, so don't duplicate it.
+  const venueLine = [event.venueName, event.venueAddress]
+    .filter((s): s is string => Boolean(s))
+    .map(escapeHtml)
     .join(' · ')
-  if (venueLine) lines.push(`WHERE: ${venueLine}`)
 
-  lines.push('', `Your ${args.tickets.length} ticket${args.tickets.length > 1 ? 's' : ''}:`)
+  const heroImg = event.image_url
+    ? `<img src="${escapeHtml(event.image_url)}" alt="${escapeHtml(event.title)}" width="600" style="display:block;width:100%;max-width:600px;height:auto;border-radius:12px 12px 0 0;border:0;" />`
+    : ''
 
-  args.tickets.forEach((t, i) => {
-    lines.push('')
-    lines.push(`  Ticket ${i + 1}: ${t.ticket_tier_name}`)
-    lines.push(`  View / scan: ${url}/tickets/${t.qr_token}`)
-  })
-
-  lines.push('')
-  lines.push(`Order reference: ${args.orderRef}`)
-  lines.push('')
-  lines.push('Show the QR code at the entrance, either from this email or by')
-  lines.push('visiting the link above.')
-  lines.push('')
-  lines.push('Cheers!')
-  lines.push('785 Magazine')
-  lines.push('')
-
-  if (args.organizerName || args.organizerEmail) {
-    lines.push('Questions about the event? Contact ' + 
-      (args.organizerName ? args.organizerName : 'the organizer') +
-      (args.organizerEmail ? ` at ${args.organizerEmail}` : ''))
-  }
-
-  lines.push('Questions about your order? Send to kerrice@seveneightfive.com')
-
-  return lines.join('\n')
-}
-
-export function formatDate(iso: string): string {
-  try {
-    const d = new Date(`${iso}T00:00:00`)
-    return d.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
+  const ticketCards = tickets
+    .map((t, i) => {
+      const ticketUrl = `${siteUrl}/tickets/${encodeURIComponent(t.qr_token)}`
+      // Generate QR via qr.io service — URL-based, works in all email clients
+      const qrUrl = `https://qr.io/?qr=${encodeURIComponent(t.qr_token)}`
+      
+      return `
+        <tr>
+          <td style="padding:0 0 16px;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border:1.5px solid #ece8e2;border-radius:12px;overflow:hidden;">
+              <tr>
+                <td style="padding:24px 24px 16px;">
+                  <div style="font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#b8b3ad;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+                    Ticket ${i + 1} of ${tickets.length}
+                  </div>
+                  <div style="margin-top:6px;font-size:16px;font-weight:600;color:#1a1814;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+                    ${escapeHtml(t.ticket_tier_name)}
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="padding:0 24px 16px;">
+                  <img src="${qrUrl}" alt="QR code for ticket ${i + 1}" width="240" height="240" style="display:block;width:240px;height:240px;border:0;background:#ffffff;padding:8px;border-radius:4px;" />
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="padding:0 24px 24px;">
+                  <div style="font-size:11px;color:#8a8580;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;letter-spacing:0.05em;word-break:break-all;">
+                    ${escapeHtml(t.qr_token)}
+                  </div>
+                  <a href="${escapeHtml(ticketUrl)}" style="display:inline-block;margin-top:12px;font-size:13px;color:#C80650;text-decoration:underline;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+                    View ticket online
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>`
     })
-  } catch {
-    return iso
-  }
+    .join('')
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="x-apple-disable-message-reformatting" />
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&display=swap');
+    </style>
+    <title>Your ticket${tickets.length > 1 ? 's' : ''} for ${escapeHtml(event.title)}</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f7f6f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1814;">
+    <div style="display:none;max-height:0;overflow:hidden;font-size:1px;color:#f7f6f4;line-height:1px;">
+      Your ${tickets.length} ticket${tickets.length > 1 ? 's' : ''} for ${escapeHtml(event.title)} — show the QR at the door.
+    </div>
+
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f7f6f4;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;">
+            <!-- Brand header: 785 TICKETS in Oswald font -->
+            <tr>
+              <td style="padding:0 0 16px;">
+                <div style="font-family:'Oswald',sans-serif;font-size:22px;font-weight:700;letter-spacing:0.12em;color:#1a1814;text-transform:uppercase;">
+                  785 Tickets
+                </div>
+              </td>
+            </tr>
+
+            <!-- Hero card -->
+            <tr>
+              <td style="padding:0 0 24px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border:1.5px solid #ece8e2;border-radius:12px;overflow:hidden;">
+                  ${heroImg ? `<tr><td>${heroImg}</td></tr>` : ''}
+                  <tr>
+                    <td style="padding:24px;">
+                      <div style="font-size:22px;font-weight:700;color:#1a1814;line-height:1.25;">
+                        ${escapeHtml(event.title)}
+                      </div>
+                      ${
+                        dateStr || timeDisplay || venueLine
+                          ? `<div style="margin-top:16px;font-size:14px;color:#1a1814;line-height:1.6;">`
+                          : ''
+                      }
+                        ${dateStr ? `<div><strong>DATE:</strong> ${dateStr}</div>` : ''}
+                        ${timeDisplay ? `<div style="margin-top:4px;"><strong>TIME:</strong> ${timeDisplay}</div>` : ''}
+                        ${venueLine ? `<div style="margin-top:4px;"><strong>WHERE:</strong> ${venueLine}</div>` : ''}
+                      ${dateStr || timeDisplay || venueLine ? `</div>` : ''}
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Greeting -->
+            <tr>
+              <td style="padding:0 4px 16px;">
+                <div style="font-size:16px;color:#1a1814;">${greeting}</div>
+                <div style="margin-top:6px;font-size:14px;color:#6b6560;line-height:1.6;">
+                  Your ticket${tickets.length > 1 ? 's are' : ' is'} below. Show the QR code at the entrance, either from this email or by tapping View Ticket Online.
+                </div>
+              </td>
+            </tr>
+
+            <!-- Ticket cards -->
+            ${ticketCards}
+
+            <!-- Order details -->
+            <tr>
+              <td style="padding:8px 4px 24px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-top:1px solid #ece8e2;padding-top:16px;">
+                  <tr>
+                    <td style="font-size:13px;color:#6b6560;">
+                      ${
+                        amountPaid !== null
+                          ? `<div>Order total: <strong style="color:#1a1814;">$${amountPaid.toFixed(2)}</strong></div>`
+                          : ''
+                      }
+                      <div style="margin-top:4px;">Order reference: <span style="font-family:'SFMono-Regular',Consolas,monospace;font-size:12px;">${escapeHtml(orderRef)}</span></div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Closing -->
+            <tr>
+              <td style="padding:16px 4px;">
+                <div style="font-size:14px;color:#1a1814;">Cheers!</div>
+                <div style="margin-top:2px;font-size:13px;color:#1a1814;font-weight:500;">785 Magazine</div>
+              </td>
+            </tr>
+
+            <!-- Footer: Event organizer + platform support -->
+            <tr>
+              <td style="padding:24px 4px;text-align:left;border-top:1px solid #ece8e2;">
+                <div style="font-size:12px;color:#8a8580;line-height:1.6;">
+                  <div style="margin-bottom:8px;">
+                    <strong style="color:#1a1814;">Questions about the event?</strong> Contact
+                    ${organizerName ? ` <strong>${escapeHtml(organizerName)}</strong>` : ' the organizer'}
+                    ${organizerEmail ? ` at <a href="mailto:${escapeHtml(organizerEmail)}" style="color:#C80650;text-decoration:underline;">${escapeHtml(organizerEmail)}</a>` : ''}
+                  </div>
+                  <div>
+                    <strong style="color:#1a1814;">Questions about your order or this email?</strong> Send to
+                    <a href="mailto:kerrice@seveneightfive.com" style="color:#C80650;text-decoration:underline;">kerrice@seveneightfive.com</a>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`
 }
 
-export function formatTime(raw: string): string {
-  // accepts HH:MM or HH:MM:SS
-  const [hStr, mStr] = raw.split(':')
-  const h = parseInt(hStr, 10)
-  const m = mStr ? parseInt(mStr, 10) : 0
-  if (Number.isNaN(h)) return raw
-  const period = h >= 12 ? 'PM' : 'AM'
-  const h12 = h % 12 === 0 ? 12 : h % 12
-  return `${h12}:${m.toString().padStart(2, '0')} ${period}`
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
