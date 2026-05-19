@@ -1,5 +1,5 @@
 // app/sellers/[slug]/page.tsx
-// Public seller profile page — Stripe-compliant
+// Public seller profile page — Stripe Connect compliant
 // URL: https://seveneightfive.com/sellers/[slug]
 
 import { notFound } from 'next/navigation';
@@ -11,7 +11,7 @@ import {
   getPlatformPolicies,
   getSellerDisplayName,
 } from '@/lib/sellers';
-import type { SellerEvent, TicketTier } from '@/types/seller';
+import type { SellerEvent } from '@/types/seller';
 
 export const revalidate = 300;
 
@@ -32,37 +32,28 @@ export async function generateMetadata({
   const name = getSellerDisplayName(seller);
   return {
     title: `${name} — 785 Magazine`,
-    description: `Tickets and events from ${name} on seveneightfive.`,
+    description: `Events from ${name} on seveneightfive.`,
     openGraph: {
       title: name,
-      description: `Tickets and events from ${name}.`,
+      description: `Events from ${name}.`,
       images: seller.avatar_url ? [seller.avatar_url] : undefined,
     },
   };
 }
 
 // ---------- Helpers ----------
-function formatPrice(amount: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
-}
-
-function formatEventDate(dateStr: string) {
-  const d = new Date(dateStr);
-  return {
-    weekday: d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
-    month: d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
-    day: d.getDate(),
-    year: d.getFullYear(),
-  };
-}
-
 function isUpcoming(event: SellerEvent): boolean {
   const t = new Date(event.start_date ?? event.event_date).getTime();
   return t >= Date.now();
+}
+
+function formatDateBlock(dateStr: string) {
+  const d = new Date(dateStr + (dateStr.includes('T') ? '' : 'T00:00:00'));
+  return {
+    day: d.getDate().toString().padStart(2, '0'),
+    mon: d.toLocaleString('en-US', { month: 'short' }).toUpperCase(),
+    year: d.getFullYear(),
+  };
 }
 
 // ---------- Page ----------
@@ -88,28 +79,8 @@ export default async function SellerPage({
 
   return (
     <main className="seller-page">
-      {/* MASTHEAD */}
-      <header className="masthead">
-        <div className="masthead__rule" />
-        <div className="masthead__row">
-          <span>SELLER DOSSIER</span>
-          <span>SEVENEIGHTFIVE / SELLERS</span>
-        </div>
-        <div className="masthead__rule" />
-      </header>
-
       {/* HERO */}
       <section className="hero">
-        <div className="hero__meta">
-          <span className="hero__kicker">/{seller.seller_slug}</span>
-          {seller.seller_activated_at && (
-            <span className="hero__kicker">
-              Selling since{' '}
-              {new Date(seller.seller_activated_at).getFullYear()}
-            </span>
-          )}
-        </div>
-
         <div className="hero__row">
           {seller.avatar_url && (
             <div className="hero__avatar">
@@ -118,92 +89,120 @@ export default async function SellerPage({
             </div>
           )}
           <div className="hero__text">
+            <p className="hero__kicker">SELLER</p>
             <h1 className="hero__name">{displayName}</h1>
             {seller.full_name &&
               seller.seller_business_name &&
-              seller.full_name.trim() !==
-                seller.seller_business_name.trim() && (
-                <p className="hero__operator">
-                  Operated by {seller.full_name}
-                </p>
+              seller.full_name.trim() !== seller.seller_business_name.trim() && (
+                <p className="hero__operator">Operated by {seller.full_name.trim()}</p>
               )}
+            <div className="hero__chips">
+              {isVerified && <span className="chip chip--verified">✓ Verified Seller</span>}
+              {upcoming.length > 0 && (
+                <span className="chip">
+                  {upcoming.length} active event{upcoming.length === 1 ? '' : 's'}
+                </span>
+              )}
+              {seller.seller_activated_at && (
+                <span className="chip chip--ghost">
+                  Selling since {new Date(seller.seller_activated_at).getFullYear()}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-
-        <div className="hero__chips">
-          {isVerified && (
-            <span className="chip chip--verified">✓ Verified Seller</span>
-          )}
-          {upcoming.length > 0 && (
-            <span className="chip">
-              {upcoming.length} active event{upcoming.length === 1 ? '' : 's'}
-            </span>
-          )}
-          {seller.followers && seller.followers > 0 && (
-            <span className="chip">
-              {Math.round(seller.followers).toLocaleString()} followers
-            </span>
-          )}
         </div>
       </section>
 
-      {/* NOW SELLING */}
+      {/* ON SALE NOW */}
       <section className="section">
-        <div className="section__label">
-          <span className="section__num">01</span>
-          <span className="section__title">
-            {upcoming.length > 0 ? 'Now Selling' : 'No Active Events'}
-          </span>
-        </div>
+        <h2 className="section__title">
+          {upcoming.length > 0 ? 'On Sale Now' : 'No Active Events'}
+        </h2>
 
         {upcoming.length === 0 ? (
           <p className="prose prose--muted">
-            {displayName} has no upcoming events at this time. Check back soon
-            or contact directly using the details below.
+            {displayName} has no upcoming events at this time. Check back soon or use the
+            contact details below.
           </p>
         ) : (
-          <ul className="events">
-            {upcoming.map((event) => (
-              <EventRow key={event.id} event={event} />
-            ))}
-          </ul>
+          <div className="events">
+            {upcoming.map((event) => {
+              const d = formatDateBlock(event.start_date ?? event.event_date);
+              const eventPath = `/events/${event.slug ?? event.id}`;
+              return (
+                <Link key={event.id} href={eventPath} className="eventCard">
+                  <div className="eventDate">
+                    <span className="day">{d.day}</span>
+                    <span className="mon">{d.mon}</span>
+                  </div>
+                  <div className="eventInfo">
+                    {event.event_format && (
+                      <div className="eventTag">{event.event_format}</div>
+                    )}
+                    <div className="eventName">{event.title}</div>
+                    <div className="eventMeta">
+                      {event.venue?.name}
+                      {event.event_start_time && ` · ${event.event_start_time}`}
+                    </div>
+                  </div>
+                  <div className="eventThumb">
+                    {event.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={event.image_url} alt="" className="eventThumbImg" />
+                    ) : (
+                      <div className="eventThumbFallback" />
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         )}
       </section>
 
       {/* PAST EVENTS */}
       {past.length > 0 && (
         <section className="section">
-          <div className="section__label">
-            <span className="section__num">02</span>
-            <span className="section__title">Past Productions</span>
-          </div>
-          <ul className="past-events">
-            {past.slice(0, 12).map((e) => {
-              const d = formatEventDate(e.start_date ?? e.event_date);
+          <h2 className="section__title">Past Events</h2>
+          <div className="events">
+            {past.slice(0, 12).map((event) => {
+              const d = formatDateBlock(event.start_date ?? event.event_date);
+              const eventPath = `/events/${event.slug ?? event.id}`;
               return (
-                <li key={e.id} className="past-events__item">
-                  <span className="past-events__date">
-                    {d.month} {d.day}, {d.year}
-                  </span>
-                  <span className="past-events__title">{e.title}</span>
-                  {e.venue?.name && (
-                    <span className="past-events__venue">{e.venue.name}</span>
-                  )}
-                </li>
+                <Link
+                  key={event.id}
+                  href={eventPath}
+                  className="eventCard eventCard--past"
+                >
+                  <div className="eventDate">
+                    <span className="day">{d.day}</span>
+                    <span className="mon">{d.mon}</span>
+                  </div>
+                  <div className="eventInfo">
+                    <div className="eventName">{event.title}</div>
+                    <div className="eventMeta">
+                      {event.venue?.name}
+                      {` · ${d.year}`}
+                    </div>
+                  </div>
+                  <div className="eventThumb">
+                    {event.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={event.image_url} alt="" className="eventThumbImg" />
+                    ) : (
+                      <div className="eventThumbFallback" />
+                    )}
+                  </div>
+                </Link>
               );
             })}
-          </ul>
+          </div>
         </section>
       )}
 
-      {/* POLICIES (required for Stripe) */}
+      {/* POLICIES — required for Stripe Connect */}
       <section className="section">
-        <div className="section__label">
-          <span className="section__num">
-            {past.length > 0 ? '03' : '02'}
-          </span>
-          <span className="section__title">Policies</span>
-        </div>
+        <h2 className="section__title">Policies</h2>
 
         <div className="policy">
           <h3 className="policy__heading">Refund Policy</h3>
@@ -218,10 +217,9 @@ export default async function SellerPage({
         <p className="policy__footnote">
           All purchases are processed under{' '}
           <Link href={policies.platform_terms_url}>
-            Seveneightfive's Terms of Service
+            Seveneightfive&apos;s Terms of Service
           </Link>{' '}
-          and the policies above. Payment processing by Stripe. For platform
-          questions contact{' '}
+          and the policies above. For platform questions contact{' '}
           <a href={`mailto:${policies.platform_contact_email}`}>
             {policies.platform_contact_email}
           </a>
@@ -231,12 +229,7 @@ export default async function SellerPage({
 
       {/* CONTACT */}
       <section className="section">
-        <div className="section__label">
-          <span className="section__num">
-            {past.length > 0 ? '04' : '03'}
-          </span>
-          <span className="section__title">Contact</span>
-        </div>
+        <h2 className="section__title">Contact</h2>
 
         <dl className="contact">
           <div className="contact__row">
@@ -253,9 +246,7 @@ export default async function SellerPage({
             <div className="contact__row">
               <dt>Phone</dt>
               <dd>
-                <a href={`tel:${seller.phone_number}`}>
-                  {seller.phone_number}
-                </a>
+                <a href={`tel:${seller.phone_number}`}>{seller.phone_number}</a>
               </dd>
             </div>
           )}
@@ -268,410 +259,267 @@ export default async function SellerPage({
         </dl>
       </section>
 
-      {/* COLOPHON */}
-      <footer className="colophon">
-        <div className="masthead__rule" />
-        <div className="colophon__row">
-          <span>
-            Hosted on <Link href="/">seveneightfive.com</Link>
-          </span>
-          <span>Payments processed securely by Stripe</span>
-        </div>
-      </footer>
+      {/* STRIPE COMPLIANCE LINE */}
+      <p className="stripe-line">Payments processed securely by Stripe</p>
 
       <style>{styles}</style>
     </main>
   );
 }
 
-// ---------- Event row ----------
-function EventRow({ event }: { event: SellerEvent }) {
-  const d = formatEventDate(event.start_date ?? event.event_date);
-
-  const tierPrices = event.ticket_tiers
-    .map((t) => Number(t.price))
-    .filter((n) => !Number.isNaN(n));
-  const minPrice =
-    tierPrices.length > 0
-      ? Math.min(...tierPrices)
-      : event.ticket_price
-      ? Number(event.ticket_price)
-      : null;
-
-  // Prefer internal route for 785tickets, external otherwise
-  const eventPath = `/events/${event.slug ?? event.id}`;
-  const buyHref =
-    event.ticketing_enabled && event.ticket_platform === '785tickets'
-      ? eventPath
-      : event.ticket_url ?? eventPath;
-
-  const ctaLabel = event.cta_label || 'Get Tickets';
-
-  return (
-    <li className="event">
-      <div className="event__date">
-        <span className="event__weekday">{d.weekday}</span>
-        <span className="event__month">{d.month}</span>
-        <span className="event__day">{d.day}</span>
-        <span className="event__year">{d.year}</span>
-      </div>
-
-      <div className="event__body">
-        <h3 className="event__title">
-          <Link href={eventPath}>{event.title}</Link>
-        </h3>
-
-        {event.venue && (
-          <p className="event__venue">
-            {event.venue.name}
-            {event.venue.city && (
-              <span className="event__address">
-                {' '}
-                · {event.venue.city}
-                {event.venue.state ? `, ${event.venue.state}` : ''}
-              </span>
-            )}
-          </p>
-        )}
-
-        {event.event_start_time && (
-          <p className="event__time">
-            Doors {event.event_start_time}
-            {event.event_end_time && ` – ${event.event_end_time}`}
-          </p>
-        )}
-
-        {event.description && (
-          <p className="event__desc">
-            {event.description.length > 240
-              ? `${event.description.slice(0, 240).trim()}…`
-              : event.description}
-          </p>
-        )}
-
-        {event.ticket_tiers.length > 0 && (
-          <ul className="tickets">
-            {event.ticket_tiers.map((t: TicketTier) => (
-              <li key={t.id} className="tickets__row">
-                <span className="tickets__name">{t.name}</span>
-                {t.description && (
-                  <span className="tickets__desc">{t.description}</span>
-                )}
-                <span className="tickets__price">
-                  {formatPrice(Number(t.price))}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div className="event__cta-row">
-          <a
-            href={buyHref}
-            className="cta"
-            {...(event.ticket_platform === 'external'
-              ? { target: '_blank', rel: 'noopener noreferrer' }
-              : {})}
-          >
-            {ctaLabel}
-            {minPrice !== null && (
-              <span className="cta__from">
-                {' '}
-                · from {formatPrice(minPrice)}
-              </span>
-            )}
-          </a>
-        </div>
-      </div>
-    </li>
-  );
-}
-
-// ---------- Styles (editorial / magazine aesthetic) ----------
+// ---------- Styles ----------
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;600&family=Inter+Tight:wght@400;500;600&display=swap');
-
   .seller-page {
     --ink: #14110f;
-    --paper: #f5f1ea;
-    --paper-2: #ebe5d9;
-    --accent: #c8442a;
     --muted: #6a635a;
-    --rule: #14110f;
+    --accent: #c80650;
+    --rule: rgba(20, 17, 15, 0.12);
+    --card-bg: rgba(0, 0, 0, 0.02);
 
-    background: var(--paper);
     color: var(--ink);
-    font-family: 'Inter Tight', system-ui, sans-serif;
+    font-family: var(--font-dm-sans), system-ui, sans-serif;
     max-width: 1100px;
     margin: 0 auto;
-    padding: 2rem clamp(1.25rem, 4vw, 3rem) 4rem;
-    line-height: 1.6;
+    padding: 1.5rem clamp(1rem, 4vw, 2.5rem) 3rem;
+    line-height: 1.5;
   }
 
-  .masthead__rule { height: 1px; background: var(--rule); }
-  .masthead__row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.6rem 0;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.7rem;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
+  .seller-page h1,
+  .seller-page h2,
+  .seller-page h3 {
+    font-family: var(--font-oswald), system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.01em;
   }
 
+  /* HERO */
   .hero {
-    padding: clamp(2.5rem, 8vw, 5rem) 0 clamp(2rem, 6vw, 4rem);
+    padding: clamp(1.5rem, 4vw, 2.5rem) 0;
     border-bottom: 1px solid var(--rule);
-  }
-  .hero__meta { display: flex; gap: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
-  .hero__kicker {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.72rem;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--muted);
   }
   .hero__row {
     display: flex;
     gap: clamp(1rem, 3vw, 2rem);
     align-items: center;
-    margin-bottom: 1.5rem;
   }
   .hero__avatar {
     flex-shrink: 0;
-    width: clamp(72px, 12vw, 120px);
-    height: clamp(72px, 12vw, 120px);
+    width: clamp(80px, 12vw, 128px);
+    height: clamp(80px, 12vw, 128px);
     border-radius: 50%;
     overflow: hidden;
     border: 2px solid var(--ink);
   }
-  .hero__avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .hero__avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
   .hero__text { flex: 1; min-width: 0; }
-  .hero__name {
-    font-family: 'Fraunces', serif;
-    font-weight: 800;
-    font-size: clamp(2rem, 7vw, 4.5rem);
-    line-height: 0.95;
-    letter-spacing: -0.03em;
+  .hero__kicker {
+    font-family: var(--font-oswald), system-ui, sans-serif;
+    font-size: 0.78rem;
+    letter-spacing: 0.22em;
+    color: var(--muted);
     margin: 0 0 0.35rem;
-    font-variation-settings: 'opsz' 144;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .hero__name {
+    font-size: clamp(2rem, 6vw, 3.75rem);
+    line-height: 1;
+    margin: 0 0 0.4rem;
+    font-weight: 700;
+    text-transform: uppercase;
   }
   .hero__operator {
-    margin: 0;
+    margin: 0 0 0.85rem;
     color: var(--muted);
-    font-style: italic;
-    font-family: 'Fraunces', serif;
-    font-size: 1rem;
+    font-size: 0.95rem;
   }
-  .hero__chips { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .hero__chips {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+  }
   .chip {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-oswald), system-ui, sans-serif;
     font-size: 0.7rem;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    padding: 0.35rem 0.7rem;
+    padding: 0.3rem 0.7rem;
     border: 1px solid var(--ink);
     border-radius: 999px;
+    font-weight: 500;
   }
-  .chip--verified { background: var(--ink); color: var(--paper); }
+  .chip--verified { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .chip--ghost { border-color: var(--rule); color: var(--muted); }
 
+  /* SECTIONS */
   .section {
-    padding: clamp(2rem, 5vw, 3.5rem) 0;
+    padding: clamp(1.75rem, 4vw, 2.5rem) 0;
     border-bottom: 1px solid var(--rule);
   }
-  .section__label {
-    display: flex;
-    align-items: baseline;
-    gap: 1rem;
-    margin-bottom: 1.75rem;
-  }
-  .section__num {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.75rem;
-    letter-spacing: 0.16em;
-    color: var(--accent);
-  }
   .section__title {
-    font-family: 'Fraunces', serif;
-    font-size: clamp(1.5rem, 3vw, 2.25rem);
-    font-weight: 600;
-    letter-spacing: -0.02em;
+    font-size: clamp(1.25rem, 2.4vw, 1.75rem);
+    margin: 0 0 1.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
   }
 
-  .prose { font-size: 1.05rem; max-width: 62ch; }
+  .prose { font-size: 1rem; max-width: 62ch; margin: 0; }
   .prose--muted { color: var(--muted); }
 
-  .events { list-style: none; padding: 0; margin: 0; }
-  .event {
+  /* EVENT CARDS — matches home page pattern */
+  .events { display: flex; flex-direction: column; gap: 0.75rem; }
+  .eventCard {
     display: grid;
-    grid-template-columns: 110px 1fr;
-    gap: clamp(1rem, 3vw, 2.5rem);
-    padding: 2rem 0;
-    border-top: 1px solid var(--rule);
-  }
-  .event:first-child { border-top: none; padding-top: 0; }
-
-  .event__date {
-    display: flex;
-    flex-direction: column;
-    line-height: 1;
-    font-family: 'JetBrains Mono', monospace;
-  }
-  .event__weekday {
-    font-size: 0.7rem;
-    letter-spacing: 0.18em;
-    color: var(--muted);
-    margin-bottom: 0.4rem;
-  }
-  .event__month { font-size: 0.85rem; letter-spacing: 0.12em; }
-  .event__day {
-    font-family: 'Fraunces', serif;
-    font-size: 3.25rem;
-    font-weight: 800;
-    line-height: 1;
-    margin: 0.2rem 0;
-    color: var(--accent);
-    font-variation-settings: 'opsz' 144;
-  }
-  .event__year { font-size: 0.75rem; color: var(--muted); }
-
-  .event__title {
-    font-family: 'Fraunces', serif;
-    font-size: clamp(1.4rem, 2.4vw, 1.85rem);
-    font-weight: 600;
-    margin: 0 0 0.4rem;
-    line-height: 1.15;
-    letter-spacing: -0.015em;
-  }
-  .event__title a { color: inherit; text-decoration: none; }
-  .event__title a:hover { color: var(--accent); }
-  .event__venue { margin: 0 0 0.15rem; font-weight: 500; }
-  .event__address { color: var(--muted); font-weight: 400; }
-  .event__time {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.78rem;
-    letter-spacing: 0.1em;
-    color: var(--muted);
-    text-transform: uppercase;
-    margin: 0 0 1rem;
-  }
-  .event__desc { max-width: 56ch; margin: 0 0 1.25rem; }
-
-  .tickets {
-    list-style: none;
-    padding: 1rem 1.1rem;
-    margin: 0 0 1.5rem;
-    background: var(--paper-2);
-    border-radius: 4px;
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-  }
-  .tickets__row {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    gap: 0.75rem;
-    align-items: baseline;
-    font-size: 0.95rem;
-  }
-  .tickets__name { font-weight: 600; }
-  .tickets__desc { color: var(--muted); font-size: 0.85rem; }
-  .tickets__price { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
-
-  .cta {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.85rem 1.5rem;
-    background: var(--ink);
-    color: var(--paper);
-    text-decoration: none;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.85rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    border-radius: 2px;
-    transition: background 0.18s, transform 0.18s;
-  }
-  .cta:hover { background: var(--accent); transform: translateY(-1px); }
-  .cta__from { color: rgba(245, 241, 234, 0.7); font-weight: 400; }
-
-  .past-events { list-style: none; padding: 0; margin: 0; }
-  .past-events__item {
-    display: grid;
-    grid-template-columns: 130px 1fr auto;
+    grid-template-columns: 64px 1fr 80px;
     gap: 1rem;
-    padding: 0.8rem 0;
-    border-top: 1px dashed var(--rule);
-    font-size: 0.95rem;
+    align-items: center;
+    padding: 0.85rem 1rem;
+    background: var(--card-bg);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.15s, transform 0.15s, border-color 0.15s;
   }
-  .past-events__item:first-child { border-top: none; }
-  .past-events__date {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.78rem;
-    color: var(--muted);
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+  .eventCard:hover {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(20, 17, 15, 0.24);
+    transform: translateY(-1px);
   }
-  .past-events__title { font-family: 'Fraunces', serif; font-weight: 600; }
-  .past-events__venue { color: var(--muted); font-size: 0.85rem; }
+  .eventCard--past { opacity: 0.78; }
 
-  .policy { margin-bottom: 1.5rem; }
-  .policy__heading {
-    font-family: 'Fraunces', serif;
-    font-size: 1.15rem;
+  .eventDate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1;
+    font-family: var(--font-oswald), system-ui, sans-serif;
+  }
+  .eventDate .day {
+    font-size: 1.85rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .eventDate .mon {
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-top: 0.15rem;
+  }
+
+  .eventInfo { min-width: 0; }
+  .eventTag {
+    font-family: var(--font-oswald), system-ui, sans-serif;
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 0.2rem;
+  }
+  .eventName {
+    font-family: var(--font-oswald), system-ui, sans-serif;
+    font-size: 1.05rem;
     font-weight: 600;
-    margin: 0 0 0.5rem;
+    line-height: 1.2;
+    margin-bottom: 0.15rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .eventMeta {
+    font-size: 0.85rem;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .eventThumb {
+    width: 80px;
+    height: 80px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.06);
+    flex-shrink: 0;
+  }
+  .eventThumbImg { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .eventThumbFallback {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(200, 6, 80, 0.12), rgba(20, 17, 15, 0.08));
+  }
+
+  /* POLICIES */
+  .policy { margin-bottom: 1.25rem; }
+  .policy:last-of-type { margin-bottom: 0; }
+  .policy__heading {
+    font-size: 1rem;
+    margin: 0 0 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
   }
   .policy__footnote {
     font-size: 0.85rem;
     color: var(--muted);
-    margin-top: 1.5rem;
+    margin-top: 1.25rem;
     max-width: 60ch;
   }
   .policy__footnote a { color: var(--ink); }
 
+  /* CONTACT */
   .contact { margin: 0; }
   .contact__row {
     display: grid;
-    grid-template-columns: 140px 1fr;
+    grid-template-columns: 120px 1fr;
     gap: 1rem;
-    padding: 0.75rem 0;
+    padding: 0.65rem 0;
     border-top: 1px solid var(--rule);
-    font-size: 1rem;
+    font-size: 0.95rem;
   }
   .contact__row:first-child { border-top: none; padding-top: 0; }
   .contact dt {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-oswald), system-ui, sans-serif;
     font-size: 0.72rem;
     letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--muted);
     align-self: center;
+    font-weight: 500;
   }
   .contact dd { margin: 0; }
-  .contact a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .contact a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
 
-  .colophon { padding-top: 2.5rem; }
-  .colophon__row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.8rem 0 0;
-    font-family: 'JetBrains Mono', monospace;
+  /* STRIPE LINE */
+  .stripe-line {
+    text-align: center;
+    margin: 2rem 0 0;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+    font-family: var(--font-oswald), system-ui, sans-serif;
     font-size: 0.72rem;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--muted);
   }
-  .colophon a { color: var(--muted); }
 
+  /* MOBILE */
   @media (max-width: 640px) {
-    .event { grid-template-columns: 1fr; gap: 0.75rem; }
-    .event__date { flex-direction: row; align-items: baseline; gap: 0.5rem; }
-    .event__day { font-size: 1.5rem; margin: 0; }
-    .past-events__item { grid-template-columns: 1fr; gap: 0.2rem; }
+    .hero__row { flex-direction: column; align-items: flex-start; gap: 1rem; }
+    .eventCard { grid-template-columns: 56px 1fr 64px; gap: 0.75rem; padding: 0.7rem; }
+    .eventDate .day { font-size: 1.5rem; }
+    .eventThumb { width: 64px; height: 64px; }
     .contact__row { grid-template-columns: 1fr; gap: 0.2rem; }
-    .tickets__row { grid-template-columns: 1fr auto; }
-    .tickets__desc { grid-column: 1 / -1; }
   }
 `;
