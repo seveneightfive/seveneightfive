@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabaseBrowser'
-import { Loader2, Plus, Trash2, AlertCircle, Check } from 'lucide-react'
+import { Loader2, Plus, Trash2, AlertCircle, Check, ChevronDown, ChevronUp, Pencil } from 'lucide-react'
 
 type Tier = {
   id?: string
@@ -53,10 +53,24 @@ const hintCls = 'mt-1 text-[11px] text-gray-400 dark:text-gray-500'
  */
 function expandSaleTime(value: string, kind: 'start' | 'end'): string | null {
   if (!value || !value.trim()) return null
-  // Already has a time component → use as-is
   if (value.includes('T')) return value
-  // Bare YYYY-MM-DD → pad to start/end of day
   return kind === 'start' ? `${value}T00:00:00` : `${value}T23:59:59`
+}
+
+function formatSaleWindow(start: string, end: string): string | null {
+  if (!start && !end) return null
+  const fmt = (s: string) => {
+    if (!s) return ''
+    try {
+      const d = new Date(s.includes('T') ? s : `${s}T00:00:00`)
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    } catch {
+      return s
+    }
+  }
+  if (start && end) return `Sales: ${fmt(start)} – ${fmt(end)}`
+  if (start) return `Sales start ${fmt(start)}`
+  return `Sales end ${fmt(end)}`
 }
 
 export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Props) {
@@ -66,6 +80,10 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+
+  // Track which tiers are expanded (showing the edit form vs just the card)
+  // Key is tier index in the `tiers` array. New unsaved tiers default open.
+  const [openTiers, setOpenTiers] = useState<Record<number, boolean>>({})
 
   const supabase = createClient()
 
@@ -92,7 +110,12 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
   }, [eventId])
 
   const addTier = () => {
-    setTiers((prev) => [...prev, { ...EMPTY_TIER(), sort_order: prev.length }])
+    setTiers((prev) => {
+      const next = [...prev, { ...EMPTY_TIER(), sort_order: prev.length }]
+      // Auto-open the newly added tier
+      setOpenTiers((o) => ({ ...o, [next.length - 1]: true }))
+      return next
+    })
   }
 
   const updateTier = (index: number, field: keyof Tier, value: any) => {
@@ -101,6 +124,10 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
 
   const deleteTier = (index: number) => {
     setTiers((prev) => prev.map((t, i) => (i === index ? { ...t, _deleted: true } : t)))
+  }
+
+  const toggleOpen = (index: number) => {
+    setOpenTiers((prev) => ({ ...prev, [index]: !prev[index] }))
   }
 
   const handleSave = async () => {
@@ -124,6 +151,7 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
         await supabase.from('ticket_tiers').delete().eq('id', t.id!)
       }
 
+      const updatedTiers = [...tiers]
       for (let i = 0; i < activeTiers.length; i++) {
         const t = activeTiers[i]
         const payload = {
@@ -148,13 +176,14 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
             .select('id')
             .single()
           if (error) throw error
-          setTiers((prev) =>
-            prev.map((tier, idx) =>
-              idx === tiers.indexOf(t) ? { ...tier, id: data.id, _new: false } : tier
-            )
-          )
+          const idx = updatedTiers.indexOf(t)
+          if (idx >= 0) updatedTiers[idx] = { ...t, id: data.id, _new: false }
         }
       }
+      setTiers(updatedTiers)
+
+      // Collapse all tiers after a successful save — clearer UX
+      setOpenTiers({})
 
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
@@ -224,124 +253,186 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
         <>
           {activeTiers.length === 0 && (
             <div className="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-white/[0.02] dark:text-gray-400">
-              No ticket tiers yet. Add one below to get started.
+              No ticket tiers yet. Tap <span className="font-semibold">Create Ticket Tier</span> below to add one.
             </div>
           )}
 
-          {activeTiers.map((tier, i) => (
-            <div
-              key={tier.id || `new-${i}`}
-              className="space-y-3 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-gray-400 dark:text-gray-500">
-                  Tier {i + 1}
-                </span>
-                <div className="flex items-center gap-3">
-                  {tier.quantity_sold !== undefined && tier.quantity_sold > 0 && (
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {tier.quantity_sold} sold
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => deleteTier(tiers.indexOf(tier))}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 transition hover:text-brand-600 dark:hover:text-brand-400"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Remove
-                  </button>
-                </div>
-              </div>
+          {activeTiers.map((tier) => {
+            const realIndex = tiers.indexOf(tier)
+            const isOpen = !!openTiers[realIndex]
+            const isUnsaved = !tier.id
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr_1fr]">
-                <div>
-                  <label className={fieldLabelCls}>Tier Name *</label>
-                  <input
-                    type="text"
-                    placeholder="General Admission"
-                    value={tier.name}
-                    onChange={(e) => updateTier(tiers.indexOf(tier), 'name', e.target.value)}
-                    className={inputCls}
-                  />
-                </div>
-                <div>
-                  <label className={fieldLabelCls}>Price ($)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="0 = Free"
-                    value={tier.price}
-                    onChange={(e) => updateTier(tiers.indexOf(tier), 'price', e.target.value)}
-                    className={inputCls}
-                  />
-                </div>
-                <div>
-                  <label className={fieldLabelCls}>Quantity</label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Unlimited"
-                    value={tier.quantity}
-                    onChange={(e) => updateTier(tiers.indexOf(tier), 'quantity', e.target.value)}
-                    className={inputCls}
-                  />
-                  <p className={hintCls}>Leave blank for unlimited</p>
-                </div>
-              </div>
+            // Card summary (collapsed view)
+            const priceLabel =
+              tier.price === '' || tier.price === '0' || tier.price === '0.00'
+                ? 'Free'
+                : `$${parseFloat(tier.price || '0').toFixed(2)}`
+            const qtyLabel = tier.quantity
+              ? `${tier.quantity_sold || 0}/${tier.quantity} sold`
+              : tier.quantity_sold
+                ? `${tier.quantity_sold} sold`
+                : 'Unlimited'
+            const saleWindow = formatSaleWindow(tier.sale_starts_at, tier.sale_ends_at)
 
-              <div>
-                <label className={fieldLabelCls}>Description (optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Includes meet & greet"
-                  value={tier.description}
-                  onChange={(e) => updateTier(tiers.indexOf(tier), 'description', e.target.value)}
-                  className={inputCls}
-                />
-              </div>
+            return (
+              <div
+                key={tier.id || `new-${realIndex}`}
+                className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"
+              >
+                {/* Collapsed summary header (always visible) */}
+                <button
+                  type="button"
+                  onClick={() => toggleOpen(realIndex)}
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-2">
+                      <span className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                        {tier.name || 'Untitled tier'}
+                      </span>
+                      {isUnsaved && (
+                        <span className="shrink-0 rounded-full bg-yellow-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300">
+                          Unsaved
+                        </span>
+                      )}
+                      {!tier.is_active && (
+                        <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                          Inactive
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      <span>{priceLabel}</span>
+                      <span>·</span>
+                      <span>{qtyLabel}</span>
+                      {saleWindow && (
+                        <>
+                          <span>·</span>
+                          <span>{saleWindow}</span>
+                        </>
+                      )}
+                    </div>
+                    {tier.description && (
+                      <div className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">
+                        {tier.description}
+                      </div>
+                    )}
+                  </div>
+                  <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-gray-400 dark:text-gray-500">
+                    {isOpen ? (
+                      <>
+                        <ChevronUp className="h-4 w-4" />
+                        <span className="hidden sm:inline">Close</span>
+                      </>
+                    ) : (
+                      <>
+                        <Pencil className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Edit</span>
+                      </>
+                    )}
+                  </span>
+                </button>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className={fieldLabelCls}>Sale Starts</label>
-                  <input
-                    type="datetime-local"
-                    value={tier.sale_starts_at}
-                    onChange={(e) =>
-                      updateTier(tiers.indexOf(tier), 'sale_starts_at', e.target.value)
-                    }
-                    className={inputCls}
-                  />
-                  <p className={hintCls}>Leave blank to sell immediately. Date only = midnight that day.</p>
-                </div>
-                <div>
-                  <label className={fieldLabelCls}>Sale Ends</label>
-                  <input
-                    type="datetime-local"
-                    value={tier.sale_ends_at}
-                    onChange={(e) =>
-                      updateTier(tiers.indexOf(tier), 'sale_ends_at', e.target.value)
-                    }
-                    className={inputCls}
-                  />
-                  <p className={hintCls}>Leave blank to sell until event. Date only = end of that day.</p>
-                </div>
-              </div>
+                {/* Expanded edit form */}
+                {isOpen && (
+                  <div className="space-y-3 border-t border-gray-100 p-4 dark:border-gray-800">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr_1fr]">
+                      <div>
+                        <label className={fieldLabelCls}>Tier Name *</label>
+                        <input
+                          type="text"
+                          placeholder="General Admission"
+                          value={tier.name}
+                          onChange={(e) => updateTier(realIndex, 'name', e.target.value)}
+                          className={inputCls}
+                        />
+                      </div>
+                      <div>
+                        <label className={fieldLabelCls}>Price ($)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="0 = Free"
+                          value={tier.price}
+                          onChange={(e) => updateTier(realIndex, 'price', e.target.value)}
+                          className={inputCls}
+                        />
+                      </div>
+                      <div>
+                        <label className={fieldLabelCls}>Quantity</label>
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="Unlimited"
+                          value={tier.quantity}
+                          onChange={(e) => updateTier(realIndex, 'quantity', e.target.value)}
+                          className={inputCls}
+                        />
+                        <p className={hintCls}>Leave blank for unlimited</p>
+                      </div>
+                    </div>
 
-              <label className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  checked={tier.is_active}
-                  onChange={(e) => updateTier(tiers.indexOf(tier), 'is_active', e.target.checked)}
-                  className="h-4 w-4 accent-brand-600"
-                />
-                <span className="text-xs text-gray-600 dark:text-gray-400">
-                  Active (visible for purchase)
-                </span>
-              </label>
-            </div>
-          ))}
+                    <div>
+                      <label className={fieldLabelCls}>Description (optional)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Includes meet & greet"
+                        value={tier.description}
+                        onChange={(e) => updateTier(realIndex, 'description', e.target.value)}
+                        className={inputCls}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className={fieldLabelCls}>Sale Starts</label>
+                        <input
+                          type="datetime-local"
+                          value={tier.sale_starts_at}
+                          onChange={(e) => updateTier(realIndex, 'sale_starts_at', e.target.value)}
+                          className={inputCls}
+                        />
+                        <p className={hintCls}>Leave blank to sell immediately.</p>
+                      </div>
+                      <div>
+                        <label className={fieldLabelCls}>Sale Ends</label>
+                        <input
+                          type="datetime-local"
+                          value={tier.sale_ends_at}
+                          onChange={(e) => updateTier(realIndex, 'sale_ends_at', e.target.value)}
+                          className={inputCls}
+                        />
+                        <p className={hintCls}>Leave blank to sell until event.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 pt-1">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={tier.is_active}
+                          onChange={(e) => updateTier(realIndex, 'is_active', e.target.checked)}
+                          className="h-4 w-4 accent-brand-600"
+                        />
+                        <span className="text-xs text-gray-600 dark:text-gray-400">
+                          Active (visible for purchase)
+                        </span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => deleteTier(realIndex)}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 transition hover:text-brand-600 dark:hover:text-brand-400"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
 
           <button
             type="button"
@@ -349,7 +440,7 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
             className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-600 transition hover:border-brand-500 hover:bg-brand-50 hover:text-brand-700 dark:border-gray-700 dark:bg-white/[0.02] dark:text-gray-400 dark:hover:border-brand-500/40 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
           >
             <Plus className="h-4 w-4" />
-            Add Ticket Tier
+            Create Ticket Tier
           </button>
         </>
       )}
