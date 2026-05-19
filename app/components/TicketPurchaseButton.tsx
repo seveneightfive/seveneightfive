@@ -20,37 +20,32 @@ type Props = {
   eventSlug: string
 }
 
-/**
- * Normalize a US phone number to E.164.
- *
- * - "555-123-4567"   → "+15551234567"
- * - "(555) 123 4567" → "+15551234567"
- * - "5551234567"     → "+15551234567"
- * - "+15551234567"   → "+15551234567" (unchanged)
- * - "+44 7700 ..."   → "+447700..." (international: keep as-is, strip spaces)
- *
- * If the value can't be coerced to something plausible, return null so the
- * caller can flag a validation error.
- */
 function normalizePhone(raw: string): string | null {
   const cleaned = raw.replace(/[\s().\-]/g, '')
   if (!cleaned) return null
-
-  // Already international
-  if (cleaned.startsWith('+')) {
-    return cleaned.length >= 8 ? cleaned : null
-  }
-
-  // 10-digit US
+  if (cleaned.startsWith('+')) return cleaned.length >= 8 ? cleaned : null
   const digits = cleaned.replace(/\D/g, '')
   if (digits.length === 10) return `+1${digits}`
   if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
-
   return null
 }
 
 function isEmailish(s: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim())
+}
+
+/**
+ * Mirror of lib/stripe.ts buyer-side math so we can preview the fee
+ * before redirecting to Stripe. If lib/stripe.ts constants change they
+ * must change here too — intentionally duplicated because lib/stripe.ts
+ * is server-only.
+ */
+const STRIPE_FEE_PERCENT = 0.029
+const STRIPE_FIXED_FEE_CENTS = 30
+function serviceFeeCentsForPreview(priceInCents: number): number {
+  if (priceInCents <= 0) return 0
+  const est = Math.ceil(priceInCents * STRIPE_FEE_PERCENT) + STRIPE_FIXED_FEE_CENTS
+  return Math.ceil(est / 10) * 10
 }
 
 export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
@@ -63,25 +58,19 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
   const [error, setError] = useState('')
   const [expanded, setExpanded] = useState(false)
 
-  // Session state — we only need to know IF they're logged in.
-  // If yes, skip the guest form. If no, show it.
   const [userId, setUserId] = useState<string | null>(null)
   const [sessionChecked, setSessionChecked] = useState(false)
 
-  // Guest form state (used only when userId is null)
   const [guestName, setGuestName] = useState('')
   const [guestEmail, setGuestEmail] = useState('')
   const [guestPhone, setGuestPhone] = useState('')
 
   useEffect(() => {
     const supabase = createClient()
-
-    // Session check (don't block tier loading on this)
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUserId(user?.id ?? null)
       setSessionChecked(true)
     })
-
     supabase
       .from('ticket_tiers')
       .select(
@@ -112,8 +101,6 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
   const validateGuest = (): string | null => {
     if (!guestName.trim()) return 'Name is required.'
     if (!isEmailish(guestEmail)) return 'Please enter a valid email.'
-    // Phone is optional for free RSVPs but required for paid (helps seller
-    // contact buyers about day-of changes). Tweak this rule if you disagree.
     if (!isFree) {
       const normalized = normalizePhone(guestPhone)
       if (!normalized) return 'Please enter a valid phone number.'
@@ -125,7 +112,6 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
     if (!selectedTier || !tier) return
     setError('')
 
-    // Build the guest payload if this is a guest checkout
     let guestPayload: { name: string; email: string; phone: string | null } | null = null
     if (isGuest) {
       const v = validateGuest()
@@ -180,10 +166,20 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
 
   if (loading || tiers.length === 0) return null
 
-  const remaining =
-    tier?.quantity !== null ? (tier?.quantity ?? 0) - tier.quantity_sold : null
+  const remaining = tier?.quantity !== null ? (tier?.quantity ?? 0) - tier.quantity_sold : null
   const maxQty = Math.min(remaining ?? 10, 10)
-  const totalPrice = ((tier?.price ?? 0) * quantity).toFixed(2)
+
+  // Pricing breakdown (all in cents for precision)
+  const unitCents = Math.round((tier?.price ?? 0) * 100)
+  const serviceFeePerTicketCents = serviceFeeCentsForPreview(unitCents)
+  const subtotalCents = unitCents * quantity
+  const serviceFeeTotalCents = serviceFeePerTicketCents * quantity
+  const totalCents = subtotalCents + serviceFeeTotalCents
+
+  const fmt = (cents: number) => `$${(cents / 100).toFixed(2)}`
+  const subtotalDisplay = fmt(subtotalCents)
+  const serviceFeeDisplay = fmt(serviceFeeTotalCents)
+  const totalDisplay = fmt(totalCents)
 
   const headerLabel = isFreeEvent ? 'Free Event' : '🎟 785 Tickets'
   const headerPrice = isFree ? 'Free' : `$${tier.price.toFixed(2)}`
@@ -198,17 +194,12 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         .tpb-eyebrow { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #b8b3ad; }
         .tpb-price { font-family: 'Oswald', sans-serif; font-size: 1.3rem; font-weight: 600; color: #1a1814; }
         .tpb-price-free { color: #2d7a2d; }
-        .tpb-action-btn {
-          padding: 11px 22px; border: none; border-radius: 8px;
-          font-family: 'Oswald', sans-serif; font-size: 0.85rem; font-weight: 600;
-          letter-spacing: 0.1em; text-transform: uppercase; color: #fff;
-          cursor: pointer; transition: all 0.15s; white-space: nowrap;
-        }
+        .tpb-price-note { font-size: 0.7rem; font-weight: 400; color: #6b6560; margin-left: 6px; }
+        .tpb-action-btn { padding: 11px 22px; border: none; border-radius: 8px; font-family: 'Oswald', sans-serif; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #fff; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
         .tpb-action-btn.paid { background: #C80650; }
         .tpb-action-btn.paid:hover { background: #a8041f; }
         .tpb-action-btn.free { background: #2d7a2d; }
         .tpb-action-btn.free:hover { background: #235e23; }
-        .tpb-action-btn.done { background: #2d7a2d; opacity: 0.7; cursor: default; }
         .tpb-expand { padding: 0 20px 20px; border-top: 1px solid #ece8e2; }
         .tpb-tiers { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
         .tpb-tier { padding: 12px 14px; border-radius: 8px; border: 1.5px solid #ece8e2; background: #fff; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: space-between; }
@@ -223,8 +214,12 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         .tpb-qty-btn:hover { background: #f0ede8; }
         .tpb-qty-btn:disabled { color: #b8b3ad; cursor: not-allowed; }
         .tpb-qty-num { width: 36px; text-align: center; font-weight: 600; font-size: 0.95rem; background: #fff; border-left: 1.5px solid #ece8e2; border-right: 1.5px solid #ece8e2; height: 36px; display: flex; align-items: center; justify-content: center; }
-        .tpb-total { margin-left: auto; font-family: 'Oswald', sans-serif; font-size: 1rem; font-weight: 600; color: #1a1814; }
         .tpb-remaining { font-size: 0.72rem; color: #a85a30; font-weight: 500; }
+        .tpb-summary { margin-top: 16px; padding: 12px 14px; background: #fff; border: 1.5px solid #ece8e2; border-radius: 8px; }
+        .tpb-summary-row { display: flex; align-items: baseline; justify-content: space-between; font-size: 0.85rem; color: #1a1814; }
+        .tpb-summary-row + .tpb-summary-row { margin-top: 6px; }
+        .tpb-summary-label { color: #6b6560; }
+        .tpb-summary-total { border-top: 1px solid #ece8e2; margin-top: 10px; padding-top: 10px; font-family: 'Oswald', sans-serif; font-size: 1rem; font-weight: 600; }
         .tpb-error { margin-top: 12px; padding: 10px 14px; background: rgba(200,6,80,0.08); border: 1px solid rgba(200,6,80,0.2); border-radius: 8px; font-size: 0.82rem; color: #C80650; }
         .tpb-guest-form { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
         .tpb-guest-row { display: flex; flex-direction: column; gap: 4px; }
@@ -234,12 +229,7 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         .tpb-guest-hint { font-size: 0.72rem; color: #8a8580; }
         .tpb-guest-signin { font-size: 0.78rem; color: #6b6560; margin-top: 4px; text-align: center; }
         .tpb-guest-signin a { color: #C80650; text-decoration: underline; font-weight: 500; }
-        .tpb-confirm-btn {
-          margin-top: 16px; width: 100%; padding: 14px; border: none; border-radius: 8px;
-          font-family: 'Oswald', sans-serif; font-size: 0.9rem; font-weight: 600;
-          letter-spacing: 0.1em; text-transform: uppercase; color: #fff;
-          cursor: pointer; transition: all 0.15s;
-        }
+        .tpb-confirm-btn { margin-top: 16px; width: 100%; padding: 14px; border: none; border-radius: 8px; font-family: 'Oswald', sans-serif; font-size: 0.9rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #fff; cursor: pointer; transition: all 0.15s; }
         .tpb-confirm-btn.paid { background: #C80650; }
         .tpb-confirm-btn.paid:hover { background: #a8041f; }
         .tpb-confirm-btn.free { background: #2d7a2d; }
@@ -271,18 +261,8 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
                 <span className="tpb-eyebrow">{headerLabel}</span>
                 <span className={`tpb-price ${isFree ? 'tpb-price-free' : ''}`}>
                   {headerPrice}
-                  {tiers.length > 1 && (
-                    <span
-                      style={{
-                        fontSize: '0.7rem',
-                        fontWeight: 400,
-                        color: '#6b6560',
-                        marginLeft: 6,
-                      }}
-                    >
-                      + more options
-                    </span>
-                  )}
+                  {!isFree && <span className="tpb-price-note">+ service fee</span>}
+                  {tiers.length > 1 && <span className="tpb-price-note">· more options</span>}
                 </span>
               </div>
               {!expanded && (
@@ -319,9 +299,7 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
                         >
                           <div>
                             <div className="tpb-tier-name">{t.name}</div>
-                            {t.description && (
-                              <div className="tpb-tier-desc">{t.description}</div>
-                            )}
+                            {t.description && <div className="tpb-tier-desc">{t.description}</div>}
                           </div>
                           <span className="tpb-tier-price">
                             {t.price === 0 ? 'Free' : `$${t.price.toFixed(2)}`}
@@ -355,7 +333,27 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
                     {remaining !== null && remaining <= 20 && (
                       <span className="tpb-remaining">{remaining} remaining</span>
                     )}
-                    {quantity > 1 && <span className="tpb-total">Total: ${totalPrice}</span>}
+                  </div>
+                )}
+
+                {/* Pricing summary (paid tickets only) */}
+                {!isFree && (
+                  <div className="tpb-summary">
+                    <div className="tpb-summary-row">
+                      <span className="tpb-summary-label">
+                        {quantity > 1 ? `${quantity} × ` : ''}
+                        {tier.name}
+                      </span>
+                      <span>{subtotalDisplay}</span>
+                    </div>
+                    <div className="tpb-summary-row">
+                      <span className="tpb-summary-label">Service fee</span>
+                      <span>{serviceFeeDisplay}</span>
+                    </div>
+                    <div className="tpb-summary-row tpb-summary-total">
+                      <span>Total</span>
+                      <span>{totalDisplay}</span>
+                    </div>
                   </div>
                 )}
 
@@ -405,8 +403,8 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
                     </div>
                     <p className="tpb-guest-signin">
                       Have an account?{' '}
-                      <a href={`/login?return=/events/${eventSlug}`}>Sign in</a> to use
-                      saved details.
+                      <a href={`/login?return=/events/${eventSlug}`}>Sign in</a> to use saved
+                      details.
                     </p>
                   </div>
                 )}
@@ -424,7 +422,7 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
                       : 'Redirecting to checkout…'
                     : isFree
                       ? `RSVP — I'm Going!`
-                      : `Buy ${quantity > 1 ? `${quantity} Tickets` : 'Ticket'} · $${totalPrice}`}
+                      : `Buy ${quantity > 1 ? `${quantity} Tickets` : 'Ticket'} · ${totalDisplay}`}
                 </button>
               </div>
             )}
