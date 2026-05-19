@@ -29,6 +29,9 @@ type EventForm = {
   ticket_url: string
   learnmore_link: string
   event_types: string[]
+  // `star` is an admin-only "featured" flag. The toggle is hidden from
+  // the creator UI but we keep it in state so we don't accidentally null
+  // it out on save for events that admins have already starred.
   star: boolean
   venue_id: string
 }
@@ -65,8 +68,6 @@ function EventEditInner() {
   const isNew = !eventId
 
   const [form, setForm] = useState<EventForm>(EMPTY)
-  // Default new events to '785' since that's the most common path you want to push.
-  // For existing events, we re-infer from saved data once loaded.
   const [ticketMode, setTicketMode] = useState<TicketMode>('785')
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
@@ -152,13 +153,11 @@ function EventEditInner() {
           ticket_url: data.ticket_url || '',
           learnmore_link: data.learnmore_link || '',
           event_types: data.event_types || [],
+          // Preserve existing star value so we don't clobber admin choices.
           star: data.star || false,
           venue_id: data.venue_id || '',
         })
 
-        // Infer ticket mode from saved data:
-        // - URL present → external
-        // - Otherwise default to 785 (user can switch to Free if no tiers)
         setTicketMode(
           data.ticket_url && String(data.ticket_url).trim() ? 'external' : '785'
         )
@@ -254,7 +253,6 @@ function EventEditInner() {
       return
     }
 
-    // Lightweight per-mode validation
     if (ticketMode === 'external' && !form.ticket_url.trim()) {
       setError('Please add a Ticket URL, or switch to a different ticket option.')
       return
@@ -263,8 +261,6 @@ function EventEditInner() {
     setSaving(true)
     setError('')
 
-    // Persist only the ticket fields relevant to the chosen mode.
-    // This prevents stale data (e.g. an old ticket_url) lingering after a mode switch.
     const ticketFields =
       ticketMode === 'free'
         ? { ticket_price: 0, ticket_url: null }
@@ -274,7 +270,6 @@ function EventEditInner() {
               ticket_url: form.ticket_url || null,
             }
           : {
-              // 785 mode: pricing comes from tiers, so clear top-level price/URL.
               ticket_price: null,
               ticket_url: null,
             }
@@ -289,6 +284,7 @@ function EventEditInner() {
       ...ticketFields,
       learnmore_link: form.learnmore_link || null,
       event_types: form.event_types,
+      // Preserved from loaded data; not editable in creator UI.
       star: form.star,
       venue_id: form.venue_id || null,
     }
@@ -531,29 +527,17 @@ function EventEditInner() {
         )}
       </Card>
 
-      {/* Card: Links */}
+      {/* Card: Learn More Link (renamed from "Links") */}
       <Card>
         <h3 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
-          Links
+          Learn More Link
         </h3>
         <Field label="Learn More / Website">
           <input type="url" value={form.learnmore_link} onChange={e => set('learnmore_link', e.target.value)} placeholder="https://…" className={inputCls} />
         </Field>
       </Card>
 
-      {/* Card: Visibility */}
-      <Card>
-        <h3 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
-          Visibility
-        </h3>
-        <label className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-white/[0.02]">
-          <input type="checkbox" checked={form.star} onChange={e => set('star', e.target.checked)} className="h-4 w-4 accent-brand-600" />
-          <div className="flex-1">
-            <span className="text-sm font-semibold text-gray-900 dark:text-white">Feature this event</span>
-            <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">Shows in the Featured section</span>
-          </div>
-        </label>
-      </Card>
+      {/* Visibility section removed — admin-only, managed elsewhere. */}
 
       {/* Card: Featured Artists */}
       <Card>
