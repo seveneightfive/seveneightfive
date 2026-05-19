@@ -23,10 +23,12 @@ export async function generateStaticParams() {
 export async function generateMetadata({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const seller = await getSellerBySlug(params.slug);
+  const { slug } = await params;
+  const seller = await getSellerBySlug(slug);
   if (!seller) return { title: 'Seller not found' };
+
   const name = getSellerDisplayName(seller);
   return {
     title: `${name} — 785 Magazine`,
@@ -67,10 +69,11 @@ function isUpcoming(event: SellerEvent): boolean {
 export default async function SellerPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
+  const { slug } = await params;
   const [seller, policies] = await Promise.all([
-    getSellerBySlug(params.slug),
+    getSellerBySlug(slug),
     getPlatformPolicies(),
   ]);
 

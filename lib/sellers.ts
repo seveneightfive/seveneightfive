@@ -95,10 +95,13 @@ export async function getPlatformPolicies(): Promise<PlatformPolicies> {
   };
 
   if (error || !data) {
-    console.error('platform settings error:', error);
-    return defaults;
-  }
-
+  console.error('platform settings error:', JSON.stringify(error, null, 2));
+  console.error('  message:', error?.message);
+  console.error('  details:', error?.details);
+  console.error('  hint:', error?.hint);
+  console.error('  code:', error?.code);
+  return defaults;
+}
   const map: Record<string, string> = {};
   data.forEach((row) => {
     map[row.key] = row.value;
