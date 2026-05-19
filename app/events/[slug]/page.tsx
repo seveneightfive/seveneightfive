@@ -6,6 +6,7 @@ import TicketPurchaseButton from '@/app/components/TicketPurchaseButton'
 import FollowFavoriteButtons from '@/app/components/FollowFavoriteButtons'
 import AddToCalendar from './AddToCalendar'
 import ShareButtons from './ShareButtons'
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Venue = {
@@ -237,6 +238,127 @@ function formatTime(t: string | null): string {
   return m === 0 ? `${hour} ${ampm}` : `${hour}:${m.toString().padStart(2, '0')} ${ampm}`
 }
 
+/**
+ * Render a paragraph of plain text with auto-linked URLs and emails.
+ *
+ * Behavior:
+ *   - URLs starting with http://, https://, or bare `www.` become <a> tags
+ *   - Email addresses become mailto: links
+ *   - Single newlines inside a paragraph become <br>
+ *   - Every link gets title="..." showing the URL, opens in a new tab,
+ *     and includes rel="noopener noreferrer"
+ *
+ * Security: we DON'T render any user-typed HTML. React's default JSX
+ * rendering escapes strings, so an event description containing literal
+ * `<script>` or `<a href>` markup will display as text, not execute.
+ * We only inject anchor tags that WE construct here.
+ *
+ * The output is an array of React nodes (strings + <a> + <br>) suitable
+ * for use inside a <p>.
+ */
+function renderInline(text: string): React.ReactNode[] {
+  // Match URLs and emails. Order matters: emails first so we don't treat
+  // the "name@" portion as part of a URL host.
+  //
+  // - emails: simple "x@y.z" pattern
+  // - urls: starts with http:// or https://, OR bare "www." followed by domain
+  const TOKEN_RE =
+    /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})|(https?:\/\/[^\s<>"]+)|(\bwww\.[^\s<>"]+)/g
+
+  const nodes: React.ReactNode[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  let keyCounter = 0
+
+  // Helper to push the run of plain text between matches, handling
+  // intra-paragraph single newlines as <br>.
+  const pushPlain = (segment: string) => {
+    if (!segment) return
+    const lines = segment.split('\n')
+    lines.forEach((line, i) => {
+      if (line) nodes.push(line)
+      if (i < lines.length - 1) {
+        nodes.push(<br key={`br-${keyCounter++}`} />)
+      }
+    })
+  }
+
+  while ((match = TOKEN_RE.exec(text)) !== null) {
+    // Text leading up to this match
+    pushPlain(text.slice(lastIndex, match.index))
+
+    const [token, email, urlHttp, urlWww] = match
+    if (email) {
+      nodes.push(
+        <a
+          key={`a-${keyCounter++}`}
+          href={`mailto:${email}`}
+          title={email}
+          className="desc-link"
+        >
+          {email}
+        </a>
+      )
+    } else {
+      // Strip trailing punctuation that probably belongs to the sentence,
+      // not the URL. e.g. "see https://example.com." should not include the
+      // trailing period in the href.
+      let displayUrl = (urlHttp || urlWww)
+      let trailing = ''
+      const trailingMatch = displayUrl.match(/[.,;:!?)\]}'"]+$/)
+      if (trailingMatch) {
+        trailing = trailingMatch[0]
+        displayUrl = displayUrl.slice(0, -trailing.length)
+      }
+      const href = urlHttp ? displayUrl : `https://${displayUrl}`
+      nodes.push(
+        <a
+          key={`a-${keyCounter++}`}
+          href={href}
+          title={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="desc-link"
+        >
+          {displayUrl}
+        </a>
+      )
+      if (trailing) nodes.push(trailing)
+    }
+
+    lastIndex = match.index + token.length
+  }
+
+  // Trailing plain text after the last match
+  pushPlain(text.slice(lastIndex))
+
+  return nodes
+}
+
+/**
+ * Render the full description. Splits on double-newlines (blank lines) into
+ * paragraphs; each paragraph keeps its single-newline line breaks.
+ *
+ * Example input:
+ *   "First paragraph line one.
+ *    First paragraph line two.
+ *
+ *    Second paragraph with a link: https://example.com"
+ *
+ * Output: two <p> elements. First has a <br> between the two lines.
+ * Second has an auto-linked anchor.
+ */
+function renderDescription(text: string): React.ReactNode {
+  // Normalize Windows line endings, then split on blank lines.
+  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const paragraphs = normalized.split(/\n{2,}/)
+
+  return paragraphs
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p, i) => <p key={i}>{renderInline(p)}</p>)
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function EventPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -321,6 +443,8 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         .section-eyebrow { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #374151; margin-bottom: 14px; }
         .description-text { font-size: 1rem; font-weight: 300; line-height: 1.8; color: var(--ink); }
         .description-text p + p { margin-top: 14px; }
+        .description-text .desc-link { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; word-break: break-word; transition: opacity 0.15s; }
+        .description-text .desc-link:hover { opacity: 0.7; }
 
         /* VENUE CARD */
         .venue-card { display: flex; align-items: center; gap: 16px; padding: 16px; background: var(--off); border-radius: 10px; text-decoration: none; color: var(--ink); transition: background 0.15s; }
@@ -516,9 +640,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           <div className="section">
             <div className="section-eyebrow">About This Event</div>
             <div className="description-text">
-              {event.description.split('\n').filter(Boolean).map((p, i) => (
-                <p key={i}>{p}</p>
-              ))}
+              {renderDescription(event.description)}
             </div>
           </div>
         )}
