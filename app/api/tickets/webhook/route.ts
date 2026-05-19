@@ -255,22 +255,93 @@ export async function POST(request: NextRequest) {
           break
         }
 
-        try {
-          await sendTicketConfirmation({
-            admin,
-            buyerEmail: buyerInfo.email,
-            buyerName: buyerInfo.name,
-            eventId: meta.event_id,
-            tierId: meta.tier_id,
-            ticketRows: insertedFallback,
-            amountPaid: pi.amount_received ? pi.amount_received / 100 : null,
-            orderRef: pi.id,
-          })
-        } catch (emailErr) {
-          console.error('[webhook] fallback ticket email send failed:', emailErr)
-        }
-        break
-      }
+        /**
+ * Look up event + venue + tier names + organizer info and dispatch the 
+ * confirmation email via Resend.
+ */
+async function sendTicketConfirmation(args: {
+  admin: ReturnType<typeof createClient>
+  buyerEmail: string
+  buyerName: string | null
+  eventId: string
+  tierId: string
+  ticketRows: { id: string; qr_token: string }[]
+  amountPaid: number | null
+  orderRef: string
+}) {
+  const { admin, buyerEmail, buyerName, eventId, tierId, ticketRows, amountPaid, orderRef } =
+    args
+
+  // Pull event + venue + organizer
+  const { data: ev, error: evErr } = await admin
+    .from('events')
+    .select(`
+      title,
+      slug,
+      image_url,
+      event_date,
+      event_start_time,
+      event_end_time,
+      description,
+      auth_user_id,
+      venues (
+        name,
+        address,
+        city,
+        state
+      ),
+      profiles!events_auth_user_id_profile_fkey (
+        full_name,
+        email
+      )
+    `)
+    .eq('id', eventId)
+    .single()
+
+  if (evErr || !ev) {
+    console.error('[webhook] could not load event for email:', evErr)
+    return
+  }
+
+  const venue = Array.isArray(ev.venues) ? ev.venues[0] : ev.venues
+  const creatorProfile = Array.isArray(ev.profiles) ? ev.profiles[0] : ev.profiles
+
+  // Pull tier name
+  const { data: tier } = await admin
+    .from('ticket_tiers')
+    .select('name')
+    .eq('id', tierId)
+    .single()
+
+  const tierName = tier?.name || 'Ticket'
+
+  await sendTicketEmail({
+    to: buyerEmail,
+    buyerName,
+    event: {
+      title: ev.title,
+      slug: ev.slug,
+      date: ev.event_date,
+      startTime: ev.event_start_time,
+      endTime: ev.event_end_time,
+      image_url: ev.image_url,
+      venueName: venue?.name || null,
+      venueAddress: venue?.address || null,
+      // Don't include city/state here — it's already in the address
+      venueCityState: null,
+    },
+    tickets: ticketRows.map((t) => ({
+      qr_token: t.qr_token,
+      ticket_tier_name: tierName,
+    })),
+    amountPaid,
+    orderRef,
+    // Organizer contact info
+    organizerName: creatorProfile?.full_name || null,
+    organizerEmail: creatorProfile?.email || null,
+  })
+}
+
 
       // ── charge.refunded ──────────────────────────────────────────────
       case 'charge.refunded': {
