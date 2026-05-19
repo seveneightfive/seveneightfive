@@ -320,7 +320,7 @@ export async function POST(request: NextRequest) {
      */
     const session =
       await stripe.checkout.sessions.create({
-        customer: customerId,
+        customer_email: user.email,
 
         payment_method_types: ['card'],
 
