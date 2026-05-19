@@ -1,24 +1,28 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabaseServer'
 import { stripe } from '@/lib/stripe'
+import { syncStripeAccountToProfile } from '@/lib/stripeSync'
 
 /**
  * POST /api/tickets/webhook
  *
- * Handles Stripe webhook events. Verifies the signature using
- * STRIPE_WEBHOOK_SECRET, then processes:
+ * Stripe webhook handler. Verifies signature, then dispatches on event.type:
+ *   - checkout.session.completed → mint ticket(s) / activate ads
+ *   - payment_intent.succeeded   → fallback ticket mint
+ *   - charge.refunded            → mark refunded
+ *   - account.updated            → sync Connect status to profile
  *
- *   - checkout.session.completed  → mint ticket(s), send confirmation
- *   - payment_intent.succeeded    → mark ticket as paid (fallback)
- *   - charge.refunded             → mark ticket as refunded
- *   - account.updated             → sync Connect account status to profile
- *
- * Must be registered in Stripe Dashboard → Webhooks pointing to:
+ * Stripe Dashboard → Webhooks → Endpoint URL:
  *   https://yourdomain.com/api/tickets/webhook
  *
- * Set STRIPE_WEBHOOK_SECRET in Vercel env vars (whsec_...).
+ * MUST be subscribed to (at minimum):
+ *   checkout.session.completed
+ *   payment_intent.succeeded
+ *   charge.refunded
+ *   account.updated                  ← required for the seller status sync
+ *
+ * Env: STRIPE_WEBHOOK_SECRET (whsec_...)
  */
-
 export async function POST(request: NextRequest) {
   const body = await request.text()
   const sig = request.headers.get('stripe-signature')
@@ -46,7 +50,7 @@ export async function POST(request: NextRequest) {
   try {
     switch (event.type) {
 
-      // ── PRIMARY: checkout session completed ──────────────────────────
+      // ── checkout.session.completed ───────────────────────────────────
       case 'checkout.session.completed': {
         const session = event.data.object as import('stripe').Stripe.Checkout.Session
 
@@ -54,7 +58,7 @@ export async function POST(request: NextRequest) {
 
         const meta = session.metadata || {}
 
-        // ── Advertisement payment ──────────────────────────────────────
+        // Advertisement
         if (meta.type === 'advertisement' && meta.ad_id) {
           const { error: adError } = await admin
             .from('advertisements')
@@ -70,7 +74,7 @@ export async function POST(request: NextRequest) {
           break
         }
 
-        // ── Ticket purchase ────────────────────────────────────────────
+        // Ticket purchase
         const tierId = meta.tier_id
         const eventId = meta.event_id
         const buyerUserId = meta.buyer_user_id
@@ -84,20 +88,17 @@ export async function POST(request: NextRequest) {
           break
         }
 
-        // Get buyer email
         const { data: profile } = await admin
           .from('profiles')
           .select('email, full_name')
           .eq('id', buyerUserId)
           .single()
 
-        // Get the amount paid and platform fee
         const amountTotal = session.amount_total ? session.amount_total / 100 : null
         const platformFee = paymentIntentId
           ? await getPlatformFee(paymentIntentId)
           : null
 
-        // Mint one ticket row per quantity
         const tickets = Array.from({ length: quantity }, () => ({
           ticket_tier_id: tierId,
           event_id: eventId,
@@ -118,7 +119,6 @@ export async function POST(request: NextRequest) {
 
         if (insertError) {
           console.error('[webhook] failed to insert tickets:', insertError)
-          // Return 500 so Stripe retries
           return NextResponse.json({ error: 'Failed to create tickets' }, { status: 500 })
         }
 
@@ -126,14 +126,13 @@ export async function POST(request: NextRequest) {
         break
       }
 
-      // ── FALLBACK: payment intent succeeded (direct charge, not checkout) ──
+      // ── payment_intent.succeeded (fallback) ──────────────────────────
       case 'payment_intent.succeeded': {
         const pi = event.data.object as import('stripe').Stripe.PaymentIntent
         const meta = pi.metadata || {}
 
-        if (!meta.tier_id) break // not a 785ticket payment
+        if (!meta.tier_id) break
 
-        // Check if ticket already created by checkout.session.completed
         const { data: existing } = await admin
           .from('tickets')
           .select('id')
@@ -141,9 +140,8 @@ export async function POST(request: NextRequest) {
           .limit(1)
           .maybeSingle()
 
-        if (existing) break // already handled
+        if (existing) break
 
-        // Mint ticket (same logic as above, minimal metadata)
         const quantity = parseInt(meta.quantity || '1', 10)
         const { data: profile } = await admin
           .from('profiles')
@@ -167,7 +165,7 @@ export async function POST(request: NextRequest) {
         break
       }
 
-      // ── REFUND ────────────────────────────────────────────────────────
+      // ── charge.refunded ──────────────────────────────────────────────
       case 'charge.refunded': {
         const charge = event.data.object as import('stripe').Stripe.Charge
         const piId = typeof charge.payment_intent === 'string'
@@ -184,33 +182,32 @@ export async function POST(request: NextRequest) {
         break
       }
 
-      // ── CONNECT ACCOUNT UPDATED ───────────────────────────────────────
+      // ── account.updated ──────────────────────────────────────────────
       case 'account.updated': {
         const account = event.data.object as import('stripe').Stripe.Account
-        const isEnabled = account.charges_enabled && account.payouts_enabled
 
-        await admin
-          .from('profiles')
-          .update({ stripe_account_status: isEnabled ? 'enabled' : 'restricted' })
-          .eq('stripe_account_id', account.id)
-
+        // Use the shared sync helper so seller_activated_at / wants_ticketing
+        // get set consistently with the connect/return path.
+        try {
+          await syncStripeAccountToProfile(admin, account.id)
+          console.log(`[webhook] synced Connect account ${account.id}`)
+        } catch (err) {
+          console.error('[webhook] account.updated sync failed:', err)
+        }
         break
       }
 
       default:
-        // Ignore unhandled event types
         break
     }
 
     return NextResponse.json({ received: true })
-
   } catch (err: any) {
     console.error('[webhook] handler error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// Helper: get application_fee_amount from a PaymentIntent's charges
 async function getPlatformFee(paymentIntentId: string): Promise<number | null> {
   try {
     const charges = await stripe.charges.list({ payment_intent: paymentIntentId, limit: 1 })

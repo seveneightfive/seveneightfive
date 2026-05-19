@@ -10,6 +10,7 @@ import {
   ExternalLink,
   CheckCircle,
   AlertTriangle,
+  RefreshCw,
 } from 'lucide-react'
 
 type Profile = {
@@ -48,20 +49,20 @@ function PayoutsPageInner() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [connecting, setConnecting] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [error, setError] = useState('')
 
-  // Seller profile form
   const [businessName, setBusinessName] = useState('')
   const [supportEmail, setSupportEmail] = useState('')
   const [profileSaved, setProfileSaved] = useState(false)
 
-  // Banners from Stripe redirect
   const stripeConnected = searchParams.get('stripe_connected') === '1'
   const stripePending = searchParams.get('stripe_pending') === '1'
   const stripeError = searchParams.get('stripe_error')
   const stripeRefresh = searchParams.get('stripe_refresh') === '1'
 
+  // Initial profile load
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -89,7 +90,32 @@ function PayoutsPageInner() {
     load()
   }, [router])
 
-  // If we just came back from a refresh redirect, immediately re-launch onboarding
+  // Self-heal: if they have a Stripe account but aren't enabled,
+  // silently re-check with Stripe. Catches the "closed the tab before
+  // the return URL fired" case and missing-webhook setups.
+  useEffect(() => {
+    if (!profile?.stripe_account_id) return
+    if (profile.stripe_account_status === 'enabled') return
+    if (syncing) return
+
+    let cancelled = false
+    setSyncing(true)
+    fetch('/api/stripe/connect/sync', { method: 'POST' })
+      .then(r => r.json())
+      .then(json => {
+        if (cancelled) return
+        if (json?.status && json.status !== profile.stripe_account_status) {
+          setProfile(p => p ? { ...p, stripe_account_status: json.status } : p)
+        }
+      })
+      .catch(() => { /* silent — non-critical */ })
+      .finally(() => { if (!cancelled) setSyncing(false) })
+
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.stripe_account_id])
+
+  // Refresh-redirect handling
   useEffect(() => {
     if (stripeRefresh && profile && !connecting) {
       handleConnect()
@@ -114,6 +140,34 @@ function PayoutsPageInner() {
     } catch (err: any) {
       setError(err?.message || 'Something went wrong')
       setConnecting(false)
+    }
+  }
+
+  async function handleManualSync() {
+    setSyncing(true)
+    setError('')
+    try {
+      const res = await fetch('/api/stripe/connect/sync', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Sync failed')
+      // Pull a fresh profile to reflect any side-effect fields too
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data } = await supabase
+          .from('profiles')
+          .select(
+            `id, full_name, email,
+            stripe_account_id, stripe_account_status,
+            is_seller, seller_business_name, seller_support_email, seller_activated_at`
+          )
+          .eq('id', user.id)
+          .single()
+        if (data) setProfile(data as Profile)
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Sync failed')
+    } finally {
+      setSyncing(false)
     }
   }
 
@@ -165,17 +219,8 @@ function PayoutsPageInner() {
         ? 'In progress'
         : 'Not connected'
 
-  const statusColor = isEnabled
-    ? 'success'
-    : isRestricted
-      ? 'warning'
-      : isPending
-        ? 'warning'
-        : 'gray'
-
   return (
     <div className="space-y-6">
-      {/* Page header */}
       <div>
         <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
           Creator
@@ -184,12 +229,10 @@ function PayoutsPageInner() {
           Payouts & Selling
         </h1>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Connect your bank to sell tickets, accept donations, and receive
-          payouts.
+          Connect your bank to sell tickets, accept donations, and receive payouts.
         </p>
       </div>
 
-      {/* Return banners from the connect flow */}
       {stripeConnected && (
         <div className="flex gap-2 rounded-lg border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
           <Check className="h-4 w-4 shrink-0" />
@@ -200,28 +243,36 @@ function PayoutsPageInner() {
       {stripePending && (
         <div className="flex gap-2 rounded-lg border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          Almost there — Stripe still needs a bit more info before you can take
-          payments.
+          Almost there — Stripe still needs a bit more info before you can take payments.
         </div>
       )}
 
       {stripeError && (
         <div className="flex gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400">
           <AlertCircle className="h-4 w-4 shrink-0" />
-          Something went wrong returning from Stripe. Please try connecting
-          again.
+          Something went wrong returning from Stripe. Please try connecting again.
         </div>
       )}
 
-      {/* Main content card */}
       <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-        {/* Stripe Connect Status */}
         <div className="mb-6">
-          <h2 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
-            Stripe Connect
-          </h2>
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <h2 className="font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+              Stripe Connect
+            </h2>
+            {hasAccount && (
+              <button
+                onClick={handleManualSync}
+                disabled={syncing}
+                className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.08]"
+                title="Re-check status with Stripe"
+              >
+                <RefreshCw className={`h-3 w-3 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Checking…' : 'Re-check status'}
+              </button>
+            )}
+          </div>
 
-          {/* Status indicator */}
           <div className="mb-6 flex items-center gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
             <div
               className={`h-3 w-3 shrink-0 rounded-full ${
@@ -254,58 +305,44 @@ function PayoutsPageInner() {
                 }`}
               >
                 {isEnabled && 'Charges and payouts are enabled.'}
-                {isRestricted &&
-                  'Stripe needs additional info — finish onboarding to start selling.'}
-                {isPending &&
-                  'Onboarding started — finish to enable payouts.'}
-                {!hasAccount &&
-                  "You haven't connected a Stripe account yet."}
+                {isRestricted && 'Stripe needs additional info — finish onboarding to start selling.'}
+                {isPending && 'Onboarding started — finish to enable payouts.'}
+                {!hasAccount && "You haven't connected a Stripe account yet."}
               </p>
             </div>
             {profile?.seller_activated_at && isEnabled && (
               <div className="text-right text-xs text-gray-600 dark:text-gray-400">
                 Active since
                 <br />
-                {new Date(profile.seller_activated_at).toLocaleDateString(
-                  undefined,
-                  { month: 'short', day: 'numeric', year: 'numeric' }
-                )}
+                {new Date(profile.seller_activated_at).toLocaleDateString(undefined, {
+                  month: 'short', day: 'numeric', year: 'numeric',
+                })}
               </div>
             )}
           </div>
 
-          {/* Action: connect / continue / manage */}
           {!isEnabled && (
             <>
               <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
                 We use Stripe Connect so payouts go straight to your bank.
-                seveneightfive takes a small platform fee per ticket — Stripe
-                handles their card processing fees separately. You'll need a
-                U.S. bank account, your legal name, date of birth, and the last
-                4 of your SSN. It usually takes 3–5 minutes.
+                seveneightfive takes a small platform fee per ticket — Stripe handles their card
+                processing fees separately. You'll need a U.S. bank account, your legal name,
+                date of birth, and the last 4 of your SSN. It usually takes 3–5 minutes.
               </p>
               <button
                 onClick={handleConnect}
                 disabled={connecting}
                 className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {connecting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  ''
-                )}
-                {connecting
-                  ? 'Opening Stripe…'
-                  : hasAccount
-                    ? 'Continue setup'
-                    : 'Connect Stripe to start selling'}
+                {connecting ? <Loader2 className="h-4 w-4 animate-spin" /> : ''}
+                {connecting ? 'Opening Stripe…' : hasAccount ? 'Continue setup' : 'Connect Stripe to start selling'}
               </button>
             </>
           )}
 
           {isEnabled && (
             <div className="flex gap-2 flex-wrap">
-              <a
+              
                 href="https://dashboard.stripe.com/"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -319,11 +356,7 @@ function PayoutsPageInner() {
                 disabled={connecting}
                 className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
               >
-                {connecting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  ''
-                )}
+                {connecting ? <Loader2 className="h-4 w-4 animate-spin" /> : ''}
                 {connecting ? 'Loading…' : 'Update banking info'}
               </button>
             </div>
@@ -337,21 +370,15 @@ function PayoutsPageInner() {
           )}
         </div>
 
-        {/* Divider */}
         <hr className="my-6 border-t border-gray-200 dark:border-gray-800" />
 
-        {/* Seller details — only shown once connected */}
         {hasAccount && (
-          <form
-            className="space-y-4"
-            onSubmit={handleSaveSellerProfile}
-          >
+          <form className="space-y-4" onSubmit={handleSaveSellerProfile}>
             <h3 className="font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
               Seller Details
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Shown to buyers on receipts and ticket pages. Optional — defaults
-              to your name and email.
+              Shown to buyers on receipts and ticket pages. Optional — defaults to your name and email.
             </p>
 
             <div>
@@ -391,11 +418,7 @@ function PayoutsPageInner() {
                 disabled={savingProfile}
                 className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {savingProfile ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  ''
-                )}
+                {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : ''}
                 {savingProfile ? 'Saving…' : 'Save seller details'}
               </button>
               {profileSaved && (
@@ -407,7 +430,6 @@ function PayoutsPageInner() {
           </form>
         )}
 
-        {/* Help / what next */}
         {hasAccount && (
           <>
             <hr className="my-6 border-t border-gray-200 dark:border-gray-800" />
@@ -431,20 +453,18 @@ function PayoutsPageInner() {
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle className="h-4 w-4 shrink-0 text-success-600 dark:text-success-400 mt-0.5" />
-                  <span>
-                    Run paid promotions and ads on seveneightfive.com
-                  </span>
+                  <span>Run paid promotions and ads on seveneightfive.com</span>
                 </li>
               </ul>
 
               <div className="flex gap-2 flex-wrap">
-                <a
+                
                   href="/dashboard/events"
                   className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
                 >
                   Manage your events
                 </a>
-                <a
+                
                   href="/dashboard/advertise"
                   className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
                 >
