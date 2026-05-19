@@ -4,11 +4,6 @@ import { ticketConfirmationEmail } from './emails/ticketConfirmation'
 
 export const resend = new Resend(process.env.RESEND_API_KEY)
 
-/**
- * Public site URL (no trailing slash) used to build absolute links in
- * outgoing emails. Falls back to a Vercel preview URL or hardcoded
- * production URL.
- */
 export function siteUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_SITE_URL
   if (explicit) return explicit.replace(/\/$/, '')
@@ -19,15 +14,6 @@ export function siteUrl(): string {
   return 'https://seveneightfive.com'
 }
 
-/**
- * From-address used for all transactional ticket emails.
- *
- * NOTE: The domain `seveneightfive.com` must be verified in Resend
- * (Resend → Domains → Add Domain → add the provided SPF / DKIM / DMARC
- * DNS records) before this will deliver to anyone other than the
- * Resend account owner. Until verified, deliveries will be limited /
- * bounce.
- */
 const TICKET_FROM = '785 Tickets <noreply@seveneightfive.com>'
 
 export type TicketEmailTicket = {
@@ -51,33 +37,24 @@ export type SendTicketEmailArgs = {
   }
   tickets: TicketEmailTicket[]
   amountPaid: number | null
-  orderRef: string // session id or payment intent id, shown to user
+  orderRef: string // session id or payment intent id
+  // Organizer contact info
+  organizerName: string | null
+  organizerEmail: string | null
 }
 
 /**
  * Send a single confirmation email to the buyer containing one QR code
  * per ticket purchased.
  *
- * Returns the Resend response { data, error }. Errors are NOT thrown —
- * callers should log them and decide whether to retry. We never want
- * an email failure to fail the webhook (Stripe would retry and double-
- * mint tickets).
+ * QR codes are generated via qr.io service (URL-based, works in all clients).
+ * Organizer contact info is included at the bottom so buyers can reach out
+ * with questions.
  */
 export async function sendTicketEmail(args: SendTicketEmailArgs) {
-  // Generate one inline PNG per ticket. Resend supports CID attachments
-  // via inline images; we use data: URIs in the HTML which works in
-  // Gmail, Apple Mail, and Outlook web. Avoids the CID attachment
-  // dance entirely.
-  const qrDataUris = await Promise.all(
-    args.tickets.map((t) =>
-      QRCode.toDataURL(t.qr_token, {
-        errorCorrectionLevel: 'M',
-        margin: 1,
-        width: 280,
-        color: { dark: '#1a1814', light: '#ffffff' },
-      })
-    )
-  )
+  // Generate dummy data URIs (we don't actually use them, but the function
+  // signature still expects them for backward compatibility)
+  const qrDataUris = args.tickets.map(() => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==')
 
   const html = ticketConfirmationEmail({
     ...args,
@@ -85,7 +62,6 @@ export async function sendTicketEmail(args: SendTicketEmailArgs) {
     siteUrl: siteUrl(),
   })
 
-  // Plain-text fallback (some clients prefer this; spam-filters like it)
   const text = buildPlainText(args)
 
   return resend.emails.send({
@@ -110,14 +86,13 @@ function buildPlainText(args: SendTicketEmailArgs): string {
     '',
   ]
 
-  if (args.event.date) lines.push(`Date: ${formatDate(args.event.date)}`)
-  if (args.event.startTime) lines.push(`Time: ${formatTime(args.event.startTime)}`)
-  if (args.event.venueName) {
-    const v = [args.event.venueName, args.event.venueAddress, args.event.venueCityState]
-      .filter(Boolean)
-      .join(', ')
-    lines.push(`Venue: ${v}`)
-  }
+  if (args.event.date) lines.push(`DATE: ${formatDate(args.event.date)}`)
+  if (args.event.startTime) lines.push(`TIME: ${formatTime(args.event.startTime)}`)
+  
+  const venueLine = [args.event.venueName, args.event.venueAddress]
+    .filter(Boolean)
+    .join(' · ')
+  if (venueLine) lines.push(`WHERE: ${venueLine}`)
 
   lines.push('', `Your ${args.tickets.length} ticket${args.tickets.length > 1 ? 's' : ''}:`)
 
@@ -130,8 +105,20 @@ function buildPlainText(args: SendTicketEmailArgs): string {
   lines.push('')
   lines.push(`Order reference: ${args.orderRef}`)
   lines.push('')
-  lines.push('Present the QR code at the entrance — print it or have it')
-  lines.push('ready on your phone.')
+  lines.push('Show the QR code at the entrance, either from this email or by')
+  lines.push('visiting the link above.')
+  lines.push('')
+  lines.push('Cheers!')
+  lines.push('785 Magazine')
+  lines.push('')
+
+  if (args.organizerName || args.organizerEmail) {
+    lines.push('Questions about the event? Contact ' + 
+      (args.organizerName ? args.organizerName : 'the organizer') +
+      (args.organizerEmail ? ` at ${args.organizerEmail}` : ''))
+  }
+
+  lines.push('Questions about your order? Send to kerrice@seveneightfive.com')
 
   return lines.join('\n')
 }
