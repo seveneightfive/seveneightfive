@@ -20,6 +20,39 @@ type Props = {
   eventSlug: string
 }
 
+/**
+ * Normalize a US phone number to E.164.
+ *
+ * - "555-123-4567"   → "+15551234567"
+ * - "(555) 123 4567" → "+15551234567"
+ * - "5551234567"     → "+15551234567"
+ * - "+15551234567"   → "+15551234567" (unchanged)
+ * - "+44 7700 ..."   → "+447700..." (international: keep as-is, strip spaces)
+ *
+ * If the value can't be coerced to something plausible, return null so the
+ * caller can flag a validation error.
+ */
+function normalizePhone(raw: string): string | null {
+  const cleaned = raw.replace(/[\s().\-]/g, '')
+  if (!cleaned) return null
+
+  // Already international
+  if (cleaned.startsWith('+')) {
+    return cleaned.length >= 8 ? cleaned : null
+  }
+
+  // 10-digit US
+  const digits = cleaned.replace(/\D/g, '')
+  if (digits.length === 10) return `+1${digits}`
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
+
+  return null
+}
+
+function isEmailish(s: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim())
+}
+
 export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
   const [tiers, setTiers] = useState<Tier[]>([])
   const [selectedTier, setSelectedTier] = useState<string | null>(null)
@@ -30,17 +63,36 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
   const [error, setError] = useState('')
   const [expanded, setExpanded] = useState(false)
 
+  // Session state — we only need to know IF they're logged in.
+  // If yes, skip the guest form. If no, show it.
+  const [userId, setUserId] = useState<string | null>(null)
+  const [sessionChecked, setSessionChecked] = useState(false)
+
+  // Guest form state (used only when userId is null)
+  const [guestName, setGuestName] = useState('')
+  const [guestEmail, setGuestEmail] = useState('')
+  const [guestPhone, setGuestPhone] = useState('')
+
   useEffect(() => {
     const supabase = createClient()
+
+    // Session check (don't block tier loading on this)
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUserId(user?.id ?? null)
+      setSessionChecked(true)
+    })
+
     supabase
       .from('ticket_tiers')
-      .select('id, name, description, price, quantity, quantity_sold, sale_starts_at, sale_ends_at, is_active')
+      .select(
+        'id, name, description, price, quantity, quantity_sold, sale_starts_at, sale_ends_at, is_active'
+      )
       .eq('event_id', eventId)
       .eq('is_active', true)
       .order('sort_order')
       .then(({ data }) => {
         const now = new Date()
-        const available = (data || []).filter(t => {
+        const available = (data || []).filter((t) => {
           if (t.sale_starts_at && new Date(t.sale_starts_at) > now) return false
           if (t.sale_ends_at && new Date(t.sale_ends_at) < now) return false
           if (t.quantity !== null && t.quantity - t.quantity_sold <= 0) return false
@@ -52,30 +104,50 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
       })
   }, [eventId])
 
-  const isFreeEvent = tiers.length > 0 && tiers.every(t => t.price === 0)
-  const tier = tiers.find(t => t.id === selectedTier) || tiers[0]
+  const isFreeEvent = tiers.length > 0 && tiers.every((t) => t.price === 0)
+  const tier = tiers.find((t) => t.id === selectedTier) || tiers[0]
   const isFree = tier?.price === 0
+  const isGuest = sessionChecked && !userId
+
+  const validateGuest = (): string | null => {
+    if (!guestName.trim()) return 'Name is required.'
+    if (!isEmailish(guestEmail)) return 'Please enter a valid email.'
+    // Phone is optional for free RSVPs but required for paid (helps seller
+    // contact buyers about day-of changes). Tweak this rule if you disagree.
+    if (!isFree) {
+      const normalized = normalizePhone(guestPhone)
+      if (!normalized) return 'Please enter a valid phone number.'
+    }
+    return null
+  }
 
   const handleAction = async () => {
     if (!selectedTier || !tier) return
-    setPurchasing(true)
     setError('')
 
-    try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (!user) {
-        window.location.href = `/login?return=/events/${eventSlug}`
+    // Build the guest payload if this is a guest checkout
+    let guestPayload: { name: string; email: string; phone: string | null } | null = null
+    if (isGuest) {
+      const v = validateGuest()
+      if (v) {
+        setError(v)
         return
       }
+      guestPayload = {
+        name: guestName.trim(),
+        email: guestEmail.trim().toLowerCase(),
+        phone: normalizePhone(guestPhone),
+      }
+    }
 
+    setPurchasing(true)
+
+    try {
       if (isFree) {
-        // Free ticket — RSVP directly, no Stripe needed
         const res = await fetch('/api/tickets/rsvp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tierId: selectedTier, eventId, quantity }),
+          body: JSON.stringify({ tierId: selectedTier, eventId, quantity, guest: guestPayload }),
         })
         const json = await res.json()
         if (!res.ok) {
@@ -87,11 +159,10 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         setExpanded(false)
         setPurchasing(false)
       } else {
-        // Paid ticket — redirect to Stripe Checkout
         const res = await fetch('/api/tickets/checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tierId: selectedTier, eventId, quantity }),
+          body: JSON.stringify({ tierId: selectedTier, eventId, quantity, guest: guestPayload }),
         })
         const json = await res.json()
         if (!res.ok) {
@@ -109,7 +180,8 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
 
   if (loading || tiers.length === 0) return null
 
-  const remaining = tier?.quantity !== null ? (tier?.quantity ?? 0) - tier.quantity_sold : null
+  const remaining =
+    tier?.quantity !== null ? (tier?.quantity ?? 0) - tier.quantity_sold : null
   const maxQty = Math.min(remaining ?? 10, 10)
   const totalPrice = ((tier?.price ?? 0) * quantity).toFixed(2)
 
@@ -154,6 +226,14 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         .tpb-total { margin-left: auto; font-family: 'Oswald', sans-serif; font-size: 1rem; font-weight: 600; color: #1a1814; }
         .tpb-remaining { font-size: 0.72rem; color: #a85a30; font-weight: 500; }
         .tpb-error { margin-top: 12px; padding: 10px 14px; background: rgba(200,6,80,0.08); border: 1px solid rgba(200,6,80,0.2); border-radius: 8px; font-size: 0.82rem; color: #C80650; }
+        .tpb-guest-form { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+        .tpb-guest-row { display: flex; flex-direction: column; gap: 4px; }
+        .tpb-guest-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #6b6560; }
+        .tpb-guest-input { padding: 10px 12px; font-size: 0.92rem; border: 1.5px solid #ece8e2; border-radius: 8px; background: #fff; color: #1a1814; outline: none; transition: border-color 0.15s; }
+        .tpb-guest-input:focus { border-color: #C80650; }
+        .tpb-guest-hint { font-size: 0.72rem; color: #8a8580; }
+        .tpb-guest-signin { font-size: 0.78rem; color: #6b6560; margin-top: 4px; text-align: center; }
+        .tpb-guest-signin a { color: #C80650; text-decoration: underline; font-weight: 500; }
         .tpb-confirm-btn {
           margin-top: 16px; width: 100%; padding: 14px; border: none; border-radius: 8px;
           font-family: 'Oswald', sans-serif; font-size: 0.9rem; font-weight: 600;
@@ -176,30 +256,50 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
           <div className="tpb-rsvp-done">
             <span className="tpb-rsvp-check">✓</span>
             <div>
-              <div className="tpb-rsvp-text">You're going!</div>
-              <div className="tpb-rsvp-sub">Check your dashboard to view your RSVP.</div>
+              <div className="tpb-rsvp-text">You&apos;re going!</div>
+              <div className="tpb-rsvp-sub">
+                {isGuest
+                  ? 'Confirmation has been recorded. Check your email for details.'
+                  : 'Check your dashboard to view your RSVP.'}
+              </div>
             </div>
           </div>
         ) : (
           <>
-            <div className="tpb-header" onClick={() => setExpanded(e => !e)}>
+            <div className="tpb-header" onClick={() => setExpanded((e) => !e)}>
               <div className="tpb-header-left">
                 <span className="tpb-eyebrow">{headerLabel}</span>
                 <span className={`tpb-price ${isFree ? 'tpb-price-free' : ''}`}>
                   {headerPrice}
-                  {tiers.length > 1 && <span style={{ fontSize: '0.7rem', fontWeight: 400, color: '#6b6560', marginLeft: 6 }}>+ more options</span>}
+                  {tiers.length > 1 && (
+                    <span
+                      style={{
+                        fontSize: '0.7rem',
+                        fontWeight: 400,
+                        color: '#6b6560',
+                        marginLeft: 6,
+                      }}
+                    >
+                      + more options
+                    </span>
+                  )}
                 </span>
               </div>
               {!expanded && (
                 <button
                   className={`tpb-action-btn ${isFree ? 'free' : 'paid'}`}
-                  onClick={e => { e.stopPropagation(); setExpanded(true) }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setExpanded(true)
+                  }}
                 >
                   {ctaLabel}
                 </button>
               )}
               {expanded && (
-                <span style={{ fontSize: '0.75rem', color: '#6b6560', cursor: 'pointer' }}>✕ Close</span>
+                <span style={{ fontSize: '0.75rem', color: '#6b6560', cursor: 'pointer' }}>
+                  ✕ Close
+                </span>
               )}
             </div>
 
@@ -207,7 +307,7 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
               <div className="tpb-expand">
                 {tiers.length > 1 && (
                   <div className="tpb-tiers">
-                    {tiers.map(t => {
+                    {tiers.map((t) => {
                       const rem = t.quantity !== null ? t.quantity - t.quantity_sold : null
                       const soldOut = rem !== null && rem <= 0
                       return (
@@ -219,7 +319,9 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
                         >
                           <div>
                             <div className="tpb-tier-name">{t.name}</div>
-                            {t.description && <div className="tpb-tier-desc">{t.description}</div>}
+                            {t.description && (
+                              <div className="tpb-tier-desc">{t.description}</div>
+                            )}
                           </div>
                           <span className="tpb-tier-price">
                             {t.price === 0 ? 'Free' : `$${t.price.toFixed(2)}`}
@@ -234,14 +336,78 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
                   <div className="tpb-qty-row">
                     <span className="tpb-qty-label">Qty</span>
                     <div className="tpb-qty-ctrl">
-                      <button className="tpb-qty-btn" onClick={() => setQuantity(q => Math.max(1, q - 1))} disabled={quantity <= 1}>−</button>
+                      <button
+                        className="tpb-qty-btn"
+                        onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                        disabled={quantity <= 1}
+                      >
+                        −
+                      </button>
                       <span className="tpb-qty-num">{quantity}</span>
-                      <button className="tpb-qty-btn" onClick={() => setQuantity(q => Math.min(maxQty, q + 1))} disabled={quantity >= maxQty}>+</button>
+                      <button
+                        className="tpb-qty-btn"
+                        onClick={() => setQuantity((q) => Math.min(maxQty, q + 1))}
+                        disabled={quantity >= maxQty}
+                      >
+                        +
+                      </button>
                     </div>
                     {remaining !== null && remaining <= 20 && (
                       <span className="tpb-remaining">{remaining} remaining</span>
                     )}
                     {quantity > 1 && <span className="tpb-total">Total: ${totalPrice}</span>}
+                  </div>
+                )}
+
+                {/* Guest form — only when not logged in */}
+                {isGuest && (
+                  <div className="tpb-guest-form">
+                    <div className="tpb-guest-row">
+                      <label className="tpb-guest-label">Your Name</label>
+                      <input
+                        type="text"
+                        className="tpb-guest-input"
+                        placeholder="First Last"
+                        value={guestName}
+                        onChange={(e) => setGuestName(e.target.value)}
+                        autoComplete="name"
+                      />
+                    </div>
+                    <div className="tpb-guest-row">
+                      <label className="tpb-guest-label">Email</label>
+                      <input
+                        type="email"
+                        className="tpb-guest-input"
+                        placeholder="you@example.com"
+                        value={guestEmail}
+                        onChange={(e) => setGuestEmail(e.target.value)}
+                        autoComplete="email"
+                      />
+                      <span className="tpb-guest-hint">
+                        Your ticket will be sent to this email.
+                      </span>
+                    </div>
+                    <div className="tpb-guest-row">
+                      <label className="tpb-guest-label">
+                        Phone {isFree && '(optional)'}
+                      </label>
+                      <input
+                        type="tel"
+                        className="tpb-guest-input"
+                        placeholder="(555) 123-4567"
+                        value={guestPhone}
+                        onChange={(e) => setGuestPhone(e.target.value)}
+                        autoComplete="tel"
+                      />
+                      <span className="tpb-guest-hint">
+                        US numbers — country code added automatically.
+                      </span>
+                    </div>
+                    <p className="tpb-guest-signin">
+                      Have an account?{' '}
+                      <a href={`/login?return=/events/${eventSlug}`}>Sign in</a> to use
+                      saved details.
+                    </p>
                   </div>
                 )}
 
@@ -253,11 +419,12 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
                   disabled={purchasing || !selectedTier}
                 >
                   {purchasing
-                    ? (isFree ? 'Saving your RSVP…' : 'Redirecting to checkout…')
+                    ? isFree
+                      ? 'Saving your RSVP…'
+                      : 'Redirecting to checkout…'
                     : isFree
                       ? `RSVP — I'm Going!`
-                      : `Buy ${quantity > 1 ? `${quantity} Tickets` : 'Ticket'} · $${totalPrice}`
-                  }
+                      : `Buy ${quantity > 1 ? `${quantity} Tickets` : 'Ticket'} · $${totalPrice}`}
                 </button>
               </div>
             )}
