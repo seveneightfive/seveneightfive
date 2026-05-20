@@ -3,11 +3,7 @@
 import { createClient } from '@/lib/supabaseBrowser'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
-import Link from 'next/link'
-import {
-  Settings,
-  LogOut,
-} from 'lucide-react'
+import { LogOut } from 'lucide-react'
 
 type Props = {
   initials: string
@@ -19,20 +15,20 @@ type Props = {
 /**
  * Top-right avatar menu inside AppHeader.
  *
- * Behaviour preserved from the original implementation:
+ * Behaviour preserved from the previous implementation:
  *  - Click avatar → toggle menu
  *  - Click outside → close menu
  *  - Supabase auth signOut + router push on sign out
  *  - Avatar shows uploaded image if avatarUrl present, otherwise initials on
  *    a brand-magenta circle
  *
- * Visual changes:
- *  - All styling moved from inline styles to Tailwind so the menu responds
- *    to the dashboard's dark/light theme toggle. Inline styles never read
- *    the .dark class on <html>; Tailwind dark: variants do.
- *  - Emoji icons replaced with lucide-react icons. Emojis render
- *    inconsistently across OSes / older browsers and clashed visually with
- *    the rest of the TailAdmin icon set.
+ * Change in this version:
+ *  - Removed the "Settings" link. Settings now lives in the sidebar's
+ *    Account group, so the dropdown link was redundant. The dropdown still
+ *    shows the user identity block + Sign Out, which is the minimum
+ *    "who am I / get out" affordance people expect from an avatar.
+ *  - Removed the menuItems array and the Link import (both now unused).
+ *  - Removed the Settings icon import.
  */
 export default function AvatarMenu({
   initials,
@@ -59,10 +55,6 @@ export default function AvatarMenu({
     await supabase.auth.signOut()
     router.push('/login')
   }
-
-  const menuItems = [
-    { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
-  ]
 
   return (
     <div ref={wrapRef} className="relative">
@@ -98,30 +90,14 @@ export default function AvatarMenu({
           className="absolute right-0 top-[calc(100%+10px)] z-[300] w-60 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-lg dark:border-gray-800 dark:bg-gray-900"
           role="menu"
         >
-          {/* User block */}
-          <div className="border-b border-gray-200 px-4 pb-3 pt-3.5 dark:border-gray-800">
+          {/* User identity block */}
+          <div className="px-4 pb-3 pt-3.5">
             <div className="font-display text-sm font-bold uppercase tracking-wide text-gray-900 dark:text-white">
               {fullName}
             </div>
             <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
               {phoneOrEmail}
             </div>
-          </div>
-
-          {/* Items */}
-          <div className="py-1">
-            {menuItems.map(({ icon: Icon, label, href }) => (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                role="menuitem"
-              >
-                <Icon className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
-                <span>{label}</span>
-              </Link>
-            ))}
           </div>
 
           {/* Sign out */}
