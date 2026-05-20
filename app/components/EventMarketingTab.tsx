@@ -18,6 +18,7 @@ type Analytics = {
   socialViews: number
   checkIns: number
   checkInRate: number
+  ticketsSold: number
 }
 
 export default function EventMarketingTab({ eventId, eventSlug, eventTitle }: Props) {
@@ -33,55 +34,63 @@ export default function EventMarketingTab({ eventId, eventSlug, eventTitle }: Pr
 
   useEffect(() => {
     async function loadData() {
-      // Generate QR code for event page
-      const qr = await QRCode.toDataURL(eventUrl, { width: 300, margin: 2 })
-      setQrDataUrl(qr)
+      try {
+        // Generate QR code for event page
+        const qr = await QRCode.toDataURL(eventUrl, { width: 300, margin: 2 })
+        setQrDataUrl(qr)
 
-      // Load analytics
-      const [viewsRes, checkInsRes, ticketCountRes] = await Promise.all([
-        supabase
-          .from('event_page_views')
-          .select('source')
-          .eq('event_id', eventId),
-        supabase
-          .from('check_ins')
-          .select('id')
-          .in('ticket_id', 
-            // Subquery: get all ticket IDs for this event
-            (await supabase
-              .from('tickets')
-              .select('id')
-              .eq('event_id', eventId)
-              .then(r => r.data?.map(t => t.id) || []))
-          ),
-        supabase
-          .from('tickets')
-          .select('id')
-          .eq('event_id', eventId)
-          .eq('payment_status', 'paid'),
-      ])
+        // Load analytics from aggregation table (fast!)
+        const [analyticsRes, ticketsRes, checkInsRes] = await Promise.all([
+          supabase
+            .from('event_analytics')
+            .select('*')
+            .eq('event_id', eventId)
+            .maybeSingle(),
+          supabase
+            .from('tickets')
+            .select('id')
+            .eq('event_id', eventId)
+            .eq('payment_status', 'paid'),
+          supabase
+            .from('check_ins')
+            .select('id')
+            .in(
+              'ticket_id',
+              (await supabase
+                .from('tickets')
+                .select('id')
+                .eq('event_id', eventId)
+                .then((r) => r.data?.map((t) => t.id) || []))
+            ),
+        ])
 
-      const views = viewsRes.data || []
-      const checkins = checkInsRes.data || []
-      const tickets = ticketCountRes.data || []
+        const analyticsData = analyticsRes.data
+        const tickets = ticketsRes.data || []
+        const checkins = checkInsRes.data || []
 
-      const totalViews = views.length
-      const qrScans = views.filter(v => v.source === 'qr').length
-      const directViews = views.filter(v => v.source === 'direct').length
-      const socialViews = views.filter(v => v.source === 'social').length
-      const checkInCount = checkins.length
-      const checkInRate = tickets.length > 0 ? (checkInCount / tickets.length) * 100 : 0
+        const totalViews = analyticsData?.total_page_views || 0
+        const qrScans = analyticsData?.views_qr || 0
+        const directViews = analyticsData?.views_direct || 0
+        const socialViews = analyticsData?.views_social || 0
+        const checkInCount = checkins.length
+        const ticketsSold = tickets.length
+        const checkInRate = ticketsSold > 0 ? (checkInCount / ticketsSold) * 100 : 0
 
-      setAnalytics({
-        totalViews,
-        qrScans,
-        directViews,
-        socialViews,
-        checkIns: checkInCount,
-        checkInRate,
-      })
+        setAnalytics({
+          totalViews,
+          qrScans,
+          directViews,
+          socialViews,
+          checkIns: checkInCount,
+          checkInRate,
+          ticketsSold,
+        })
 
-      setLoading(false)
+        setLoading(false)
+      } catch (err) {
+        console.error('Error loading analytics:', err)
+        setLoading(false)
+      }
     }
 
     loadData()
@@ -211,14 +220,15 @@ export default function EventMarketingTab({ eventId, eventSlug, eventTitle }: Pr
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {[
               { label: 'Total Page Views', value: analytics.totalViews, color: 'text-blue-600' },
-              { label: 'QR Scans', value: analytics.qrScans, color: 'text-green-600' },
+              { label: 'QR Code Scans', value: analytics.qrScans, color: 'text-green-600' },
               { label: 'Direct Visits', value: analytics.directViews, color: 'text-purple-600' },
               { label: 'Social Visits', value: analytics.socialViews, color: 'text-pink-600' },
-              { label: 'Check-Ins', value: analytics.checkIns, color: 'text-orange-600' },
+              { label: 'Tickets Sold', value: analytics.ticketsSold, color: 'text-orange-600' },
+              { label: 'Check-Ins', value: analytics.checkIns, color: 'text-teal-600' },
               {
                 label: 'Check-In Rate',
                 value: `${analytics.checkInRate.toFixed(1)}%`,
-                color: 'text-teal-600',
+                color: 'text-indigo-600',
               },
             ].map((stat, i) => (
               <div key={i} className="rounded-lg bg-gray-50 p-4 dark:bg-white/[0.02]">
