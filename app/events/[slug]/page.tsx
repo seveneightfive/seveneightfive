@@ -6,6 +6,7 @@ import TicketPurchaseButton from '@/app/components/TicketPurchaseButton'
 import FollowFavoriteButtons from '@/app/components/FollowFavoriteButtons'
 import AddToCalendar from './AddToCalendar'
 import ShareButtons from './ShareButtons'
+import EventPageViewLogger from './EventPageViewLogger'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -115,7 +116,7 @@ export async function generateMetadata(
 
   const d = new Date(event.event_date + 'T12:00:00')
   const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
-  const description = event.description || `${event.title} — ${dateStr}${event.venue ? ` at ${event.venue.name}` : ''} in Topeka, KS`
+  const description = event.description || `${event.title} | ${dateStr}${event.venue ? ` at ${event.venue.name}` : ''} in Topeka, KS`
 
   return {
     title: `${event.title} | The 785`,
@@ -238,30 +239,7 @@ function formatTime(t: string | null): string {
   return m === 0 ? `${hour} ${ampm}` : `${hour}:${m.toString().padStart(2, '0')} ${ampm}`
 }
 
-/**
- * Render a paragraph of plain text with auto-linked URLs and emails.
- *
- * Behavior:
- *   - URLs starting with http://, https://, or bare `www.` become <a> tags
- *   - Email addresses become mailto: links
- *   - Single newlines inside a paragraph become <br>
- *   - Every link gets title="..." showing the URL, opens in a new tab,
- *     and includes rel="noopener noreferrer"
- *
- * Security: we DON'T render any user-typed HTML. React's default JSX
- * rendering escapes strings, so an event description containing literal
- * `<script>` or `<a href>` markup will display as text, not execute.
- * We only inject anchor tags that WE construct here.
- *
- * The output is an array of React nodes (strings + <a> + <br>) suitable
- * for use inside a <p>.
- */
 function renderInline(text: string): React.ReactNode[] {
-  // Match URLs and emails. Order matters: emails first so we don't treat
-  // the "name@" portion as part of a URL host.
-  //
-  // - emails: simple "x@y.z" pattern
-  // - urls: starts with http:// or https://, OR bare "www." followed by domain
   const TOKEN_RE =
     /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})|(https?:\/\/[^\s<>"]+)|(\bwww\.[^\s<>"]+)/g
 
@@ -270,8 +248,6 @@ function renderInline(text: string): React.ReactNode[] {
   let match: RegExpExecArray | null
   let keyCounter = 0
 
-  // Helper to push the run of plain text between matches, handling
-  // intra-paragraph single newlines as <br>.
   const pushPlain = (segment: string) => {
     if (!segment) return
     const lines = segment.split('\n')
@@ -284,7 +260,6 @@ function renderInline(text: string): React.ReactNode[] {
   }
 
   while ((match = TOKEN_RE.exec(text)) !== null) {
-    // Text leading up to this match
     pushPlain(text.slice(lastIndex, match.index))
 
     const [token, email, urlHttp, urlWww] = match
@@ -300,9 +275,6 @@ function renderInline(text: string): React.ReactNode[] {
         </a>
       )
     } else {
-      // Strip trailing punctuation that probably belongs to the sentence,
-      // not the URL. e.g. "see https://example.com." should not include the
-      // trailing period in the href.
       let displayUrl = (urlHttp || urlWww)
       let trailing = ''
       const trailingMatch = displayUrl.match(/[.,;:!?)\]}'"]+$/)
@@ -329,27 +301,12 @@ function renderInline(text: string): React.ReactNode[] {
     lastIndex = match.index + token.length
   }
 
-  // Trailing plain text after the last match
   pushPlain(text.slice(lastIndex))
 
   return nodes
 }
 
-/**
- * Render the full description. Splits on double-newlines (blank lines) into
- * paragraphs; each paragraph keeps its single-newline line breaks.
- *
- * Example input:
- *   "First paragraph line one.
- *    First paragraph line two.
- *
- *    Second paragraph with a link: https://example.com"
- *
- * Output: two <p> elements. First has a <br> between the two lines.
- * Second has an auto-linked anchor.
- */
 function renderDescription(text: string): React.ReactNode {
-  // Normalize Windows line endings, then split on blank lines.
   const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   const paragraphs = normalized.split(/\n{2,}/)
 
@@ -379,6 +336,8 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
 
   return (
     <>
+      <EventPageViewLogger slug={slug} />
+      
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <style>{`
@@ -494,7 +453,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         }
       `}</style>
 
-      {/* HERO — starts at top of page, no nav above it */}
+      {/* HERO */}
       <section className="hero">
         {event.image_url
           ? <ImageLightbox src={event.image_url} alt={event.title} />
@@ -510,7 +469,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           <div className="hero-date-row">
             <span className="hero-date">{isToday ? 'Today' : dayOfWeek}, {fullDate}</span>
             {isToday && <span className="hero-today">Today</span>}
-            {event.star && <span className="hero-star">★ Featured</span>}
+            {event.star && <span className="hero-star">Featured</span>}
           </div>
         </div>
       </section>
@@ -526,7 +485,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
             <div className="info-cell">
               <div className="info-label">Date</div>
               <div className="info-value">
-                <strong>{isToday ? 'Today — ' : ''}{dayOfWeek}</strong><br />{fullDate}
+                <strong>{isToday ? 'Today | ' : ''}{dayOfWeek}</strong><br />{fullDate}
               </div>
             </div>
 
@@ -662,7 +621,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
               <div className="venue-info">
                 <div className="venue-name">{event.venue.name}</div>
                 <div className="venue-address">
-                  {[event.venue.address, event.venue.neighborhood || event.venue.city].filter(Boolean).join(' · ')}
+                  {[event.venue.address, event.venue.neighborhood || event.venue.city].filter(Boolean).join(' | ')}
                 </div>
               </div>
               <span className="venue-arrow">→</span>
@@ -711,7 +670,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
                         {rel.title}
                       </div>
                       <div style={{ fontSize: '0.78rem', color: 'var(--ink-faint)' }}>
-                        {relDateStr}{rel.venue ? ` · ${rel.venue.name}` : ''}
+                        {relDateStr}{rel.venue ? ` | ${rel.venue.name}` : ''}
                       </div>
                     </div>
 
