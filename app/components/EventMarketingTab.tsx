@@ -30,13 +30,14 @@ export default function EventMarketingTab({ eventId, eventSlug, eventTitle }: Pr
   const supabase = createClient()
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://seveneightfive.com'
   const eventUrl = `${siteUrl}/events/${eventSlug}`
+  const qrUrl = `${eventUrl}?ref=qr`
   const checkInUrl = `${siteUrl}/events/${eventSlug}/checkin`
 
   useEffect(() => {
     async function loadData() {
       try {
         // Generate QR code for event page
-        const qr = await QRCode.toDataURL(eventUrl, { width: 300, margin: 2 })
+        const qr = await QRCode.toDataURL(qrUrl, { width: 300, margin: 2 })
         setQrDataUrl(qr)
 
         // Load analytics from aggregation table (fast!)
@@ -111,10 +112,10 @@ export default function EventMarketingTab({ eventId, eventSlug, eventTitle }: Pr
   }
 
   const socialShareLinks = {
-    facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(eventUrl)}`,
-    twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(eventUrl)}&text=${encodeURIComponent(`Check out ${eventTitle} on 785 Magazine`)}`,
-    linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(eventUrl)}`,
-  }
+  facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${eventUrl}?ref=facebook`)}`,
+  twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(`${eventUrl}?ref=twitter`)}&text=${encodeURIComponent(`Check out ${eventTitle} on 785 Magazine`)}`,
+  linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${eventUrl}?ref=linkedin`)}`,
+}
 
   if (loading) {
     return (
