@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import webpush from "web-push"
-import { supabase } from "@/lib/supabase"
+import { createClient } from "@/lib/supabaseServer"   // ← service role, server-side
 
 webpush.setVapidDetails(
   process.env.VAPID_SUBJECT!,
