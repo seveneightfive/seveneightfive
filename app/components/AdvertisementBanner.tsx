@@ -1,7 +1,6 @@
 'use client'
-'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 
 type Ad = {
@@ -18,6 +17,9 @@ type Ad = {
 
 export default function AdvertisementBanner() {
   const [ad, setAd] = useState<Ad | null>(null)
+  // Guard against React 18 StrictMode's double-mount in dev (and any
+  // accidental double-fire from re-renders) inflating the view counter.
+  const viewTracked = useRef(false)
 
   useEffect(() => {
     async function fetchAd() {
@@ -32,13 +34,16 @@ export default function AdvertisementBanner() {
         .limit(1)
         .maybeSingle()
 
-      if (data) {
-        setAd(data)
-        // Track view (fire and forget)
-        supabase
-          .from('advertisements')
-          .update({ views: data.views + 1 })
-          .eq('id', data.id)
+      if (!data) return
+      setAd(data)
+
+      // Track view via RPC (atomic, RLS-bypassing). Fire-and-forget — we
+      // don't block rendering on it, and we don't surface errors to the user.
+      if (!viewTracked.current) {
+        viewTracked.current = true
+        supabase.rpc('increment_ad_view', { ad_id: data.id }).then(({ error }) => {
+          if (error) console.error('[ad view] tracking failed:', error)
+        })
       }
     }
     fetchAd()
@@ -46,10 +51,11 @@ export default function AdvertisementBanner() {
 
   async function handleClick() {
     if (!ad?.button_link) return
-    await supabase
-      .from('advertisements')
-      .update({ clicks: ad.clicks + 1 })
-      .eq('id', ad.id)
+    // Fire the increment in parallel with opening the link — don't make
+    // the user wait on a round-trip before the link opens.
+    supabase.rpc('increment_ad_click', { ad_id: ad.id }).then(({ error }) => {
+      if (error) console.error('[ad click] tracking failed:', error)
+    })
     window.open(ad.button_link, '_blank', 'noopener,noreferrer')
   }
 
@@ -70,8 +76,8 @@ export default function AdvertisementBanner() {
         border: '1px solid rgba(255,255,255,0.06)',
         transition: 'transform 0.2s',
       }}
-      onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.005)')}
-      onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+      onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.005)')}
+      onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
     >
       <style>{`
         @media (max-width: 640px) {
@@ -130,7 +136,7 @@ export default function AdvertisementBanner() {
             }}>
               {ad.button_text}
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/>
+                <line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" />
               </svg>
             </span>
           </div>
