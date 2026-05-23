@@ -91,7 +91,7 @@ export default async function HomePage() {
   ])
 
   // Count upcoming events at NOTO venues
-  const notoVenueIds = (notoVenues ?? []).map((v) => v.id)
+  const notoVenueIds = (notoVenues ?? []).map((v: { id: string }) => v.id)
   const { count: notoEventCount } = notoVenueIds.length > 0
     ? await supabase
         .from('events')
@@ -101,14 +101,14 @@ export default async function HomePage() {
     : { count: 0 }
 
   // 3. Get artist_ids from event_artists for those upcoming event IDs
-  const eventIdList = (upcomingEventIds ?? []).map((e) => e.id)
+  const eventIdList = (upcomingEventIds ?? []).map((e: { id: string }) => e.id)
 
   const { data: eventArtistLinks } = eventIdList.length > 0
     ? await supabase
         .from('event_artists')
         .select('artist_id')
         .in('event_id', eventIdList)
-    : { data: [] }
+    : { data: [] as { artist_id: string }[] }
 
   // Count upcoming events per artist
   const countMap: Record<string, number> = {}
