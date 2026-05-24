@@ -36,13 +36,35 @@ export async function POST(request: NextRequest) {
 
     const priceInCents = duration === 5 ? 1000 : 1500
 
-    // Calculate end_date
-    const start = new Date(start_date + 'T12:00:00')
-    start.setDate(start.getDate() + duration - 1)
-    const end_date = start.toISOString().split('T')[0]
+// Calculate end_date
+const start = new Date(start_date + 'T12:00:00')
+start.setDate(start.getDate() + duration - 1)
+const end_date = start.toISOString().split('T')[0]
 
-    const origin = request.nextUrl.origin
-    const admin = createAdminClient()
+const origin = request.nextUrl.origin
+const admin = createAdminClient()
+
+// ─── Enforce the per-day cap (3 active ads max) ──────────────────────
+// We check max overlap on ANY day in the requested range. The frontend
+// shows the same number, but enforcement lives here because frontend
+// checks can be bypassed.
+const MAX_PER_DAY = 3
+const { data: maxOverlap, error: overlapErr } = await admin
+  .rpc('get_max_overlap_in_range', { p_start: start_date, p_end: end_date })
+
+if (overlapErr) {
+  console.error('[advertise/checkout] availability check failed:', overlapErr)
+  return NextResponse.json({ error: 'Availability check failed' }, { status: 500 })
+}
+if (Number(maxOverlap ?? 0) >= MAX_PER_DAY) {
+  return NextResponse.json(
+    {
+      error: 'These dates are no longer available. Please pick different dates.',
+      code: 'DATES_UNAVAILABLE',
+    },
+    { status: 409 }
+  )
+}
 
     // Insert ad as draft/pending — goes live after payment confirmed by webhook
     const { data: ad, error: insertError } = await admin
