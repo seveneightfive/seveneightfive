@@ -29,7 +29,7 @@ export default function AdvertisementBanner() {
   async function fetchAd() {
     const { data, error } = await supabase
       .rpc('get_random_active_ad')
-      .maybeSingle()
+      .maybeSingle<Ad>()
 
     if (error) {
       console.error('[ad fetch] failed:', error)
