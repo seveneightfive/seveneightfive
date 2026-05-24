@@ -26,31 +26,28 @@ export default function AdvertisementBanner() {
 
   // ── Fetch the active ad and track the view ───────────────────────────────
   useEffect(() => {
-    async function fetchAd() {
-      const today = new Date().toISOString().split('T')[0]
-      const { data } = await supabase
-        .from('advertisements')
-        .select('id, headline, ad_copy, content, ad_image_url, button_text, button_link, views, clicks')
-        .eq('payment_status', 'paid')
-        .lte('start_date', today)
-        .gte('end_date', today)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+  async function fetchAd() {
+    const { data, error } = await supabase
+      .rpc('get_random_active_ad')
+      .maybeSingle()
 
-      if (!data) return
-      setAd(data)
-
-      if (!viewTracked.current) {
-        viewTracked.current = true
-        supabase.rpc('increment_ad_view', { ad_id: data.id }).then(({ error }) => {
-          if (error) console.error('[ad view] tracking failed:', error)
-        })
-      }
+    if (error) {
+      console.error('[ad fetch] failed:', error)
+      return
     }
-    fetchAd()
-  }, [])
+    if (!data) return
+    setAd(data)
 
+    if (!viewTracked.current) {
+      viewTracked.current = true
+      supabase.rpc('increment_ad_view', { ad_id: data.id }).then(({ error }) => {
+        if (error) console.error('[ad view] tracking failed:', error)
+      })
+    }
+  }
+  fetchAd()
+}, [])
+  
   // ── Scroll observers + parallax ──────────────────────────────────────────
   useEffect(() => {
     const el = cardRef.current
