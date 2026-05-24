@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 export type HeroSlide = {
   id: string
@@ -16,18 +16,91 @@ export type HeroSlide = {
 export default function HeroSlider({ slides }: { slides: HeroSlide[] }) {
   const [current, setCurrent] = useState(0)
   const [paused, setPaused] = useState(false)
+  const [dragOffset, setDragOffset] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+
+  const touchStartX = useRef<number | null>(null)
+  const touchStartY = useRef<number | null>(null)
+  const touchStartTime = useRef<number>(0)
+  const isHorizontalSwipe = useRef<boolean | null>(null)
+  const wrapRef = useRef<HTMLElement | null>(null)
 
   const next = useCallback(() => {
     setCurrent(c => (c + 1) % slides.length)
   }, [slides.length])
 
-  const prev = () => setCurrent(c => (c - 1 + slides.length) % slides.length)
+  const prev = useCallback(() => {
+    setCurrent(c => (c - 1 + slides.length) % slides.length)
+  }, [slides.length])
 
+  // Autoplay
   useEffect(() => {
-    if (paused || slides.length <= 1) return
+    if (paused || isDragging || slides.length <= 1) return
     const id = setTimeout(next, 6000)
     return () => clearTimeout(id)
-  }, [current, paused, next, slides.length])
+  }, [current, paused, isDragging, next, slides.length])
+
+  // Touch handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (slides.length <= 1) return
+    const t = e.touches[0]
+    touchStartX.current = t.clientX
+    touchStartY.current = t.clientY
+    touchStartTime.current = Date.now()
+    isHorizontalSwipe.current = null
+    setPaused(true)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return
+    const t = e.touches[0]
+    const dx = t.clientX - touchStartX.current
+    const dy = t.clientY - touchStartY.current
+
+    // Determine swipe direction on first significant movement
+    if (isHorizontalSwipe.current === null) {
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+        isHorizontalSwipe.current = Math.abs(dx) > Math.abs(dy)
+      }
+    }
+
+    if (isHorizontalSwipe.current === true) {
+      // Prevent vertical scroll while horizontally swiping
+      if (e.cancelable) e.preventDefault()
+      setIsDragging(true)
+      // Add slight resistance for a more natural feel
+      setDragOffset(dx * 0.85)
+    }
+  }
+
+  const handleTouchEnd = () => {
+    if (touchStartX.current === null) {
+      setPaused(false)
+      return
+    }
+
+    const distance = dragOffset
+    const elapsed = Date.now() - touchStartTime.current
+    const velocity = Math.abs(distance) / elapsed // px per ms
+
+    // Trigger if dragged > 18% of width OR a quick flick
+    const width = wrapRef.current?.offsetWidth ?? window.innerWidth
+    const threshold = width * 0.18
+    const isFlick = velocity > 0.5 && Math.abs(distance) > 40
+
+    if (isHorizontalSwipe.current && (Math.abs(distance) > threshold || isFlick)) {
+      if (distance < 0) next()
+      else prev()
+    }
+
+    // Reset
+    touchStartX.current = null
+    touchStartY.current = null
+    isHorizontalSwipe.current = null
+    setDragOffset(0)
+    setIsDragging(false)
+    setPaused(false)
+  }
 
   if (!slides.length) return null
 
@@ -42,6 +115,7 @@ export default function HeroSlider({ slides }: { slides: HeroSlide[] }) {
           min-height: 520px;
           overflow: hidden;
           background: #0A0A0A;
+          touch-action: pan-y;
         }
 
         .hs-slide {
@@ -57,12 +131,26 @@ export default function HeroSlider({ slides }: { slides: HeroSlide[] }) {
           pointer-events: auto;
         }
 
+        /* While dragging, kill opacity transition and shift active + neighbor slides */
+        .hs-wrap.hs-dragging .hs-slide {
+          transition: none;
+        }
+
+        .hs-wrap.hs-dragging .hs-slide.hs-active,
+        .hs-wrap.hs-dragging .hs-slide.hs-prev-slide,
+        .hs-wrap.hs-dragging .hs-slide.hs-next-slide {
+          opacity: 1;
+          pointer-events: auto;
+        }
+
         .hs-img {
           width: 100%;
           height: 100%;
           object-fit: cover;
           object-position: center;
           display: block;
+          user-select: none;
+          -webkit-user-drag: none;
         }
 
         .hs-overlay {
@@ -217,31 +305,61 @@ export default function HeroSlider({ slides }: { slides: HeroSlide[] }) {
       `}</style>
 
       <section
-        className="hs-wrap"
+        ref={wrapRef}
+        className={`hs-wrap${isDragging ? ' hs-dragging' : ''}`}
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         aria-label="Hero slideshow"
       >
-        {slides.map((slide, i) => (
-          <div key={slide.id} className={`hs-slide${i === current ? ' hs-active' : ''}`}>
-            {slide.image_url && (
-              <img src={slide.image_url} alt="" className="hs-img" aria-hidden="true" />
-            )}
-            <div className="hs-overlay" />
-            <div className="hs-content">
-              <h1 className="hs-headline">{slide.headline}</h1>
-              {slide.body && <p className="hs-body">{slide.body}</p>}
-              {slide.button_label && slide.button_url && (
-                <a href={slide.button_url} className="hs-btn">
-                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                  {slide.button_label}
-                </a>
+        {slides.map((slide, i) => {
+          const isActive = i === current
+          const isPrev = i === (current - 1 + slides.length) % slides.length
+          const isNext = i === (current + 1) % slides.length
+
+          let transform = ''
+          if (isDragging) {
+            const width = wrapRef.current?.offsetWidth ?? 0
+            if (isActive) {
+              transform = `translate3d(${dragOffset}px, 0, 0)`
+            } else if (isNext) {
+              transform = `translate3d(${dragOffset + width}px, 0, 0)`
+            } else if (isPrev) {
+              transform = `translate3d(${dragOffset - width}px, 0, 0)`
+            }
+          }
+
+          const classes = [
+            'hs-slide',
+            isActive ? 'hs-active' : '',
+            isDragging && isPrev ? 'hs-prev-slide' : '',
+            isDragging && isNext ? 'hs-next-slide' : '',
+          ].filter(Boolean).join(' ')
+
+          return (
+            <div key={slide.id} className={classes} style={transform ? { transform } : undefined}>
+              {slide.image_url && (
+                <img src={slide.image_url} alt="" className="hs-img" aria-hidden="true" draggable={false} />
               )}
+              <div className="hs-overlay" />
+              <div className="hs-content">
+                <h1 className="hs-headline">{slide.headline}</h1>
+                {slide.body && <p className="hs-body">{slide.body}</p>}
+                {slide.button_label && slide.button_url && (
+                  <a href={slide.button_url} className="hs-btn">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                    {slide.button_label}
+                  </a>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
 
         {/* Slide counter */}
         {slides.length > 1 && (
