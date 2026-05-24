@@ -384,7 +384,7 @@ export default function AdvertiseClient({
                   />
                 </Field>
 
-                <Field label="Ad Image" optional hint="max 5MB">
+                <Field label="Ad Image" optional hint="Square image (800×800px or larger). Max 5MB. JPG or PNG">
                   <input
                     ref={fileRef}
                     type="file"
