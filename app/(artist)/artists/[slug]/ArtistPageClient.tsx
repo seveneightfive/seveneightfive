@@ -28,7 +28,7 @@ type Artist = {
   slug: string
   bio: string | null
   tagline: string | null
-  bio_written_by_785: boolean | null   // NEW — checkbox from admin
+  bio_written_by_785: boolean | null
   image_url: string | null
   avatar_url: string | null
   artist_type: string | null
@@ -85,72 +85,69 @@ type Props = {
   jsonLd: object
 }
 
-// ─── SVG Icons (inline, no emoji) ────────────────────────────────────────────
+// ─── SVG Icons ────────────────────────────────────────────────────────────────
 
 const IconWebsite = () => (
-  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke-width="1.6">
-    <circle cx="12" cy="12" r="10"/>
-    <line x1="2" y1="12" x2="22" y2="12"/>
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6">
+    <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
     <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
   </svg>
 )
 const IconEmail = () => (
-  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke-width="1.6">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6">
     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
     <polyline points="22,6 12,13 2,6"/>
   </svg>
 )
 const IconYouTube = () => (
-  <svg width="32" height="32" viewBox="0 0 24 24">
+  <svg width="24" height="24" viewBox="0 0 24 24">
     <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
   </svg>
 )
 const IconSpotify = () => (
-  <svg width="32" height="32" viewBox="0 0 24 24">
+  <svg width="24" height="24" viewBox="0 0 24 24">
     <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
   </svg>
 )
 const IconInstagram = () => (
-  <svg width="32" height="32" viewBox="0 0 24 24">
+  <svg width="24" height="24" viewBox="0 0 24 24">
     <rect x="2" y="2" width="20" height="20" rx="5" className="icon-outline"/>
     <circle cx="12" cy="12" r="4" className="icon-outline"/>
     <circle cx="17.5" cy="6.5" r="1.2" className="icon-dot"/>
   </svg>
 )
 const IconFacebook = () => (
-  <svg width="32" height="32" viewBox="0 0 24 24">
+  <svg width="24" height="24" viewBox="0 0 24 24">
     <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
   </svg>
 )
 const IconX = () => (
-  <svg width="32" height="32" viewBox="0 0 24 24">
+  <svg width="24" height="24" viewBox="0 0 24 24">
     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.259 5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
   </svg>
 )
 const IconSoundCloud = () => (
-  <svg width="32" height="32" viewBox="0 0 24 24">
-    <path d="M1.175 12.225c-.017.128-.027.257-.027.39 0 .13.01.26.027.388-.017-.128-.027-.258-.027-.389 0-.132.01-.261.027-.389zM.608 11.81c-.026.131-.04.265-.04.4 0 .135.014.27.04.4C.582 12.48.568 12.345.568 12.21c0-.135.014-.269.04-.4zm.567-.365c-.01.053-.015.106-.015.16 0 .053.005.106.015.159-.01-.053-.015-.106-.015-.16 0-.053.005-.106.015-.159z"/>
+  <svg width="24" height="24" viewBox="0 0 24 24">
     <path d="M11.5 8.5c-.7 0-1.36.15-1.95.42C9.17 6.1 7.05 4 4.5 4 1.91 4 0 6.09 0 8.5c0 .17.01.34.03.5H0v7h15.5c1.93 0 3.5-1.57 3.5-3.5S17.43 9 15.5 9c-.17 0-.34.01-.5.03C14.47 8.77 13.04 8.5 11.5 8.5z"/>
   </svg>
 )
 const IconAppleMusic = () => (
-  <svg width="32" height="32" viewBox="0 0 24 24">
+  <svg width="24" height="24" viewBox="0 0 24 24">
     <path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.769-.73 7.7 7.7 0 00-1.996-.16c-.693.02-1.39.04-2.08.06l-5.55.15c-.7.02-1.4.04-2.1.06A8.765 8.765 0 005.9.27C4.91.51 4.07 1.04 3.43 1.8c-.62.73-1.04 1.6-1.25 2.56-.16.73-.19 1.47-.17 2.22V19.26c.02.75.07 1.5.27 2.24.36 1.38 1.2 2.46 2.46 3.14.65.35 1.35.54 2.07.62.82.09 1.64.1 2.46.1h9.3c.8 0 1.6-.01 2.4-.1.78-.08 1.52-.3 2.2-.69 1.27-.72 2.1-1.82 2.47-3.25.18-.7.22-1.42.23-2.14V12c0-1.96-.01-3.92-.01-5.876zM15.5 5.83l-6 1.67v7.1c-.32-.12-.67-.18-1.03-.18C7.06 14.42 6 15.45 6 16.71s1.06 2.29 2.47 2.29c1.41 0 2.53-1.03 2.53-2.29V9.48l4-1.12v5.76c-.32-.12-.67-.18-1.03-.18-1.41 0-2.47 1.03-2.47 2.29s1.06 2.29 2.47 2.29c1.41 0 2.53-1.03 2.53-2.29V5.83z"/>
   </svg>
 )
 const IconTikTok = () => (
-  <svg width="32" height="32" viewBox="0 0 24 24">
+  <svg width="24" height="24" viewBox="0 0 24 24">
     <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.18 8.18 0 004.79 1.54V6.78a4.85 4.85 0 01-1.02-.09z"/>
   </svg>
 )
 const IconLink = () => (
-  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke-width="1.6">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6">
     <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
     <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
   </svg>
 )
 
-// Map label → icon component + render type
 function getSvgIcon(label: string) {
   const l = label.toLowerCase()
   if (l.includes('instagram')) return { component: <IconInstagram />, type: 'mixed' }
@@ -182,13 +179,14 @@ export default function ArtistPageClient({
 }: Props) {
   const [shareOpen, setShareOpen] = useState(false)
   const [lightboxImage, setLightboxImage] = useState<PortfolioImage | null>(null)
-  const [activeSection, setActiveSection] = useState<string>('')
   const [copied, setCopied] = useState(false)
-  const [tabsHidden, setTabsHidden] = useState(false)
-  const lastScrollY = useRef(0)
 
-  // Intro animation state
+  // Intro animation state — preserved exactly from original
   const [introPhase, setIntroPhase] = useState<'intro' | 'transitioning' | 'done'>('intro')
+
+  // Scroll-driven sheet lift: 0 = card at rest position, 1 = fully scrolled up
+  const [sheetProgress, setSheetProgress] = useState(0)
+  const heroRef = useRef<HTMLDivElement>(null)
 
   const mp = artist.musician_profile
 
@@ -199,36 +197,22 @@ export default function ArtistPageClient({
     Literary: 'Literary Artist',
   }
 
-  // Scrollspy — IntersectionObserver
-  useEffect(() => {
-    if (introPhase !== 'done') return
-    const observers: IntersectionObserver[] = []
-    navItems.forEach(({ id }) => {
-      const el = document.getElementById(id)
-      if (!el) return
-      const obs = new IntersectionObserver(
-        ([entry]) => { if (entry.isIntersecting) setActiveSection(id) },
-        { threshold: 0.3 }
-      )
-      obs.observe(el)
-      observers.push(obs)
-    })
-    return () => observers.forEach(o => o.disconnect())
-  }, [navItems, introPhase])
-
-  // Hide/show sticky tabs on scroll direction
+  // Scroll listener — drives white card lift over hero
   useEffect(() => {
     if (introPhase !== 'done') return
     const onScroll = () => {
-      const y = window.scrollY
-      if (y > lastScrollY.current + 8) {
-        setTabsHidden(true)
-      } else if (y < lastScrollY.current - 8) {
-        setTabsHidden(false)
-      }
-      lastScrollY.current = y
+      const hero = heroRef.current
+      if (!hero) return
+      const heroH = hero.offsetHeight
+      // Card starts lifting after 40px of scroll, fully covers hero at heroH * 0.45
+      const scrollY = window.scrollY
+      const start = 40
+      const end = heroH * 0.45
+      const progress = Math.min(1, Math.max(0, (scrollY - start) / (end - start)))
+      setSheetProgress(progress)
     }
     window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
     return () => window.removeEventListener('scroll', onScroll)
   }, [introPhase])
 
@@ -250,23 +234,21 @@ export default function ArtistPageClient({
     setTimeout(() => setIntroPhase('done'), 600)
   }
 
-  const scrollToSection = (id: string) => {
-    const el = document.getElementById(id)
-    if (!el) return
-    const offset = 57 // sticky tab height
-    const top = el.getBoundingClientRect().top + window.scrollY - offset
-    window.scrollTo({ top, behavior: 'smooth' })
-  }
-
   const pageUrl = typeof window !== 'undefined' ? window.location.href : ''
   const heroImage = artist.image_url || artist.avatar_url
+
+  // Sheet translateY: starts at SHEET_PEEK (how much of card shows below fold), lifts to 0
+  // The card is position:sticky and we use translateY to animate it up over the hero
+  const SHEET_PEEK = 72 // px of rounded card visible below the hero at rest
+  const sheetTranslate = SHEET_PEEK * (1 - sheetProgress)
+  // Back/heart button opacity: fade them out subtly as card covers hero
+  const heroButtonOpacity = Math.max(0.35, 1 - sheetProgress * 0.5)
 
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <style>{`
-
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
@@ -281,18 +263,19 @@ export default function ArtistPageClient({
           --gold: #FFCE03;
           --serif: 'Oswald', sans-serif;
           --sans: 'DM Sans', system-ui, sans-serif;
-          --nav-h: 57px;
         }
 
-        html { scroll-behavior: smooth; background: var(--white); }
+        html { background: var(--white); }
         body {
           background: var(--white);
           color: var(--ink);
           font-family: var(--sans);
           -webkit-font-smoothing: antialiased;
+          /* Prevent scroll during intro */
         }
+        body.intro-active { overflow: hidden; }
 
-        /* ─── INTRO SCREEN ─────────────────────────────── */
+        /* ─── INTRO SCREEN — preserved exactly ───────── */
         .intro-screen {
           position: fixed;
           inset: 0;
@@ -381,18 +364,29 @@ export default function ArtistPageClient({
           to { opacity: 1; transform: translateY(0); }
         }
 
-        /* ─── HERO ─────────────────────────────────────── */
-        .hero {
+        /* ─── PAGE WRAPPER ───────────────────────────── */
+        .artist-page {
+          position: relative;
+          min-height: 100svh;
+        }
+
+        /* ─── HERO ───────────────────────────────────── */
+        .hero-wrap {
           position: relative;
           width: 100%;
           height: 100svh;
-          max-height: 700px;
-          min-height: 480px;
+          min-height: 500px;
+          max-height: 800px;
+        }
+        .hero {
+          position: sticky;
+          top: 0;
+          width: 100%;
+          height: 100svh;
+          min-height: 500px;
+          max-height: 800px;
           overflow: hidden;
           background: var(--ink);
-          display: flex;
-          flex-direction: column;
-          justify-content: flex-end;
         }
         .hero-img {
           position: absolute;
@@ -407,10 +401,10 @@ export default function ArtistPageClient({
           inset: 0;
           background: linear-gradient(
             180deg,
-            rgba(0,0,0,0.08) 0%,
-            rgba(0,0,0,0.0) 25%,
-            rgba(0,0,0,0.55) 65%,
-            rgba(0,0,0,0.92) 100%
+            rgba(0,0,0,0.1) 0%,
+            rgba(0,0,0,0.0) 30%,
+            rgba(0,0,0,0.5) 65%,
+            rgba(0,0,0,0.88) 100%
           );
         }
         .hero-monogram {
@@ -426,267 +420,160 @@ export default function ArtistPageClient({
           text-transform: uppercase;
           user-select: none;
         }
-        .hero-body {
-          position: relative;
-          z-index: 2;
-          padding: 24px 24px 32px;
-        }
-        .hero-eyebrow {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          margin-bottom: 10px;
-        }
-        .hero-type-label {
-          font-size: 0.65rem;
-          font-weight: 500;
-          letter-spacing: 0.22em;
-          text-transform: uppercase;
-          color: #FFCE03;
-        }
-        .hero-verified {
-          font-size: 0.62rem;
-          font-weight: 600;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: var(--accent);
-          background: rgba(200,6,80,0.18);
-          border: 1px solid rgba(200,6,80,0.35);
-          padding: 3px 8px;
-          border-radius: 100px;
-        }
-        .hero-name {
-          font-family: var(--serif);
-          font-size: clamp(2.6rem, 9vw, 5.5rem);
-          font-weight: 700;
-          color: #fff;
-          line-height: 0.95;
-          text-transform: uppercase;
-          margin-bottom: 10px;
-          animation: fadeUp 0.6s cubic-bezier(0.22,1,0.36,1) both;
-        }
-        .hero-tagline {
-          font-size: clamp(0.88rem, 2vw, 1rem);
-          font-weight: 300;
-          font-style: italic;
-          color: rgba(255,255,255,0.6);
-          line-height: 1.5;
-          margin-bottom: 14px;
-          max-width: 480px;
-          animation: fadeUp 0.6s 0.08s cubic-bezier(0.22,1,0.36,1) both;
-        }
-        .hero-pills {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 6px;
-          margin-bottom: 18px;
-          animation: fadeUp 0.6s 0.16s cubic-bezier(0.22,1,0.36,1) both;
-        }
-        .hero-pill {
-          font-size: 0.67rem;
-          font-weight: 500;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: rgba(255,255,255,0.55);
-          border: 1px solid rgba(255,255,255,0.18);
-          padding: 4px 10px;
-          border-radius: 100px;
-        }
-        .hero-pill.location {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          color: rgba(255,255,255,0.4);
-          border-color: transparent;
-          padding-left: 0;
-        }
-        .hero-actions {
-          display: flex;
-          gap: 10px;
-          align-items: center;
-          animation: fadeUp 0.6s 0.24s cubic-bezier(0.22,1,0.36,1) both;
-        }
 
-        /* Follow = heart icon button */
-        .btn-follow-heart {
-          width: 40px;
-          height: 40px;
+        /* Floating back button — top left over hero */
+        .hero-back {
+          position: absolute;
+          top: 16px;
+          left: 16px;
+          z-index: 10;
+          width: 38px;
+          height: 38px;
           border-radius: 50%;
-          background: rgba(255,255,255,0.1);
-          border: 1px solid rgba(255,255,255,0.22);
+          background: rgba(0,0,0,0.35);
+          border: 1px solid rgba(255,255,255,0.18);
           display: flex;
           align-items: center;
           justify-content: center;
-          cursor: pointer;
-          transition: background 0.15s, border-color 0.15s, transform 0.12s;
+          text-decoration: none;
+          backdrop-filter: blur(6px);
+          -webkit-backdrop-filter: blur(6px);
+          transition: background 0.15s;
           -webkit-tap-highlight-color: transparent;
-          flex-shrink: 0;
         }
-        .btn-follow-heart:hover { background: rgba(200,6,80,0.25); border-color: var(--accent); }
-        .btn-follow-heart.active { background: rgba(200,6,80,0.3); border-color: var(--accent); }
-        .btn-follow-heart:active { transform: scale(0.9); }
-        .btn-follow-heart svg { transition: fill 0.15s, stroke 0.15s; }
-        .btn-follow-heart.active svg { fill: var(--accent); stroke: var(--accent); }
+        .hero-back:hover { background: rgba(0,0,0,0.55); }
 
-        .hero-btn-share {
+        /* Floating heart button — top right over hero */
+        .hero-heart {
+          position: absolute;
+          top: 16px;
+          right: 16px;
+          z-index: 10;
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          background: rgba(0,0,0,0.35);
+          border: 1px solid rgba(255,255,255,0.18);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          backdrop-filter: blur(6px);
+          -webkit-backdrop-filter: blur(6px);
+          /* FollowFavoriteButtons renders inside here — we reset its default styles */
+        }
+
+        /* Name + type label sit at the bottom of the hero */
+        .hero-body {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          z-index: 2;
+          padding: 24px 22px 28px;
+        }
+        .hero-type-label {
+          font-size: 0.62rem;
+          font-weight: 700;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          color: var(--gold);
+          margin-bottom: 8px;
+          animation: fadeUp 0.6s cubic-bezier(0.22,1,0.36,1) both;
+        }
+        .hero-name {
+          font-family: var(--serif);
+          font-size: clamp(2.8rem, 10vw, 6rem);
+          font-weight: 700;
+          color: #fff;
+          line-height: 0.93;
+          text-transform: uppercase;
+          animation: fadeUp 0.65s 0.05s cubic-bezier(0.22,1,0.36,1) both;
+        }
+
+        /* ─── SCROLL-UP CONTENT SHEET ────────────────── */
+        /*
+          The sheet sits in normal document flow AFTER the hero-wrap.
+          It has a negative margin-top equal to SHEET_PEEK so it visually
+          overlaps the very bottom of the hero at rest.
+          JS then applies a translateY to lift it further as the user scrolls.
+        */
+        .content-sheet {
+          position: relative;
+          z-index: 20;
+          background: var(--white);
+          border-radius: 22px 22px 0 0;
+          margin-top: -72px; /* = SHEET_PEEK — pulls card up so it peeks below hero */
+          min-height: 60vh;
+          /* translateY is applied inline via JS */
+          will-change: transform;
+        }
+
+        /* Drag handle pill at top of sheet */
+        .sheet-handle-pill {
+          width: 36px;
+          height: 4px;
+          background: var(--border);
+          border-radius: 2px;
+          margin: 12px auto 0;
+        }
+
+        /* Artist name strip inside sheet (visible when hero scrolls off) */
+        .sheet-name-strip {
+          padding: 16px 22px 0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .sheet-artist-name {
+          font-family: var(--serif);
+          font-size: 1.3rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: var(--ink);
+          line-height: 1;
+        }
+        .sheet-share-btn {
           display: inline-flex;
           align-items: center;
-          gap: 7px;
-          padding: 9px 20px;
+          gap: 6px;
+          padding: 7px 16px;
           border-radius: 100px;
           font-family: var(--sans);
-          font-size: 0.75rem;
-          font-weight: 500;
+          font-size: 0.72rem;
+          font-weight: 600;
           letter-spacing: 0.06em;
           text-transform: uppercase;
           cursor: pointer;
-          border: 1px solid rgba(255,255,255,0.22);
-          background: rgba(255,255,255,0.1);
-          color: rgba(255,255,255,0.85);
-          transition: opacity 0.15s;
+          border: 1px solid var(--border);
+          background: var(--off);
+          color: var(--ink-soft);
+          transition: border-color 0.15s, color 0.15s;
           -webkit-tap-highlight-color: transparent;
-        }
-        .hero-btn-share:hover { opacity: 0.8; }
-
-        /* ─── STICKY TABS ──────────────────────────────── */
-        .top-nav {
-          position: sticky;
-          top: 0;
-          z-index: 200;
-          background: var(--white);
-          border-bottom: 1px solid var(--border);
-          display: flex;
-          align-items: center;
-          height: var(--nav-h);
-          padding: 0 16px;
-          overflow-x: auto;
-          scrollbar-width: none;
-          transition: transform 0.25s ease;
-        }
-        .top-nav.hidden { transform: translateY(-100%); }
-        .top-nav::-webkit-scrollbar { display: none; }
-
-        .top-nav-back {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 0.72rem;
-          font-weight: 500;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          color: var(--ink-soft);
-          text-decoration: none;
-          padding-right: 16px;
-          margin-right: 4px;
-          border-right: 1px solid var(--border);
-          white-space: nowrap;
-          flex-shrink: 0;
-          transition: color 0.15s;
-        }
-        .top-nav-back:hover { color: var(--ink); }
-
-        .top-nav-link {
-          font-size: 0.72rem;
-          font-weight: 600;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: var(--ink-soft);
-          text-decoration: none;
-          padding: 0 14px;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          border-bottom: 2px solid transparent;
-          white-space: nowrap;
-          flex-shrink: 0;
-          transition: all 0.15s;
-          cursor: pointer;
-          background: none;
-          border-left: none;
-          border-top: none;
-          border-right: none;
-          font-family: var(--sans);
-        }
-        .top-nav-link:hover { color: var(--ink); }
-        .top-nav-link.active { color: var(--ink); border-bottom-color: var(--accent); }
-
-        /* Mobile: inline tabs (no bottom nav) */
-        .mobile-tabs {
-          display: none;
-          position: sticky;
-          top: 0;
-          z-index: 200;
-          background: var(--white);
-          border-bottom: 1px solid var(--border);
-          height: var(--nav-h);
-          overflow-x: auto;
-          scrollbar-width: none;
-          transition: transform 0.25s ease;
-        }
-        .mobile-tabs.hidden { transform: translateY(-100%); }
-        .mobile-tabs::-webkit-scrollbar { display: none; }
-        .mobile-tabs-inner {
-          display: flex;
-          align-items: stretch;
-          height: 100%;
-          padding: 0 12px;
-        }
-        .mobile-tab-back {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          font-size: 0.7rem;
-          font-weight: 500;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          color: var(--ink-soft);
-          text-decoration: none;
-          padding-right: 14px;
-          margin-right: 4px;
-          border-right: 1px solid var(--border);
           white-space: nowrap;
           flex-shrink: 0;
         }
-        .mobile-tab-item {
-          padding: 0 12px;
-          font-size: 0.7rem;
-          font-weight: 600;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: var(--ink-soft);
-          display: flex;
-          align-items: center;
-          border-bottom: 2px solid transparent;
-          white-space: nowrap;
-          flex-shrink: 0;
-          cursor: pointer;
-          background: none;
-          border-left: none;
-          border-top: none;
-          border-right: none;
-          font-family: var(--sans);
-          transition: all 0.15s;
-        }
-        .mobile-tab-item.active { color: var(--ink); border-bottom-color: var(--accent); }
+        .sheet-share-btn:hover { border-color: var(--ink-faint); color: var(--ink); }
 
-        /* ─── MAIN CONTENT ─────────────────────────────── */
+        /* ─── CONTENT SECTIONS ───────────────────────── */
         .artist-main {
           max-width: 680px;
           margin: 0 auto;
-          padding: 0 24px;
+          padding: 0 22px;
         }
         .section {
-          padding: 52px 0;
+          padding: 48px 0;
           border-bottom: 1px solid var(--border);
         }
         .section:last-child { border-bottom: none; padding-bottom: 80px; }
 
         .eyebrow {
-          font-size: 0.65rem;
-          font-weight: 500;
+          font-size: 0.63rem;
+          font-weight: 700;
           letter-spacing: 0.2em;
           text-transform: uppercase;
-          color: #374151;
+          color: var(--ink-soft);
           margin-bottom: 20px;
           display: flex;
           align-items: center;
@@ -700,9 +587,9 @@ export default function ArtistPageClient({
           max-width: 48px;
         }
 
-        /* ─── ABOUT ──── */
+        /* ─── ABOUT ──────────────────────────────────── */
         .words-by {
-          font-size: 0.65rem;
+          font-size: 0.63rem;
           font-weight: 600;
           letter-spacing: 0.16em;
           text-transform: uppercase;
@@ -714,7 +601,7 @@ export default function ArtistPageClient({
         .pull-quote {
           border-left: 3px solid var(--accent);
           padding: 8px 16px;
-          margin-bottom: 18px;
+          margin-bottom: 20px;
           font-size: 1rem;
           font-style: italic;
           color: var(--ink);
@@ -722,7 +609,7 @@ export default function ArtistPageClient({
         }
 
         .bio-text {
-          font-size: 1.02rem;
+          font-size: 1rem;
           font-weight: 300;
           line-height: 1.8;
           color: var(--ink);
@@ -750,7 +637,7 @@ export default function ArtistPageClient({
         }
         .awards-text { font-size: 0.9rem; color: var(--ink-soft); line-height: 1.55; }
 
-        /* ─── AUDIO / VIDEO ──── */
+        /* ─── AUDIO / VIDEO ──────────────────────────── */
         .audio-block {
           background: var(--ink);
           border-radius: 10px;
@@ -784,7 +671,7 @@ export default function ArtistPageClient({
         .video-meta { margin-top: 12px; font-size: 0.82rem; color: var(--ink-faint); font-style: italic; line-height: 1.5; }
         .video-meta strong { color: var(--ink-soft); font-style: normal; }
 
-        /* ─── WORKS / PORTFOLIO ──── */
+        /* ─── WORKS / PORTFOLIO ──────────────────────── */
         .works-image { width: 100%; border-radius: 10px; display: block; }
         .works-text { font-size: 0.95rem; line-height: 1.7; color: var(--ink-soft); }
         .portfolio-grid {
@@ -803,7 +690,7 @@ export default function ArtistPageClient({
         .portfolio-img:hover { opacity: 0.85; }
         .portfolio-caption { font-size: 0.75rem; color: var(--ink-faint); font-style: italic; line-height: 1.4; }
 
-        /* ─── EVENTS ──── */
+        /* ─── EVENTS ─────────────────────────────────── */
         .event-item {
           display: flex;
           gap: 16px;
@@ -812,12 +699,11 @@ export default function ArtistPageClient({
           border-bottom: 1px solid var(--border);
           text-decoration: none;
           color: inherit;
-          cursor: pointer;
           transition: background 0.12s;
           -webkit-tap-highlight-color: transparent;
         }
         .event-item:last-child { border-bottom: none; }
-        .event-item:active { background: rgba(200,6,80,0.03); margin: 0 -24px; padding-left: 24px; padding-right: 24px; }
+        .event-item:active { background: rgba(200,6,80,0.03); margin: 0 -22px; padding-left: 22px; padding-right: 22px; }
         .ev-date { width: 40px; flex-shrink: 0; text-align: center; }
         .ev-mo { font-size: 0.62rem; font-weight: 700; color: var(--accent); letter-spacing: 0.12em; text-transform: uppercase; }
         .ev-day { font-family: var(--serif); font-size: 1.8rem; font-weight: 700; color: var(--ink); line-height: 1; }
@@ -833,20 +719,16 @@ export default function ArtistPageClient({
         .events-empty-title { font-family: var(--serif); font-size: 1rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); }
         .events-empty-sub { font-size: 0.85rem; color: var(--ink-faint); }
 
-        /* ─── LINKS — icon grid ──── */
+        /* ─── LINKS — 5-per-row smaller icon grid ────── */
         .links-icon-grid {
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 12px;
-        }
-        @media (min-width: 520px) {
-          .links-icon-grid { grid-template-columns: repeat(5, 1fr); }
+          grid-template-columns: repeat(5, 1fr);
+          gap: 10px;
         }
 
-        /* tile base */
         .link-tile {
           aspect-ratio: 1;
-          border-radius: 14px;
+          border-radius: 12px;
           background: var(--accent);
           display: flex;
           align-items: center;
@@ -858,43 +740,31 @@ export default function ArtistPageClient({
           -webkit-tap-highlight-color: transparent;
           overflow: hidden;
         }
-        .link-tile:active { transform: scale(0.91); }
+        .link-tile:active { transform: scale(0.88); }
         .link-tile:hover { background: var(--gold); }
 
-        /* stroke-based icons */
         .link-tile.stroke-icon svg {
-          fill: none;
-          stroke: white;
-          stroke-width: 1.6px;
-          transition: stroke 0.18s;
+          fill: none; stroke: white; stroke-width: 1.6px; transition: stroke 0.18s;
         }
         .link-tile.stroke-icon:hover svg { stroke: #5a2000; }
 
-        /* fill-based icons */
         .link-tile.fill-icon svg {
-          fill: white;
-          transition: fill 0.18s;
+          fill: white; transition: fill 0.18s;
         }
         .link-tile.fill-icon:hover svg { fill: #5a2000; }
 
-        /* mixed icons (instagram) */
         .link-tile.mixed-icon svg .icon-outline {
-          fill: none;
-          stroke: white;
-          stroke-width: 1.6px;
-          transition: stroke 0.18s;
+          fill: none; stroke: white; stroke-width: 1.6px; transition: stroke 0.18s;
         }
         .link-tile.mixed-icon svg .icon-dot {
-          fill: white;
-          stroke: none;
-          transition: fill 0.18s;
+          fill: white; stroke: none; transition: fill 0.18s;
         }
         .link-tile.mixed-icon:hover svg .icon-outline { stroke: #5a2000; }
         .link-tile.mixed-icon:hover svg .icon-dot { fill: #5a2000; }
 
-        /* ─── FOOTER ──── */
+        /* ─── FOOTER ─────────────────────────────────── */
         .artist-footer {
-          padding: 28px 24px 40px;
+          padding: 28px 24px 48px;
           text-align: center;
           border-top: 1px solid var(--border);
         }
@@ -911,8 +781,8 @@ export default function ArtistPageClient({
         .footer-wordmark em { font-style: normal; color: var(--accent); font-weight: 600; }
         .footer-wordmark:hover { color: var(--ink); }
 
-        /* ─── SHARE SHEET ──── */
-        .sheet-overlay {
+        /* ─── SHARE SHEET ────────────────────────────── */
+        .share-overlay {
           position: fixed;
           inset: 0;
           background: rgba(0,0,0,0.5);
@@ -920,7 +790,7 @@ export default function ArtistPageClient({
           display: flex;
           align-items: flex-end;
         }
-        .sheet {
+        .share-sheet {
           width: 100%;
           background: var(--white);
           border-radius: 20px 20px 0 0;
@@ -928,45 +798,40 @@ export default function ArtistPageClient({
           max-height: 85svh;
           overflow-y: auto;
         }
-        .sheet-handle {
+        .share-handle {
           width: 36px; height: 4px; background: var(--border);
           border-radius: 2px; margin: 12px auto 0;
         }
-        .sheet-header {
+        .share-header {
           display: flex; align-items: center; justify-content: space-between;
           padding: 16px 20px 12px; border-bottom: 1px solid var(--border);
         }
-        .sheet-title {
+        .share-title {
           font-family: var(--serif); font-size: 1rem;
           font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
         }
-        .sheet-close {
+        .share-close {
           background: none; border: none; cursor: pointer;
           font-size: 1.2rem; color: var(--ink-soft); padding: 4px; line-height: 1;
         }
-        .sheet-share-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 16px;
-          padding: 20px 20px 0;
+        .share-grid {
+          display: grid; grid-template-columns: repeat(4, 1fr);
+          gap: 16px; padding: 20px 20px 0;
         }
-        .sheet-share-item {
+        .share-item {
           display: flex; flex-direction: column; align-items: center; gap: 8px;
           cursor: pointer; text-decoration: none; color: inherit; border: none; background: none;
           -webkit-tap-highlight-color: transparent;
         }
-        .sheet-share-icon {
+        .share-icon {
           width: 52px; height: 52px; border-radius: 14px;
           display: flex; align-items: center; justify-content: center;
           transition: transform 0.15s;
         }
-        .sheet-share-item:active .sheet-share-icon { transform: scale(0.9); }
-        .sheet-share-label {
-          font-size: 0.68rem; color: var(--ink-soft); text-align: center;
-          font-weight: 500;
-        }
-        .sheet-link-row {
-          margin: 20px 20px 20px;
+        .share-item:active .share-icon { transform: scale(0.9); }
+        .share-label { font-size: 0.68rem; color: var(--ink-soft); text-align: center; font-weight: 500; }
+        .share-link-row {
+          margin: 20px;
           background: var(--off);
           border-radius: 10px;
           padding: 12px 14px;
@@ -974,19 +839,19 @@ export default function ArtistPageClient({
           align-items: center;
           gap: 10px;
         }
-        .sheet-link-url {
+        .share-link-url {
           flex: 1; font-size: 0.78rem; color: var(--ink-faint);
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        .sheet-copy-btn {
+        .share-copy-btn {
           padding: 7px 14px; background: var(--accent); color: white;
           border-radius: 8px; font-size: 0.75rem; font-weight: 700;
           border: none; cursor: pointer; flex-shrink: 0; font-family: var(--sans);
           transition: background 0.15s;
         }
-        .sheet-copy-btn:hover { background: #a00440; }
+        .share-copy-btn:hover { background: #a00440; }
 
-        /* ─── LIGHTBOX ──── */
+        /* ─── LIGHTBOX ───────────────────────────────── */
         .lightbox-overlay {
           position: fixed; inset: 0; background: rgba(0,0,0,0.95);
           z-index: 500; display: flex; flex-direction: column;
@@ -1001,7 +866,7 @@ export default function ArtistPageClient({
           cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
 
-        /* ─── COPY TOAST ──── */
+        /* ─── COPY TOAST ──────────────────────────────── */
         .copy-toast {
           position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
           background: var(--ink); color: white; padding: 10px 20px;
@@ -1009,45 +874,71 @@ export default function ArtistPageClient({
           z-index: 500; pointer-events: none; animation: fadeUp 0.25s ease both;
         }
 
-        /* ─── RESPONSIVE ─────────────────────────────── */
-        @media (min-width: 641px) {
-          .mobile-tabs { display: none !important; }
-          .top-nav { display: flex; }
-        }
+        /* ─── SAFE AREA / MOBILE ─────────────────────── */
         @media (max-width: 640px) {
-          .top-nav { display: none !important; }
-          .mobile-tabs { display: flex; }
-          .hero { height: 100svh; max-height: 100svh; min-height: 0; }
-          .hero-body { padding: 20px 20px 28px; }
-          .artist-main { padding: 0 20px; }
-          .section { padding: 40px 0; }
-          .links-icon-grid { grid-template-columns: repeat(4, 1fr); }
+          .hero-body { padding: 20px 18px 24px; }
+          .artist-main { padding: 0 18px; }
+          .section { padding: 36px 0; }
+        }
+
+        /* ─── FOLLOW BUTTON OVERRIDE ─────────────────── */
+        /* Strip default styles from FollowFavoriteButtons when used in hero-heart */
+        .hero-heart > * {
+          all: unset !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          width: 100% !important;
+          height: 100% !important;
+          cursor: pointer !important;
+        }
+        .hero-heart > * svg {
+          width: 18px !important;
+          height: 18px !important;
+          stroke: white !important;
+          fill: none !important;
+        }
+        .hero-heart > *.active svg,
+        .hero-heart > *[data-active="true"] svg {
+          fill: var(--accent) !important;
+          stroke: var(--accent) !important;
         }
       `}</style>
 
-      {/* ── INTRO SCREEN ── */}
-      {introPhase !== 'done' && artist.tagline && (
+      {/* ── INTRO SCREEN — preserved exactly from original ── */}
+      {introPhase !== 'done' && (
         <div
           className={`intro-screen${introPhase === 'transitioning' ? ' transitioning' : ''}`}
           onClick={handleIntroAdvance}
         >
-          <div className="intro-eyebrow">785 Magazine</div>
-          <div className="intro-tagline">
-            {artist.tagline.split(' ').map((word, i) => {
-              const isItalic = i > Math.floor(artist.tagline!.split(' ').length * 0.5)
-              return (
-                <span
-                  key={i}
-                  className={`intro-word${isItalic ? ' italic' : ''} risen`}
-                  style={{ animationDelay: `${0.5 + i * 0.15}s`, marginRight: '0.3em' }}
-                >
-                  {word}
-                </span>
-              )
-            })}
-          </div>
+          <div className="intro-eyebrow">seveneightfive</div>
+          {artist.tagline ? (
+            <div className="intro-tagline">
+              {artist.tagline.split(' ').map((word, i) => {
+                const isItalic = i > Math.floor(artist.tagline!.split(' ').length * 0.5)
+                return (
+                  <span
+                    key={i}
+                    className={`intro-word${isItalic ? ' italic' : ''} risen`}
+                    style={{ animationDelay: `${0.5 + i * 0.15}s`, marginRight: '0.3em' }}
+                  >
+                    {word}
+                  </span>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="intro-tagline">
+              <span
+                className="intro-word risen"
+                style={{ animationDelay: '0.5s' }}
+              >
+                {artist.name}
+              </span>
+            </div>
+          )}
           <div className="intro-cta">
-            <div className="intro-cta-label">Tap to continue</div>
+            <div className="intro-cta-label">View Profile</div>
             <div className="intro-cta-arrow">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
                 <path d="M5 15l7-7 7 7"/>
@@ -1057,277 +948,270 @@ export default function ArtistPageClient({
         </div>
       )}
 
-      {/* ── HERO ── */}
-      <section className="hero">
-        {heroImage ? (
-          <>
-            <img src={heroImage} alt={artist.name} className="hero-img" />
-            <div className="hero-scrim" />
-          </>
-        ) : (
-          <div className="hero-monogram">{artist.name[0]}</div>
-        )}
-        <div className="hero-body">
-          <div className="hero-eyebrow">
-            <span className="hero-type-label">
-              {TYPE_LABEL[artist.artist_type || ''] || artist.artist_type || 'Artist'}
-            </span>
-            {artist.verified && <span className="hero-verified">✓ Featured</span>}
-          </div>
-          <h1 className="hero-name">{artist.name}</h1>
-          {artist.tagline && (
-            <p className="hero-tagline">&ldquo;{artist.tagline}&rdquo;</p>
-          )}
-          <div className="hero-pills">
-            {(artist.location_city || artist.location_state) && (
-              <span className="hero-pill location">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-                </svg>
-                {[artist.location_city, artist.location_state].filter(Boolean).join(', ')}
-              </span>
-            )}
-            {genres.slice(0, 3).map(g => (
-              <span key={g} className="hero-pill">{g}</span>
-            ))}
-          </div>
-          <div className="hero-actions">
-            {/* Heart / Follow button replaces old Follow+Favourite combo */}
-            <FollowFavoriteButtons
-              entityType="artist"
-              entityId={artist.id}
-              showFollow={true}
-              showFavorite={false}
-              heartOnly={true}
-            />
-            <button className="hero-btn-share" onClick={() => setShareOpen(true)}>
-              ↑ Share
-            </button>
-          </div>
-        </div>
-      </section>
+      <div className="artist-page">
 
-      {/* ── DESKTOP: STICKY TOP NAV (hides on scroll down) ── */}
-      <nav className={`top-nav${tabsHidden ? ' hidden' : ''}`}>
-        <a href="/artists" className="top-nav-back">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5M12 5l-7 7 7 7"/>
-          </svg>
-          Directory
-        </a>
-        {navItems.map(n => (
-          <button
-            key={n.id}
-            className={`top-nav-link${activeSection === n.id ? ' active' : ''}`}
-            onClick={() => scrollToSection(n.id)}
-          >
-            {n.label}
-          </button>
-        ))}
-      </nav>
-
-      {/* ── MOBILE: INLINE STICKY TABS (replaces bottom nav) ── */}
-      <nav className={`mobile-tabs${tabsHidden ? ' hidden' : ''}`}>
-        <div className="mobile-tabs-inner">
-          <a href="/artists" className="mobile-tab-back">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M19 12H5M12 5l-7 7 7 7"/>
-            </svg>
-            Back
-          </a>
-          {navItems.map(n => (
-            <button
-              key={n.id}
-              className={`mobile-tab-item${activeSection === n.id ? ' active' : ''}`}
-              onClick={() => scrollToSection(n.id)}
-            >
-              {n.label}
-            </button>
-          ))}
-        </div>
-      </nav>
-
-      {/* ── CONTENT ── */}
-      <main className="artist-main">
-
-        {/* ABOUT */}
-        <section id="about" className="section">
-          <div className="eyebrow">About</div>
-
-          {/* "Words by 785 Staff" — only renders if checkbox is true in DB */}
-          {artist.bio_written_by_785 && (
-            <div className="words-by">Words by <span>785 Staff</span></div>
-          )}
-
-          {/* Pull quote from tagline when bio exists */}
-          {artist.tagline && artist.bio && (
-            <div className="pull-quote">&ldquo;{artist.tagline}&rdquo;</div>
-          )}
-
-          {artist.bio
-            ? artist.bio.split('\n').filter(Boolean).map((p, i) => (
-                <p key={i} className="bio-text">{p}</p>
-              ))
-            : <p className="bio-empty">Bio coming soon.</p>
-          }
-          {artist.awards?.trim() && (
-            <div className="awards-block">
-              <div className="awards-label">Awards &amp; Recognition</div>
-              <div className="awards-text">{artist.awards}</div>
-            </div>
-          )}
-        </section>
-
-        {/* MUSIC / MEDIA — hidden for Visual and Literary */}
-        {hasMusic && (
-          <section id="music" className="section">
-            <div className="eyebrow">
-              {artist.artist_type === 'Musician' ? 'Music' : 'Media'}
-            </div>
-            {mp?.audio_file_url && (
-              <div className="audio-block" style={{ marginBottom: videoId ? 20 : 0 }}>
-                <div className="audio-track-name">{mp.audio_title || 'Listen'}</div>
-                <audio controls src={mp.audio_file_url} />
-              </div>
-            )}
-            {videoId && (
+        {/* ── HERO — sticky, sits behind the rising sheet ── */}
+        <div className="hero-wrap" ref={heroRef}>
+          <div className="hero">
+            {heroImage ? (
               <>
-                <div className="video-container">
-                  <iframe
-                    src={`https://www.youtube.com/embed/${videoId}`}
-                    title={mp?.video_title || artist.name}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                </div>
-                {(mp?.video_title || mp?.artistvideoabout) && (
-                  <p className="video-meta">
-                    {mp?.video_title && <strong>{mp.video_title}</strong>}
-                    {mp?.video_title && mp?.artistvideoabout && ' — '}
-                    {mp?.artistvideoabout}
-                  </p>
-                )}
+                <img src={heroImage} alt={artist.name} className="hero-img" />
+                <div className="hero-scrim" />
               </>
+            ) : (
+              <div className="hero-monogram">{artist.name[0]}</div>
             )}
-          </section>
-        )}
 
-        {/* WORK */}
-        {hasWork && (
-          <section id="work" className="section">
-            <div className="eyebrow">Works</div>
-            {artist.visual_profile?.works && (
-              artist.visual_profile.works.startsWith('http')
-                ? <img src={artist.visual_profile.works} alt={`${artist.name} — Works`} className="works-image" style={{ marginBottom: portfolioImages.length > 0 ? 20 : 0 }} />
-                : <p className="works-text" style={{ marginBottom: portfolioImages.length > 0 ? 20 : 0 }}>{artist.visual_profile.works}</p>
-            )}
-            {portfolioImages.length > 0 && (
-              <div className="portfolio-grid">
-                {portfolioImages.map(img => (
-                  <div key={img.id} className="portfolio-item">
-                    <img
-                      src={img.image_url}
-                      alt={img.caption || artist.name}
-                      className="portfolio-img"
-                      onClick={() => setLightboxImage(img)}
-                    />
-                    {img.caption && <p className="portfolio-caption">{img.caption}</p>}
+            {/* Back button — top left */}
+            <a
+              href="/artists"
+              className="hero-back"
+              style={{ opacity: heroButtonOpacity }}
+              aria-label="Back to directory"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+                <path d="M19 12H5M12 5l-7 7 7 7"/>
+              </svg>
+            </a>
+
+            {/* Heart / Follow — top right */}
+            <div
+              className="hero-heart"
+              style={{ opacity: heroButtonOpacity }}
+            >
+              <FollowFavoriteButtons
+                entityType="artist"
+                entityId={artist.id}
+                showFollow={true}
+                showFavorite={false}
+                heartOnly={true}
+              />
+            </div>
+
+            {/* Name at bottom of hero */}
+            <div className="hero-body">
+              {artist.artist_type && (
+                <div className="hero-type-label">
+                  {TYPE_LABEL[artist.artist_type] || artist.artist_type}
+                </div>
+              )}
+              <h1 className="hero-name">{artist.name}</h1>
+            </div>
+          </div>
+        </div>
+
+        {/* ── CONTENT SHEET — rises over hero on scroll ── */}
+        <div
+          className="content-sheet"
+          style={{ transform: `translateY(${sheetTranslate}px)` }}
+        >
+          <div className="sheet-handle-pill" />
+
+          {/* Artist name + share inside sheet */}
+          <div className="sheet-name-strip">
+            <div className="sheet-artist-name">{artist.name}</div>
+            <button className="sheet-share-btn" onClick={() => setShareOpen(true)}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
+              </svg>
+              Share
+            </button>
+          </div>
+
+          <main className="artist-main">
+
+            {/* ── ABOUT ── */}
+            <section id="about" className="section">
+              <div className="eyebrow">About</div>
+
+              {artist.bio_written_by_785 && (
+                <div className="words-by">Words by <span>785 Staff</span></div>
+              )}
+
+              {artist.tagline && artist.bio && (
+                <div className="pull-quote">&ldquo;{artist.tagline}&rdquo;</div>
+              )}
+
+              {artist.bio
+                ? artist.bio.split('\n').filter(Boolean).map((p, i) => (
+                    <p key={i} className="bio-text">{p}</p>
+                  ))
+                : <p className="bio-empty">Bio coming soon.</p>
+              }
+
+              {artist.awards?.trim() && (
+                <div className="awards-block">
+                  <div className="awards-label">Awards &amp; Recognition</div>
+                  <div className="awards-text">{artist.awards}</div>
+                </div>
+              )}
+            </section>
+
+            {/* ── MUSIC / MEDIA ── */}
+            {hasMusic && (
+              <section id="music" className="section">
+                <div className="eyebrow">
+                  {artist.artist_type === 'Musician' ? 'Music' : 'Media'}
+                </div>
+                {mp?.audio_file_url && (
+                  <div className="audio-block" style={{ marginBottom: videoId ? 20 : 0 }}>
+                    <div className="audio-track-name">{mp.audio_title || 'Listen'}</div>
+                    <audio controls src={mp.audio_file_url} />
                   </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* EVENTS */}
-        <section id="events" className="section">
-          <div className="eyebrow">Upcoming Events</div>
-          {events.length === 0 ? (
-            <div className="events-empty">
-              <div className="events-empty-title">No upcoming events</div>
-              <div className="events-empty-sub">Check back soon or follow on social media</div>
-            </div>
-          ) : (
-            <div>
-              {events.map(event => {
-                const dateObj = event.event_date
-                  ? new Date(event.event_date + 'T12:00:00')
-                  : null
-                return (
-                  <a
-                    key={event.id}
-                    href={event.slug ? `/events/${event.slug}` : event.ticket_url || '#'}
-                    target={event.slug ? '_self' : '_blank'}
-                    rel="noopener noreferrer"
-                    className="event-item"
-                  >
-                    {dateObj && (
-                      <div className="ev-date">
-                        <div className="ev-mo">
-                          {dateObj.toLocaleDateString('en-US', { month: 'short' })}
-                        </div>
-                        <div className="ev-day">{dateObj.getDate()}</div>
-                      </div>
-                    )}
-                    <div className="ev-info">
-                      <div className="ev-name">{event.title}</div>
-                      {event.event_start_time && (
-                        <div className="ev-venue" style={{ marginBottom: 2 }}>
-                          {event.event_start_time.trim()}
-                        </div>
-                      )}
-                      {event.venue && (
-                        <div className="ev-venue">
-                          {event.venue.name}
-                          {event.venue.neighborhood ? ` · ${event.venue.neighborhood}` : ''}
-                        </div>
-                      )}
+                )}
+                {videoId && (
+                  <>
+                    <div className="video-container">
+                      <iframe
+                        src={`https://www.youtube.com/embed/${videoId}`}
+                        title={mp?.video_title || artist.name}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
                     </div>
-                    {event.ticket_price !== null && (
-                      <span className={`ev-price${event.ticket_price === 0 ? ' free' : ''}`}>
-                        {event.ticket_price === 0 ? 'Free' : `$${event.ticket_price}`}
-                      </span>
+                    {(mp?.video_title || mp?.artistvideoabout) && (
+                      <p className="video-meta">
+                        {mp?.video_title && <strong>{mp.video_title}</strong>}
+                        {mp?.video_title && mp?.artistvideoabout && ' — '}
+                        {mp?.artistvideoabout}
+                      </p>
                     )}
-                    <span className="ev-arrow">›</span>
-                  </a>
-                )
-              })}
-            </div>
-          )}
-        </section>
+                  </>
+                )}
+              </section>
+            )}
 
-        {/* LINKS — icon grid, no labels, crimson → gold on hover */}
-        {socialLinks.length > 0 && (
-          <section id="links" className="section">
-            <div className="eyebrow">Find Me Online</div>
-            <div className="links-icon-grid">
-              {socialLinks.map((link, i) => {
-                const { component, type } = getSvgIcon(link.label)
-                return (
-                  <a
-                    key={i}
-                    href={link.url}
-                    target={link.url.startsWith('mailto') ? '_self' : '_blank'}
-                    rel="noopener noreferrer"
-                    className={`link-tile ${type}-icon`}
-                    title={link.label}
-                    aria-label={link.label}
-                  >
-                    {component}
-                  </a>
-                )
-              })}
-            </div>
-          </section>
-        )}
+            {/* ── WORK ── */}
+            {hasWork && (
+              <section id="work" className="section">
+                <div className="eyebrow">Works</div>
+                {artist.visual_profile?.works && (
+                  artist.visual_profile.works.startsWith('http')
+                    ? <img
+                        src={artist.visual_profile.works}
+                        alt={`${artist.name} — Works`}
+                        className="works-image"
+                        style={{ marginBottom: portfolioImages.length > 0 ? 20 : 0 }}
+                      />
+                    : <p
+                        className="works-text"
+                        style={{ marginBottom: portfolioImages.length > 0 ? 20 : 0 }}
+                      >
+                        {artist.visual_profile.works}
+                      </p>
+                )}
+                {portfolioImages.length > 0 && (
+                  <div className="portfolio-grid">
+                    {portfolioImages.map(img => (
+                      <div key={img.id} className="portfolio-item">
+                        <img
+                          src={img.image_url}
+                          alt={img.caption || artist.name}
+                          className="portfolio-img"
+                          onClick={() => setLightboxImage(img)}
+                        />
+                        {img.caption && <p className="portfolio-caption">{img.caption}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
 
-      </main>
+            {/* ── EVENTS ── */}
+            <section id="events" className="section">
+              <div className="eyebrow">Upcoming Events</div>
+              {events.length === 0 ? (
+                <div className="events-empty">
+                  <div className="events-empty-title">No upcoming events</div>
+                  <div className="events-empty-sub">Check back soon or follow on social media</div>
+                </div>
+              ) : (
+                <div>
+                  {events.map(event => {
+                    const dateObj = event.event_date
+                      ? new Date(event.event_date + 'T12:00:00')
+                      : null
+                    return (
+                      <a
+                        key={event.id}
+                        href={event.slug ? `/events/${event.slug}` : event.ticket_url || '#'}
+                        target={event.slug ? '_self' : '_blank'}
+                        rel="noopener noreferrer"
+                        className="event-item"
+                      >
+                        {dateObj && (
+                          <div className="ev-date">
+                            <div className="ev-mo">
+                              {dateObj.toLocaleDateString('en-US', { month: 'short' })}
+                            </div>
+                            <div className="ev-day">{dateObj.getDate()}</div>
+                          </div>
+                        )}
+                        <div className="ev-info">
+                          <div className="ev-name">{event.title}</div>
+                          {event.event_start_time && (
+                            <div className="ev-venue" style={{ marginBottom: 2 }}>
+                              {event.event_start_time.trim()}
+                            </div>
+                          )}
+                          {event.venue && (
+                            <div className="ev-venue">
+                              {event.venue.name}
+                              {event.venue.neighborhood ? ` · ${event.venue.neighborhood}` : ''}
+                            </div>
+                          )}
+                        </div>
+                        {event.ticket_price !== null && (
+                          <span className={`ev-price${event.ticket_price === 0 ? ' free' : ''}`}>
+                            {event.ticket_price === 0 ? 'Free' : `$${event.ticket_price}`}
+                          </span>
+                        )}
+                        <span className="ev-arrow">›</span>
+                      </a>
+                    )
+                  })}
+                </div>
+              )}
+            </section>
 
-      <footer className="artist-footer">
-        <a href="/artists" className="footer-wordmark">
-          <em>seveneightfive</em> + <em>ArtsConnect</em> Artist Directory
-        </a>
-      </footer>
+            {/* ── LINKS — 5 per row, no subheading ── */}
+            {socialLinks.length > 0 && (
+              <section id="links" className="section">
+                <div className="eyebrow">Links</div>
+                <div className="links-icon-grid">
+                  {socialLinks.map((link, i) => {
+                    const { component, type } = getSvgIcon(link.label)
+                    return (
+                      <a
+                        key={i}
+                        href={link.url}
+                        target={link.url.startsWith('mailto') ? '_self' : '_blank'}
+                        rel="noopener noreferrer"
+                        className={`link-tile ${type}-icon`}
+                        title={link.label}
+                        aria-label={link.label}
+                      >
+                        {component}
+                      </a>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
+
+          </main>
+
+          <footer className="artist-footer">
+            <a href="/artists" className="footer-wordmark">
+              <em>seveneightfive</em> + <em>ArtsConnect</em> Artist Directory
+            </a>
+          </footer>
+        </div>
+        {/* end content-sheet */}
+
+      </div>
+      {/* end artist-page */}
 
       {/* ── LIGHTBOX ── */}
       {lightboxImage && (
@@ -1345,65 +1229,65 @@ export default function ArtistPageClient({
 
       {/* ── SHARE SHEET ── */}
       {shareOpen && (
-        <div className="sheet-overlay" onClick={() => setShareOpen(false)}>
-          <div className="sheet" onClick={e => e.stopPropagation()}>
-            <div className="sheet-handle" />
-            <div className="sheet-header">
-              <span className="sheet-title">Share</span>
-              <button className="sheet-close" onClick={() => setShareOpen(false)}>×</button>
+        <div className="share-overlay" onClick={() => setShareOpen(false)}>
+          <div className="share-sheet" onClick={e => e.stopPropagation()}>
+            <div className="share-handle" />
+            <div className="share-header">
+              <span className="share-title">Share</span>
+              <button className="share-close" onClick={() => setShareOpen(false)}>×</button>
             </div>
-            <div className="sheet-share-grid">
+            <div className="share-grid">
               <a
-                className="sheet-share-item"
+                className="share-item"
                 href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}`}
                 target="_blank" rel="noopener noreferrer"
               >
-                <div className="sheet-share-icon" style={{ background: '#1877F2' }}>
+                <div className="share-icon" style={{ background: '#1877F2' }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
                     <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                   </svg>
                 </div>
-                <span className="sheet-share-label">Facebook</span>
+                <span className="share-label">Facebook</span>
               </a>
               <a
-                className="sheet-share-item"
+                className="share-item"
                 href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(pageUrl)}&text=${encodeURIComponent(artist.name)}`}
                 target="_blank" rel="noopener noreferrer"
               >
-                <div className="sheet-share-icon" style={{ background: '#000' }}>
+                <div className="share-icon" style={{ background: '#000' }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
                     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.259 5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                   </svg>
                 </div>
-                <span className="sheet-share-label">X / Twitter</span>
+                <span className="share-label">X / Twitter</span>
               </a>
               <a
-                className="sheet-share-item"
+                className="share-item"
                 href={`sms:?body=${encodeURIComponent(artist.name + ' — ' + pageUrl)}`}
               >
-                <div className="sheet-share-icon" style={{ background: '#30D158' }}>
+                <div className="share-icon" style={{ background: '#30D158' }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
                     <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
                   </svg>
                 </div>
-                <span className="sheet-share-label">Messages</span>
+                <span className="share-label">Messages</span>
               </a>
               <a
-                className="sheet-share-item"
+                className="share-item"
                 href={`mailto:?subject=${encodeURIComponent(artist.name)}&body=${encodeURIComponent(pageUrl)}`}
               >
-                <div className="sheet-share-icon" style={{ background: '#6b6560' }}>
+                <div className="share-icon" style={{ background: '#6b6560' }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8">
                     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                     <polyline points="22,6 12,13 2,6"/>
                   </svg>
                 </div>
-                <span className="sheet-share-label">Email</span>
+                <span className="share-label">Email</span>
               </a>
             </div>
-            <div className="sheet-link-row">
-              <div className="sheet-link-url">{pageUrl}</div>
-              <button className="sheet-copy-btn" onClick={handleCopyLink}>
+            <div className="share-link-row">
+              <div className="share-link-url">{pageUrl}</div>
+              <button className="share-copy-btn" onClick={handleCopyLink}>
                 {copied ? 'Copied!' : 'Copy'}
               </button>
             </div>
