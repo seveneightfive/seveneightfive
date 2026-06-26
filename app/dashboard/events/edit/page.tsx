@@ -322,7 +322,7 @@ function EventEditInner() {
     setSaving(false)
     setSaved(true)
     if (newEventId) {
-      router.push(`/dashboard/events/edit?id=${newEventId}`)
+      router.push(`/dashboard/events/${form.id || eventId}/tickets`)
       return
     }
   }
