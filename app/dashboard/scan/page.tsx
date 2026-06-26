@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback } from 'react'
 import { Camera, Keyboard, CheckCircle, AlertCircle, XCircle, Loader2 } from 'lucide-react'
 
 type ScanResult =
@@ -20,23 +20,14 @@ type TicketInfo = {
 }
 
 export default function ScanPage() {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const rafRef = useRef<number | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  const detectorRef = useRef<any>(null)
-  const lastTokenRef = useRef<string | null>(null)
-  const cooldownRef = useRef(false)
+  const scanInputRef = useRef<HTMLInputElement>(null)
 
   const [tab, setTab] = useState<'camera' | 'manual'>('camera')
-  const [cameraSupported, setCameraSupported] = useState(true)
-  const [cameraActive, setCameraActive] = useState(false)
   const [manualToken, setManualToken] = useState('')
   const [validating, setValidating] = useState(false)
   const [result, setResult] = useState<ScanResult>({ state: 'idle' })
 
-  // Validate a QR token against the API
   const validate = useCallback(async (token: string) => {
-    if (validating || cooldownRef.current) return
     const trimmed = token.trim()
     if (!trimmed) return
 
@@ -59,112 +50,42 @@ export default function ScanPage() {
         setResult({ state: 'success', ticket: data.ticket, fresh: true })
       }
     } catch {
-      setResult({
-        state: 'error',
-        message: 'Network error — check connection',
-      })
+      setResult({ state: 'error', message: 'Network error — check connection' })
     } finally {
       setValidating(false)
-      // Prevent re-scanning the same code for 4 seconds
-      cooldownRef.current = true
-      setTimeout(() => {
-        cooldownRef.current = false
-      }, 4000)
     }
-  }, [validating])
+  }, [])
 
-  // Camera scanning loop using BarcodeDetector
-  const startScanLoop = useCallback(() => {
-    if (!detectorRef.current || !videoRef.current) return
+  const handleImageScan = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
 
-    const scan = async () => {
-      const video = videoRef.current
-      if (!video || video.readyState < 2) {
-        rafRef.current = requestAnimationFrame(scan)
-        return
-      }
-
-      try {
-        const codes = await detectorRef.current.detect(video)
-        if (codes.length > 0) {
-          const token = codes[0].rawValue
-          if (token && token !== lastTokenRef.current && !cooldownRef.current) {
-            lastTokenRef.current = token
-            await validate(token)
-          }
-        }
-      } catch {
-        // Detection error on a frame — ignore and continue
-      }
-
-      rafRef.current = requestAnimationFrame(scan)
-    }
-
-    rafRef.current = requestAnimationFrame(scan)
-  }, [validate])
-
-  const startCamera = useCallback(async () => {
     if (!('BarcodeDetector' in window)) {
-      setCameraSupported(false)
-      setTab('manual')
+      setResult({ state: 'error', message: 'QR scanning not supported on this browser. Use Manual Entry.' })
       return
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 1280 },
-        },
-      })
-      streamRef.current = stream
-      detectorRef.current = new (window as any).BarcodeDetector({ formats: ['qr_code'] })
-      setCameraActive(true)
-    } catch (err: any) {
-      if (err?.name === 'NotAllowedError') {
-        setCameraSupported(false)
-        setTab('manual')
+      const bitmap = await createImageBitmap(file)
+      const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] })
+      const codes = await detector.detect(bitmap)
+
+      if (codes.length === 0) {
+        setResult({ state: 'error', message: 'No QR code found — try again.' })
+        return
       }
-    }
-  }, [startScanLoop])
 
-  useEffect(() => {
-    if (cameraActive && videoRef.current && streamRef.current) {
-      videoRef.current.srcObject = streamRef.current
-      videoRef.current.play().then(() => startScanLoop()).catch(console.error)
+      await validate(codes[0].rawValue)
+    } catch {
+      setResult({ state: 'error', message: 'Could not read image — try again.' })
     }
-  }, [cameraActive, startScanLoop])
-
-  const stopCamera = useCallback(() => {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current)
-    rafRef.current = null
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop())
-      streamRef.current = null
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null
-    }
-    setCameraActive(false)
-  }, [])
+  }, [validate])
 
   const reset = useCallback(() => {
     setResult({ state: 'idle' })
     setManualToken('')
-    lastTokenRef.current = null
-    cooldownRef.current = false
-    if (tab === 'camera') startCamera()
-  }, [tab, startCamera])
-
-  useEffect(() => {
-    if (tab === 'camera') {
-      startCamera()
-    } else {
-      stopCamera()
-    }
-    return () => stopCamera()
-  }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   const formatDate = (d: string | null) =>
     d
@@ -178,7 +99,6 @@ export default function ScanPage() {
   const isIdle = result.state === 'idle'
   const isSuccess = result.state === 'success'
   const isError = result.state === 'error'
-
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -199,10 +119,7 @@ export default function ScanPage() {
       <div className="flex gap-2 rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-800 dark:bg-white/[0.02]">
         <button
           type="button"
-          onClick={() => {
-            setTab('camera')
-            setResult({ state: 'idle' })
-          }}
+          onClick={() => { setTab('camera'); setResult({ state: 'idle' }) }}
           className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold uppercase transition ${
             tab === 'camera'
               ? 'bg-white text-gray-900 shadow-sm dark:bg-white/[0.1] dark:text-white'
@@ -214,10 +131,7 @@ export default function ScanPage() {
         </button>
         <button
           type="button"
-          onClick={() => {
-            setTab('manual')
-            setResult({ state: 'idle' })
-          }}
+          onClick={() => { setTab('manual'); setResult({ state: 'idle' }) }}
           className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold uppercase transition ${
             tab === 'manual'
               ? 'bg-white text-gray-900 shadow-sm dark:bg-white/[0.1] dark:text-white'
@@ -231,39 +145,32 @@ export default function ScanPage() {
 
       {/* Camera view */}
       {tab === 'camera' && (
-        <>
-          {cameraActive ? (
-            <div className="relative overflow-hidden rounded-2xl bg-black">
-              <video
-                ref={videoRef}
-                playsInline
-                muted
-                className="block aspect-square w-full object-cover"
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div
-                  className={`h-3/5 w-3/5 border-2 border-white/60 rounded-xl shadow-lg ${
-                    result.state === 'scanning' ? 'animate-pulse' : ''
-                  }`}
-                />
-              </div>
-              <div className="absolute bottom-4 left-0 right-0 text-center text-xs text-white/50">
-                {result.state === 'scanning'
-                  ? 'Validating…'
-                  : 'Point at ticket QR code'}
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 bg-white px-6 py-16 dark:border-gray-700 dark:bg-white/[0.02]">
-              <Camera className="mb-3 h-8 w-8 text-gray-400 dark:text-gray-600" />
-              <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-                {cameraSupported
-                  ? 'Starting camera…'
-                  : 'Camera not available on this browser.\nUse Manual Entry instead.'}
-              </p>
-            </div>
-          )}
-        </>
+        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 bg-white px-6 py-16 dark:border-gray-700 dark:bg-white/[0.02]">
+          <Camera className="mb-4 h-10 w-10 text-gray-400 dark:text-gray-600" />
+          <p className="mb-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            Tap the button below to open your camera and scan a ticket QR code.
+          </p>
+          <input
+            ref={scanInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handleImageScan}
+          />
+          <button
+            type="button"
+            onClick={() => scanInputRef.current?.click()}
+            disabled={validating}
+            className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-6 py-3 font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+          >
+            {validating
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <Camera className="h-4 w-4" />
+            }
+            {validating ? 'Validating…' : 'Scan Ticket'}
+          </button>
+        </div>
       )}
 
       {/* Manual entry */}
@@ -278,9 +185,7 @@ export default function ScanPage() {
               placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
               value={manualToken}
               onChange={(e) => setManualToken(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') validate(manualToken)
-              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') validate(manualToken) }}
               autoFocus
               className="flex-1 rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 font-mono text-sm text-gray-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90 dark:focus:border-brand-500 placeholder:text-gray-400 dark:placeholder:text-gray-500"
             />
@@ -290,11 +195,7 @@ export default function ScanPage() {
               disabled={validating || !manualToken.trim()}
               className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2.5 font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {validating ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                'Check In'
-              )}
+              {validating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Check In'}
             </button>
           </div>
         </div>
@@ -318,87 +219,49 @@ export default function ScanPage() {
                   <AlertCircle className="h-5 w-5 shrink-0 text-warning-600 dark:text-warning-400" />
                 )}
                 <div>
-                  <p
-                    className={`font-semibold ${
-                      result.fresh
-                        ? 'text-success-900 dark:text-success-300'
-                        : 'text-warning-900 dark:text-warning-300'
-                    }`}
-                  >
+                  <p className={`font-semibold ${
+                    result.fresh
+                      ? 'text-success-900 dark:text-success-300'
+                      : 'text-warning-900 dark:text-warning-300'
+                  }`}>
                     {result.fresh ? 'Checked In!' : 'Already Used'}
                   </p>
-                  <p
-                    className={`mt-0.5 text-xs ${
-                      result.fresh
-                        ? 'text-success-700 dark:text-success-400'
-                        : 'text-warning-700 dark:text-warning-400'
-                    }`}
-                  >
-                    {result.fresh
-                      ? 'Ticket is valid — welcome!'
-                      : 'This ticket was already scanned'}
+                  <p className={`mt-0.5 text-xs ${
+                    result.fresh
+                      ? 'text-success-700 dark:text-success-400'
+                      : 'text-warning-700 dark:text-warning-400'
+                  }`}>
+                    {result.fresh ? 'Ticket is valid — welcome!' : 'This ticket was already scanned'}
                   </p>
                 </div>
               </div>
               <div className="space-y-1.5 text-sm">
                 <div className="flex items-baseline justify-between">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-gray-400">
-                    Name
-                  </span>
-                  <span
-                    className={
-                      result.fresh
-                        ? 'text-success-900 dark:text-success-200'
-                        : 'text-warning-900 dark:text-warning-200'
-                    }
-                  >
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-gray-400">Name</span>
+                  <span className={result.fresh ? 'text-success-900 dark:text-success-200' : 'text-warning-900 dark:text-warning-200'}>
                     {result.ticket.buyer_name}
                   </span>
                 </div>
                 {result.ticket.tier_name && (
                   <div className="flex items-baseline justify-between">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-gray-400">
-                      Tier
-                    </span>
-                    <span
-                      className={
-                        result.fresh
-                          ? 'text-success-900 dark:text-success-200'
-                          : 'text-warning-900 dark:text-warning-200'
-                      }
-                    >
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-gray-400">Tier</span>
+                    <span className={result.fresh ? 'text-success-900 dark:text-success-200' : 'text-warning-900 dark:text-warning-200'}>
                       {result.ticket.tier_name}
                     </span>
                   </div>
                 )}
                 {result.ticket.event_title && (
                   <div className="flex items-baseline justify-between">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-gray-400">
-                      Event
-                    </span>
-                    <span
-                      className={`max-w-[60%] text-right ${
-                        result.fresh
-                          ? 'text-success-900 dark:text-success-200'
-                          : 'text-warning-900 dark:text-warning-200'
-                      }`}
-                    >
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-gray-400">Event</span>
+                    <span className={`max-w-[60%] text-right ${result.fresh ? 'text-success-900 dark:text-success-200' : 'text-warning-900 dark:text-warning-200'}`}>
                       {result.ticket.event_title}
                     </span>
                   </div>
                 )}
                 {result.ticket.event_date && (
                   <div className="flex items-baseline justify-between">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-gray-400">
-                      Date
-                    </span>
-                    <span
-                      className={
-                        result.fresh
-                          ? 'text-success-900 dark:text-success-200'
-                          : 'text-warning-900 dark:text-warning-200'
-                      }
-                    >
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-600 dark:text-gray-400">Date</span>
+                    <span className={result.fresh ? 'text-success-900 dark:text-success-200' : 'text-warning-900 dark:text-warning-200'}>
                       {formatDate(result.ticket.event_date)}
                     </span>
                   </div>
@@ -412,12 +275,8 @@ export default function ScanPage() {
               <div className="flex items-start gap-3">
                 <XCircle className="h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400" />
                 <div>
-                  <p className="font-semibold text-brand-900 dark:text-brand-300">
-                    Invalid Ticket
-                  </p>
-                  <p className="mt-0.5 text-xs text-brand-700 dark:text-brand-400">
-                    {result.message}
-                  </p>
+                  <p className="font-semibold text-brand-900 dark:text-brand-300">Invalid Ticket</p>
+                  <p className="mt-0.5 text-xs text-brand-700 dark:text-brand-400">{result.message}</p>
                 </div>
               </div>
             </div>
@@ -435,8 +294,7 @@ export default function ScanPage() {
 
       {isIdle && tab === 'manual' && (
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          Enter the ticket ID shown below the QR code on the attendee&apos;s
-          ticket.
+          Enter the ticket ID shown below the QR code on the attendee&apos;s ticket.
         </p>
       )}
     </div>
