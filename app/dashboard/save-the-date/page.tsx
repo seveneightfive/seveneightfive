@@ -146,7 +146,7 @@ function downloadPDF(events: SaveTheDate[], label: string): void {
 <html>
 <head>
 <meta charset="UTF-8"/>
-<title>785 Save the Date – ${label}</title>
+<title>seveneightfive SAVE THE DATE – ${label}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -189,7 +189,7 @@ function downloadPDF(events: SaveTheDate[], label: string): void {
   <tbody>${rows || "<tr><td colspan='7' style='text-align:center;padding:24px;color:#999;'>No approved events this period.</td></tr>"}</tbody>
 </table>
 <div class="footer">
-  <span>seveneightfive.com · Topeka's Arts + Culture Platform</span>
+  <span>seveneightfive.com · Celebrating everything local, everything Topeka.</span>
   <span>${events.length} event${events.length !== 1 ? 's' : ''} listed</span>
 </div>
 </body>
