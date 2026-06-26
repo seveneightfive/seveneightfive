@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import FollowFavoriteButtons from '@/app/components/FollowFavoriteButtons'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -180,6 +179,7 @@ export default function ArtistPageClient({
   const [shareOpen, setShareOpen] = useState(false)
   const [lightboxImage, setLightboxImage] = useState<PortfolioImage | null>(null)
   const [copied, setCopied] = useState(false)
+  const [liked, setLiked] = useState(false)
 
   // Intro animation state — preserved exactly from original
   const [introPhase, setIntroPhase] = useState<'intro' | 'transitioning' | 'done'>('intro')
@@ -443,24 +443,7 @@ export default function ArtistPageClient({
         }
         .hero-back:hover { background: rgba(0,0,0,0.55); }
 
-        /* Floating heart button — top right over hero */
-        .hero-heart {
-          position: absolute;
-          top: 16px;
-          right: 16px;
-          z-index: 10;
-          width: 38px;
-          height: 38px;
-          border-radius: 50%;
-          background: rgba(0,0,0,0.35);
-          border: 1px solid rgba(255,255,255,0.18);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          backdrop-filter: blur(6px);
-          -webkit-backdrop-filter: blur(6px);
-          /* FollowFavoriteButtons renders inside here — we reset its default styles */
-        }
+
 
         /* Name + type label sit at the bottom of the hero */
         .hero-body {
@@ -881,28 +864,34 @@ export default function ArtistPageClient({
           .section { padding: 36px 0; }
         }
 
-        /* ─── FOLLOW BUTTON OVERRIDE ─────────────────── */
-        /* Strip default styles from FollowFavoriteButtons when used in hero-heart */
-        .hero-heart > * {
-          all: unset !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-          width: 100% !important;
-          height: 100% !important;
-          cursor: pointer !important;
+        /* ─── HEART BUTTON ───────────────────────────── */
+        .hero-heart-btn {
+          position: absolute;
+          top: 16px;
+          right: 16px;
+          z-index: 10;
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          background: rgba(0,0,0,0.35);
+          border: 1px solid rgba(255,255,255,0.18);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          backdrop-filter: blur(6px);
+          -webkit-backdrop-filter: blur(6px);
+          transition: background 0.15s, transform 0.12s;
+          -webkit-tap-highlight-color: transparent;
         }
-        .hero-heart > * svg {
-          width: 18px !important;
-          height: 18px !important;
-          stroke: white !important;
-          fill: none !important;
+        .hero-heart-btn:active { transform: scale(0.88); }
+        .hero-heart-btn.liked { background: rgba(200,6,80,0.4); border-color: var(--accent); }
+        .hero-heart-btn svg {
+          width: 18px; height: 18px;
+          stroke: white; fill: none;
+          transition: fill 0.15s, stroke 0.15s;
         }
-        .hero-heart > *.active svg,
-        .hero-heart > *[data-active="true"] svg {
-          fill: var(--accent) !important;
-          stroke: var(--accent) !important;
-        }
+        .hero-heart-btn.liked svg { fill: var(--accent); stroke: var(--accent); }
       `}</style>
 
       {/* ── INTRO SCREEN — preserved exactly from original ── */}
@@ -975,18 +964,16 @@ export default function ArtistPageClient({
             </a>
 
             {/* Heart / Follow — top right */}
-            <div
-              className="hero-heart"
+            <button
+              className={`hero-heart-btn${liked ? ' liked' : ''}`}
               style={{ opacity: heroButtonOpacity }}
+              onClick={() => setLiked(l => !l)}
+              aria-label={liked ? 'Unlike' : 'Like'}
             >
-              <FollowFavoriteButtons
-                entityType="artist"
-                entityId={artist.id}
-                showFollow={true}
-                showFavorite={false}
-                heartOnly={true}
-              />
-            </div>
+              <svg viewBox="0 0 24 24" strokeWidth="2">
+                <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+              </svg>
+            </button>
 
             {/* Name at bottom of hero */}
             <div className="hero-body">
@@ -1022,8 +1009,6 @@ export default function ArtistPageClient({
 
             {/* ── ABOUT ── */}
             <section id="about" className="section">
-              <div className="eyebrow">About</div>
-
               {artist.bio_written_by_785 && (
                 <div className="words-by">Words by <span>785 Staff</span></div>
               )}
@@ -1050,9 +1035,6 @@ export default function ArtistPageClient({
             {/* ── MUSIC / MEDIA ── */}
             {hasMusic && (
               <section id="music" className="section">
-                <div className="eyebrow">
-                  {artist.artist_type === 'Musician' ? 'Music' : 'Media'}
-                </div>
                 {mp?.audio_file_url && (
                   <div className="audio-block" style={{ marginBottom: videoId ? 20 : 0 }}>
                     <div className="audio-track-name">{mp.audio_title || 'Listen'}</div>
@@ -1084,7 +1066,6 @@ export default function ArtistPageClient({
             {/* ── WORK ── */}
             {hasWork && (
               <section id="work" className="section">
-                <div className="eyebrow">Works</div>
                 {artist.visual_profile?.works && (
                   artist.visual_profile.works.startsWith('http')
                     ? <img
@@ -1120,7 +1101,6 @@ export default function ArtistPageClient({
 
             {/* ── EVENTS ── */}
             <section id="events" className="section">
-              <div className="eyebrow">Upcoming Events</div>
               {events.length === 0 ? (
                 <div className="events-empty">
                   <div className="events-empty-title">No upcoming events</div>
@@ -1178,7 +1158,6 @@ export default function ArtistPageClient({
             {/* ── LINKS — 5 per row, no subheading ── */}
             {socialLinks.length > 0 && (
               <section id="links" className="section">
-                <div className="eyebrow">Links</div>
                 <div className="links-icon-grid">
                   {socialLinks.map((link, i) => {
                     const { component, type } = getSvgIcon(link.label)
