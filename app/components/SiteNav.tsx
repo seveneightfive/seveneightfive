@@ -5,11 +5,27 @@ import { usePathname } from 'next/navigation'
 import styles from './nav.module.css'
 import { useNavState } from './NavContext'
 
+// Routes where the nav chrome is completely hidden — detail pages have
+// their own immersive layout (back button, hero, scroll-up sheet).
+const IMMERSIVE_PREFIXES = [
+  '/artists/',
+  '/venues/',
+  '/events/',
+  '/stories/',
+]
+
+function isImmersive(pathname: string) {
+  return IMMERSIVE_PREFIXES.some(prefix => pathname.startsWith(prefix))
+}
+
 export default function SiteNav() {
   const pathname = usePathname()
   const { logoSuffix, rightText } = useNavState()
-  const date = new Date().toLocaleString('en-US', { month: 'short', year: 'numeric' })
 
+  // Hide ALL nav chrome on immersive detail pages
+  if (isImmersive(pathname)) return null
+
+  const date = new Date().toLocaleString('en-US', { month: 'short', year: 'numeric' })
   const isActive = (prefix: string) => pathname.startsWith(prefix)
 
   return (
