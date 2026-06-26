@@ -104,7 +104,6 @@ export default function ScanPage() {
   }, [validate])
 
   const startCamera = useCallback(async () => {
-    // Check BarcodeDetector support
     if (!('BarcodeDetector' in window)) {
       setCameraSupported(false)
       setTab('manual')
@@ -120,16 +119,8 @@ export default function ScanPage() {
         },
       })
       streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play()
-      }
-
-      detectorRef.current = new (window as any).BarcodeDetector({
-        formats: ['qr_code'],
-      })
+      detectorRef.current = new (window as any).BarcodeDetector({ formats: ['qr_code'] })
       setCameraActive(true)
-      startScanLoop()
     } catch (err: any) {
       if (err?.name === 'NotAllowedError') {
         setCameraSupported(false)
@@ -138,11 +129,22 @@ export default function ScanPage() {
     }
   }, [startScanLoop])
 
+  useEffect(() => {
+    if (cameraActive && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current
+      videoRef.current.play().then(() => startScanLoop()).catch(console.error)
+    }
+  }, [cameraActive, startScanLoop])
+
   const stopCamera = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    rafRef.current = null
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop())
       streamRef.current = null
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
     }
     setCameraActive(false)
   }, [])
@@ -152,19 +154,16 @@ export default function ScanPage() {
     setManualToken('')
     lastTokenRef.current = null
     cooldownRef.current = false
-    if (tab === 'camera' && !cameraActive) startCamera()
-  }, [tab, cameraActive, startCamera])
+    if (tab === 'camera') startCamera()
+  }, [tab, startCamera])
 
-  // Start/stop camera based on tab
   useEffect(() => {
     if (tab === 'camera') {
       startCamera()
     } else {
       stopCamera()
     }
-    return () => {
-      stopCamera()
-    }
+    return () => stopCamera()
   }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const formatDate = (d: string | null) =>
@@ -179,6 +178,7 @@ export default function ScanPage() {
   const isIdle = result.state === 'idle'
   const isSuccess = result.state === 'success'
   const isError = result.state === 'error'
+
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
