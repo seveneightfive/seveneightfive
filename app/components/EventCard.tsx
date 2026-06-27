@@ -10,6 +10,7 @@ export type EventCardEvent = {
   image_url: string | null
   event_types?: string[] | null
   venues?: { name: string; neighborhood: string | null } | { name: string; neighborhood: string | null }[] | null
+  venue?: { name: string; neighborhood: string | null } | null
 }
 
 function formatDate(dateStr: string) {
@@ -22,8 +23,19 @@ function formatDate(dateStr: string) {
 }
 
 function formatTime(t: string | null) {
-  if (!t || t.trim() === ':') return ''
-  const match = t.match(/(\d{1,2}):(\d{2})/)
+  if (!t || t.trim() === ':' || t.trim() === '') return ''
+
+  const cleaned = t.trim().toLowerCase()
+
+  const ampmMatch = cleaned.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/)
+  if (ampmMatch) {
+    const hour = parseInt(ampmMatch[1], 10)
+    const minutes = ampmMatch[2] ?? '00'
+    const ampm = ampmMatch[3].toUpperCase()
+    return minutes === '00' ? `${hour} ${ampm}` : `${hour}:${minutes} ${ampm}`
+  }
+
+  const match = cleaned.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/)
   if (!match) return t
 
   const h = parseInt(match[1], 10)
@@ -35,9 +47,10 @@ function formatTime(t: string | null) {
 }
 
 export default function EventCard({ event }: { event: EventCardEvent }) {
-  const venue = Array.isArray(event.venues) ? event.venues[0] : event.venues
+  const venue = event.venue ?? (Array.isArray(event.venues) ? event.venues[0] : event.venues)
   const date = formatDate(event.event_date)
   const href = event.slug ? `/events/${event.slug}` : '/events'
+  const time = formatTime(event.event_start_time)
 
   return (
     <Link href={href} className="group block overflow-hidden rounded-lg border border-neutral-200 bg-white text-black shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
@@ -73,19 +86,26 @@ export default function EventCard({ event }: { event: EventCardEvent }) {
           {event.title}
         </h3>
 
-        <div className="mt-2 text-sm font-medium text-neutral-700">
-          {venue?.name && <div>{venue.name}</div>}
-          <div>
-            {formatTime(event.event_start_time)}
-            {venue?.neighborhood ? ` · ${venue.neighborhood}` : ''}
-          </div>
+        <div className="mt-2 space-y-1 text-sm font-medium text-neutral-700">
+          {venue?.name && (
+            <div className="font-semibold text-neutral-900">
+              {venue.name}
+            </div>
+          )}
+
+          {(time || venue?.neighborhood) && (
+            <div>
+              {time}
+              {time && venue?.neighborhood ? ' · ' : ''}
+              {venue?.neighborhood}
+            </div>
+          )}
         </div>
 
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4">
           <span className="font-['Oswald'] text-xs font-bold uppercase tracking-widest text-[#C80650]">
             View Event →
           </span>
-          <span className="text-xl text-neutral-400">♡</span>
         </div>
       </div>
     </Link>
