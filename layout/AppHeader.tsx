@@ -69,6 +69,15 @@ const AppHeader: React.FC<{ headerUser: HeaderUser | null }> = ({
             <Image width={154} height={32} className="hidden dark:block" src="/images/logo/logo-dark.svg" alt="785 Magazine" />
           </Link>
 
+          <div className="hidden lg:block">
+  <p className="font-body text-[10px] font-bold uppercase tracking-[0.18em] text-brand-600 dark:text-brand-400">
+    seveneightfive
+  </p>
+  <h1 className="font-display text-xl font-semibold uppercase tracking-wide text-gray-900 dark:text-white">
+    Creator Hub
+  </h1>
+</div>
+
           {/* Mobile kebab: opens right-side controls drawer */}
           <button
             onClick={toggleApplicationMenu}
@@ -90,9 +99,15 @@ const AppHeader: React.FC<{ headerUser: HeaderUser | null }> = ({
           } items-center justify-between w-full gap-4 px-5 py-4 lg:flex shadow-theme-md lg:justify-end lg:px-0 lg:shadow-none`}
         >
           <div className="flex items-center gap-2 2xsm:gap-3">
-            <ThemeToggleButton />
-            {/* <NotificationDropdown /> */}
-          </div>
+  <Link
+    href="/dashboard/events/edit"
+    className="hidden items-center rounded-lg bg-brand-600 px-4 py-2 font-display text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-brand-700 lg:inline-flex"
+  >
+    + Create New
+  </Link>
+
+  <ThemeToggleButton />
+</div>
 
           {isGuest ? (
             <div className="flex items-center gap-2">
