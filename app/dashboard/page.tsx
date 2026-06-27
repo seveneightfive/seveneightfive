@@ -244,47 +244,7 @@ export default async function DashboardPage() {
   <ActionCard href="/dashboard/advertise" icon="ad" title="Buy an Ad" text="Promote your event or business." />
   <ActionCard href="/save-the-date" icon="date" title="Save the Date" text="Claim a date before details are final." />
 </section>
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
-            <div className="lg:pr-7 lg:border-r lg:border-white/25 lg:shrink-0 lg:min-w-[220px]">
-              <p className="mb-1 font-body text-[10px] font-bold uppercase tracking-[0.14em] text-white/65">
-                Publish
-              </p>
-              <h2 className="font-display text-3xl font-semibold uppercase tracking-wide text-white leading-none">
-                Create
-              </h2>
-              <p className="mt-2 font-body text-xs text-white/75 leading-relaxed max-w-[220px]">
-                {isGuest
-                  ? 'Add your event, artist page or venue — free, no account required to start.'
-                  : 'Add something new to 785 Magazine.'}
-              </p>
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 flex-1">
-              <CreateBtn href="/dashboard/events/edit">Event</CreateBtn>
-              <CreateBtn
-                href={
-                  isGuest
-                    ? '/login?next=/dashboard/announcements/new'
-                    : '/dashboard/announcements/new'
-                }
-              >
-                Announcement
-              </CreateBtn>
-              <CreateBtn
-                href="https://seveneightfive.fillout.com/new-artist"
-                external
-              >
-                Artist Page
-              </CreateBtn>
-              <CreateBtn
-                href="https://seveneightfive.fillout.com/add-venue"
-                external
-              >
-                Venue Page
-              </CreateBtn>
-            </div>
-          </div>
-        </section>
-
+          
         {/* MAIN GRID */}
         <div className="grid grid-cols-12 gap-4 md:gap-6">
           {/* ROW 1: My Tickets (6) + My Pages (6) */}
