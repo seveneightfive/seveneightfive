@@ -94,7 +94,7 @@ export default function HomeClient({
         </section>
 
         {/* ── Upcoming Events ── */}
-<section id="events">
+<section id="events" className={styles.contentWrap}>
   <div className={styles.sectionHeader}>
     <h2>Upcoming Events</h2>
     <Link href="/events">See all →</Link>
@@ -123,7 +123,7 @@ export default function HomeClient({
 </section>
 
         {/* ── Featured Artists ── */}
-        <section id="artists">
+       <section id="artists" className={styles.contentWrap}>
           <div className={styles.sectionHeader}>
             <h2>Featured Artists</h2>
             <Link href="/artists">Discover More Artists →</Link>
@@ -163,7 +163,7 @@ export default function HomeClient({
         </section>
 
         {/* ── Neighborhoods ── */}
-        <section id="neighborhoods">
+        <section id="neighborhoods" className={styles.contentWrap}>
           <div className={styles.sectionHeader}>
             <h2>Explore the City</h2>
             <Link href="/venues">All Venues →</Link>
