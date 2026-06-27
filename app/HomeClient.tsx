@@ -5,7 +5,7 @@ import styles from './home.module.css'
 import FeaturedSlider, { type FeaturedEvent } from './FeaturedSlider'
 import HeroSlider, { type HeroSlide } from './HeroSlider'
 import AdvertisementBanner from './components/AdvertisementBanner'
-import EventCard from '@/components/EventCard'
+import EventCard from './components/EventCard'
 
 type Event = {
   id: string
