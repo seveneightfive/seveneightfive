@@ -529,10 +529,6 @@
 
 /* ── Desktop Overrides ── */
 @media (min-width: 640px) {
-  .main {
-    max-width: 900px;
-  }
-
   .hero {
     width: 100vw;
     margin-left: calc(50% - 50vw);
@@ -544,8 +540,8 @@
   }
 
   .sectionHeader {
-    padding: 60px 40px 20px;
-  }
+  padding: 60px 0 20px;
+}
 
   .eventThumb {
     width: 128px;
