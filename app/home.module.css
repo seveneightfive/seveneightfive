@@ -1,9 +1,20 @@
 /* ── Variables ── */
 .main {
-  max-width: 600px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.contentWrap {
+  width: min(100% - 48px, 1280px);
   margin: 0 auto;
 }
 
+@media (max-width: 640px) {
+  .contentWrap {
+    width: min(100% - 32px, 1280px);
+  }
+}
 
 /* ── Hero ── */
 .hero {
@@ -87,8 +98,8 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  padding: 40px 20px 16px;
-  border-top: 2px solid #0A0A0A;
+  padding: 56px 0 20px;
+  border-top: none;
 }
 
 .sectionHeader h2 {
@@ -216,14 +227,14 @@
 
 .eventsGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 24px;
-  padding: 0 20px;
+  padding: 0;
 }
 
-@media (max-width: 1024px) {
+@media (min-width: 1200px) {
   .eventsGrid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
