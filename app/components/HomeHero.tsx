@@ -52,11 +52,11 @@ export default function HomeHero({ editorPick }: { editorPick: HeroEvent | null 
           <div className="mb-4 h-1 w-12 bg-[#FFCE03]" />
 
           <h1 className="font-['Oswald'] text-5xl font-bold uppercase leading-[0.95] tracking-tight sm:text-6xl lg:text-7xl">
-            Topeka’s
+            Topeka
             <br />
-            Arts, Music &
+            Arts, Music +
             <br />
-            Culture Calendar
+            Culture
           </h1>
 
           <p className="mt-6 max-w-md text-lg leading-relaxed text-white/75">
