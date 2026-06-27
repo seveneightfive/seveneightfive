@@ -6,6 +6,7 @@ import FeaturedSlider, { type FeaturedEvent } from './FeaturedSlider'
 import HeroSlider, { type HeroSlide } from './HeroSlider'
 import AdvertisementBanner from './components/AdvertisementBanner'
 import EventCard from './components/EventCard'
+import HomeHero from './components/HomeHero'
 
 type Event = {
   id: string
@@ -59,35 +60,19 @@ export default function HomeClient({
       <main className={styles.main}>
 
         {/* ── Hero ── */}
-        {heroSlides.length > 0 ? (
-          <HeroSlider slides={heroSlides} />
-        ) : (
-          <section className={styles.hero}>
-            <p className={styles.kicker}>LOCAL. VOCAL.</p>
-            <h1>
-              What&apos;s<br /><em>On</em> in<br />Top City
-            </h1>
-            <p>Discover upcoming events, artists, and neighborhoods making noise this week.</p>
-            <Link href="/events" className={styles.heroCta}>
-              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path d="M5 12h14M12 5l7 7-7 7" />
-              </svg>
-              Browse Events
-            </Link>
-          </section>
-        )}
+<HomeHero editorPick={featuredEvents[0] ?? null} />
 
-        {/* ── Featured Events Slider ── */}
-        {featuredEvents.length > 0 && (
-          <section>
-            <div className={styles.sectionHeader}>
-              <h2>Featured</h2>
-              <Link href="/events">All Events →</Link>
-            </div>
-            <FeaturedSlider events={featuredEvents} />
-          </section>
-        )}
+{/* ── Featured Events Slider ── */}
+{featuredEvents.length > 1 && (
+  <section className={styles.contentWrap}>
+    <div className={styles.sectionHeader}>
+      <h2>Featured</h2>
+      <Link href="/events">All Events →</Link>
+    </div>
 
+    <FeaturedSlider events={featuredEvents.slice(1)} />
+  </section>
+)}
         {/* ── Advertisement Banner ── */}
         <section>
           <AdvertisementBanner />
