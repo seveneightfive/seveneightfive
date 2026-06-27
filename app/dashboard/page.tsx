@@ -233,7 +233,17 @@ export default async function DashboardPage() {
         </div>
 
         {/* CREATE STRIP — moved UP from the bottom of the page */}
-        <section className="rounded-2xl bg-gradient-to-br from-brand-700 via-brand-600 to-brand-500 p-6 text-white shadow-theme-md">
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  <ActionCard href="/dashboard/events/edit" icon="calendar" title="Submit an Event" text="Add a new event to the calendar." />
+  <ActionCard href="/dashboard/venues/claim" icon="venue" title="Claim a Venue" text="Manage your venue page and events." />
+  <ActionCard href="/dashboard/artists/claim" icon="artist" title="Claim an Artist Page" text="Manage your artist profile and events." />
+  <ActionCard href="/dashboard/announcements/new" icon="megaphone" title="Post an Announcement" text="Share news with the community." />
+</section>
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+  <ActionCard href="/opportunities/submit" icon="briefcase" title="Post an Opportunity" text="Share jobs, gigs, auditions and calls." />
+  <ActionCard href="/dashboard/advertise" icon="ad" title="Buy an Ad" text="Promote your event or business." />
+  <ActionCard href="/save-the-date" icon="date" title="Save the Date" text="Claim a date before details are final." />
+</section>
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
             <div className="lg:pr-7 lg:border-r lg:border-white/25 lg:shrink-0 lg:min-w-[220px]">
               <p className="mb-1 font-body text-[10px] font-bold uppercase tracking-[0.14em] text-white/65">
@@ -797,6 +807,51 @@ function CreateBtn({
   return (
     <Link href={href} className={cls}>
       {children}
+    </Link>
+  )
+}
+
+        function ActionCard({
+  href,
+  title,
+  text,
+  icon,
+}: {
+  href: string
+  title: string
+  text: string
+  icon: 'calendar' | 'venue' | 'artist' | 'megaphone' | 'briefcase' | 'ad' | 'date'
+}) {
+  const icons = {
+    calendar: '▣',
+    venue: '▥',
+    artist: '●',
+    megaphone: '◖',
+    briefcase: '▤',
+    ad: 'AD',
+    date: '◇',
+  }
+
+  return (
+    <Link
+      href={href}
+      className="group rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm transition hover:-translate-y-1 hover:border-brand-500 hover:shadow-theme-md dark:border-gray-800 dark:bg-white/[0.02]"
+    >
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 font-display text-xl font-bold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+        {icons[icon]}
+      </div>
+
+      <h3 className="font-display text-lg font-semibold uppercase tracking-wide text-gray-900 dark:text-white">
+        {title}
+      </h3>
+
+      <p className="mx-auto mt-2 max-w-[220px] font-body text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+        {text}
+      </p>
+
+      <div className="mt-4 font-body text-xs font-bold text-brand-600 dark:text-brand-400">
+        Get Started →
+      </div>
     </Link>
   )
 }
