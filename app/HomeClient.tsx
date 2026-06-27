@@ -5,6 +5,7 @@ import styles from './home.module.css'
 import FeaturedSlider, { type FeaturedEvent } from './FeaturedSlider'
 import HeroSlider, { type HeroSlide } from './HeroSlider'
 import AdvertisementBanner from './components/AdvertisementBanner'
+import EventCard from '@/components/EventCard'
 
 type Event = {
   id: string
@@ -93,45 +94,33 @@ export default function HomeClient({
         </section>
 
         {/* ── Upcoming Events ── */}
-        <section id="events">
-          <div className={styles.sectionHeader}>
-            <h2>Upcoming Events</h2>
-            <Link href="/events">See all →</Link>
-          </div>
-          <div className={styles.events}>
-            {events.length === 0 ? (
-              <p style={{ padding: '20px', color: '#AAAAAA', fontFamily: 'Oswald, sans-serif' }}>
-                No upcoming events — check back soon.
-              </p>
-            ) : (
-              events.map((event) => {
-                const d = new Date(event.event_date + 'T00:00:00') // ensure it's treated as local date
-                const day = d.getDate().toString().padStart(2, '0')
-                const mon = d.toLocaleString('en-US', { month: 'short' }).toUpperCase()
-                return (
-                  <Link href={`/events/${event.slug ?? event.id}`} key={event.id} className={styles.eventCard}>
-                    <div className={styles.eventDate}>
-                      <span className={styles.day}>{day}</span>
-                      <span className={styles.mon}>{mon}</span>
-                    </div>
-                    <div className={styles.eventInfo}>
-                      <div className={styles.eventTag}>{event.event_types?.[0] ?? ''}</div>
-                      <div className={styles.eventName}>{event.title}</div>
-                      <div className={styles.eventMeta}>{event.venue?.name} · {event.event_start_time}</div>
-                    </div>
-                    <div className={styles.eventThumb}>
-                      {event.image_url ? (
-                        <img src={event.image_url} alt="" className={styles.eventThumbImg} />
-                      ) : (
-                        <div className={styles.eventThumbFallback} />
-                      )}
-                    </div>
-                  </Link>
-                )
-              })
-            )}
-          </div>
-        </section>
+<section id="events">
+  <div className={styles.sectionHeader}>
+    <h2>Upcoming Events</h2>
+    <Link href="/events">See all →</Link>
+  </div>
+
+  <div className={styles.eventsGrid}>
+    {events.length === 0 ? (
+      <p
+        style={{
+          padding: '20px',
+          color: '#AAAAAA',
+          fontFamily: 'Oswald, sans-serif',
+        }}
+      >
+        No upcoming events — check back soon.
+      </p>
+    ) : (
+      events.slice(0, 6).map(event => (
+        <EventCard
+          key={event.id}
+          event={event}
+        />
+      ))
+    )}
+  </div>
+</section>
 
         {/* ── Featured Artists ── */}
         <section id="artists">
