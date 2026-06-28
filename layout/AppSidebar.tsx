@@ -35,10 +35,11 @@ import ContactModal from '@/components/common/ContactModal'
  * resolving in production.
  */
 
-const LOGO_URL =
-  'https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785-logo.png'
+const LOGO_BLACK =
+  'https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785%20BG%20MAGAZINE.png'
 
-type SubItem = { name: string; path: string; pro?: boolean; new?: boolean }
+const LOGO_WHITE =
+  'https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785-Splash-512-White.png'
 
 type NavItem = {
   name: string
@@ -286,12 +287,15 @@ const AppSidebar: React.FC = () => {
       <aside
         className={`fixed top-0 left-0 flex flex-col bg-white dark:bg-gray-900 text-gray-900 dark:text-white h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 dark:border-gray-800
           ${
-            isExpanded || isMobileOpen
-              ? 'w-[290px]'
-              : isHovered
-              ? 'w-[290px]'
-              : 'w-[90px]'
-          }
+            ${
+  isMobileOpen
+    ? 'w-screen max-w-none'
+    : isExpanded
+    ? 'w-[290px]'
+    : isHovered
+    ? 'w-[290px]'
+    : 'w-[90px]'
+}
           ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
           lg:translate-x-0
           ${isExpanded ? 'lg:w-[290px]' : isHovered ? 'lg:w-[290px]' : 'lg:w-[90px]'}
@@ -302,8 +306,8 @@ const AppSidebar: React.FC = () => {
         onMouseLeave={() => setIsHovered(false)}
       >
         {/* Mobile close + logo */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800 lg:py-8 lg:flex-col lg:gap-0">
-          <button
+<div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800">
+  <button
             onClick={() => toggleMobileSidebar()}
             className="lg:hidden text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
             aria-label="Close menu"
@@ -316,21 +320,22 @@ const AppSidebar: React.FC = () => {
             Using <a> (not <Link>) since this is leaving the Next.js app to
             the public site.
           */}
-          <a
-            href="https://www.seveneightfive.com"
+            <a
+  href="/dashboard"
+              
             className="flex items-center justify-center"
             aria-label="785 Magazine homepage"
             onClick={closeMobileMenu}
           >
             {isExpanded || isHovered || isMobileOpen ? (
               <Image
-                src={LOGO_URL}
+                src={LOGO_BLACK}
                 alt="785 Magazine"
                 width={140}
                 height={42}
                 priority
                 unoptimized
-                className="h-auto w-[120px]"
+                className="h-auto w-[100px]"
               />
             ) : (
               <Image
@@ -358,7 +363,7 @@ const AppSidebar: React.FC = () => {
                   }`}
                 >
                   {isExpanded || isHovered || isMobileOpen ? (
-                    'Create + Manage'
+                    'Creator Hub'
                   ) : (
                     <HorizontaLDots />
                   )}
