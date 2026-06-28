@@ -43,10 +43,9 @@ const AppHeader: React.FC<{ headerUser: HeaderUser | null }> = ({
   const isGuest = !headerUser
 
   return (
-    <header className="sticky top-0 flex w-full bg-white border-gray-200 z-99999 dark:border-gray-800 dark:bg-gray-900 lg:border-b">
-      <div className="flex flex-col items-center justify-between grow lg:flex-row lg:px-6">
-        <div className="flex items-center justify-between w-full gap-2 px-3 py-3 border-b border-gray-200 dark:border-gray-800 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0 lg:py-4">
-          {/* Sidebar toggle (hamburger / X) */}
+<header className="sticky top-0 flex w-full border-gray-200 bg-white z-99999 dark:border-gray-800 dark:bg-gray-900 lg:border-b">
+  <div className="flex flex-col items-center justify-between grow lg:flex-row lg:px-6">
+<div className="relative flex items-center justify-between w-full gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-800 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0 lg:py-4">          {/* Sidebar toggle (hamburger / X) */}
           <button
             className="items-center justify-center w-10 h-10 text-gray-500 border-gray-200 rounded-lg z-99999 dark:border-gray-800 lg:flex dark:text-gray-400 lg:h-11 lg:w-11 lg:border"
             onClick={handleToggle}
@@ -63,11 +62,17 @@ const AppHeader: React.FC<{ headerUser: HeaderUser | null }> = ({
             )}
           </button>
 
-          {/* Mobile logo (sidebar shows the logo on desktop) */}
-          <Link href="/" className="lg:hidden">
-            <Image width={154} height={32} className="dark:hidden" src="/images/logo/logo.svg" alt="785 Magazine" />
-            <Image width={154} height={32} className="hidden dark:block" src="/images/logo/logo-dark.svg" alt="785 Magazine" />
-          </Link>
+          {/* Mobile Creator Hub title */}
+<Link
+  href="/dashboard"
+  className="absolute left-1/2 -translate-x-1/2 lg:hidden"
+>
+  <div className="font-display text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+    <span>7</span>
+    <span className="text-brand-600">8</span>
+    <span className="text-warning-500">5</span>
+  </div>
+</Link>
 
           <div className="hidden lg:block">
   <p className="font-body text-[10px] font-bold uppercase tracking-[0.18em] text-brand-600 dark:text-brand-400">
