@@ -62,16 +62,20 @@ const AppHeader: React.FC<{ headerUser: HeaderUser | null }> = ({
             )}
           </button>
 
-          {/* Mobile Creator Hub title */}
+          {/* Mobile Logo */}
 <Link
   href="/dashboard"
   className="absolute left-1/2 -translate-x-1/2 lg:hidden"
 >
-  <div className="font-display text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-    <span>7</span>
-    <span className="text-brand-600">8</span>
-    <span className="text-warning-500">5</span>
-  </div>
+  <Image
+    src="https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785%20BG%20MAGAZINE.png"
+    alt="785 Magazine"
+    width={140}
+    height={50}
+    priority
+    unoptimized
+    className="h-10 w-auto"
+  />
 </Link>
 
           <div className="hidden lg:block">
@@ -81,6 +85,27 @@ const AppHeader: React.FC<{ headerUser: HeaderUser | null }> = ({
   <h1 className="font-display text-xl font-semibold uppercase tracking-wide text-gray-900 dark:text-white">
     Creator Hub
   </h1>
+</div><div className="hidden lg:flex items-center gap-4">
+  <Image
+    src="https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785%20BG%20MAGAZINE.png"
+    alt="785 Magazine"
+    width={120}
+    height={45}
+    priority
+    unoptimized
+    className="h-10 w-auto"
+  />
+
+  <div className="h-8 w-px bg-gray-300 dark:bg-gray-700" />
+
+  <div>
+    <div className="font-display text-lg font-bold uppercase tracking-wide">
+      Creator Hub
+    </div>
+    <div className="text-xs text-gray-500">
+      Manage events, pages, tickets & ads
+    </div>
+  </div>
 </div>
 
           {/* Mobile kebab: opens right-side controls drawer */}
