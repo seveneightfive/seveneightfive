@@ -35,7 +35,7 @@ import ContactModal from '@/components/common/ContactModal'
  * resolving in production.
  */
 
-const LOGO_BLACK =
+cconst LOGO_BLACK =
   'https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785%20BG%20MAGAZINE.png'
 
 const LOGO_WHITE =
@@ -322,33 +322,44 @@ const AppSidebar: React.FC = () => {
           */}
             <a
   href="/dashboard"
-              
-            className="flex items-center justify-center"
-            aria-label="785 Magazine homepage"
-            onClick={closeMobileMenu}
-          >
-            {isExpanded || isHovered || isMobileOpen ? (
-              <Image
-                src={LOGO_BLACK}
-                alt="785 Magazine"
-                width={140}
-                height={42}
-                priority
-                unoptimized
-                className="h-auto w-[100px]"
-              />
-            ) : (
-              <Image
-                src={LOGO_URL}
-                alt="785"
-                width={42}
-                height={42}
-                priority
-                unoptimized
-                className="h-auto w-[36px]"
-              />
-            )}
-          </a>
+  className="flex items-center justify-center"
+  aria-label="Creator Hub"
+  onClick={closeMobileMenu}
+>
+  {isExpanded || isHovered || isMobileOpen ? (
+    <>
+      <Image
+        src={LOGO_BLACK}
+        alt="785 Magazine"
+        width={140}
+        height={56}
+        priority
+        unoptimized
+        className="h-12 w-auto dark:hidden"
+      />
+
+      <Image
+        src={LOGO_WHITE}
+        alt="785 Magazine"
+        width={140}
+        height={56}
+        priority
+        unoptimized
+        className="hidden h-12 w-auto dark:block"
+      />
+    </>
+  ) : (
+    <Image
+      src={LOGO_BLACK}
+      alt="785"
+      width={42}
+      height={42}
+      priority
+      unoptimized
+      className="h-auto w-[36px]"
+    />
+  )}
+</a>
         </div>
 
         <div className="flex flex-col overflow-y-auto duration-300 ease-linear flex-1 no-scrollbar px-5 py-6">
