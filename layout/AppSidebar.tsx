@@ -286,7 +286,6 @@ const AppSidebar: React.FC = () => {
 
       <aside
         className={`fixed top-0 left-0 flex flex-col bg-white dark:bg-gray-900 text-gray-900 dark:text-white h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 dark:border-gray-800
-          ${
             ${
   isMobileOpen
     ? 'w-screen max-w-none'
