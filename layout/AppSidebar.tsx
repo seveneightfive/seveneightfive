@@ -41,6 +41,13 @@ const LOGO_BLACK =
 const LOGO_WHITE =
   'https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785-Splash-512-White.png'
 
+type SubItem = {
+  name: string
+  path: string
+  pro?: boolean
+  new?: boolean
+}
+  
 type NavItem = {
   name: string
   icon: React.ReactNode
