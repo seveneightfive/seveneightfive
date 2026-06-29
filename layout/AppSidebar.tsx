@@ -35,7 +35,7 @@ import ContactModal from '@/components/common/ContactModal'
  * resolving in production.
  */
 
-cconst LOGO_BLACK =
+const LOGO_BLACK =
   'https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785%20BG%20MAGAZINE.png'
 
 const LOGO_WHITE =
