@@ -79,7 +79,7 @@ export async function generateMetadata(
   const { slug } = await params
   const artist = await getArtist(slug)
   if (!artist) return { title: 'Artist Not Found' }
-  const description = artist.bio || artist.tagline || `${artist.name} — Kansas artist on The 785`
+  const description = artist.bio || artist.tagline || `${artist.name} — Topeka artist | seveneightfive`
   const image = artist.image_url || artist.avatar_url
   return {
     title: `${artist.name} | The 785`,
