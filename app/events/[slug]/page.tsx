@@ -121,6 +121,7 @@ export async function generateMetadata(
   return {
     title: `${event.title} | The 785`,
     description,
+    alternates: { canonical: `https://seveneightfive.com/events/${event.slug}` },
     openGraph: {
       title: event.title,
       description,
@@ -215,6 +216,18 @@ function getJsonLd(event: Event) {
       name: 'seveneightfive',
       url: 'https://seveneightfive.com',
     },
+  }
+}
+
+// ← moved out here, top-level, sibling to getJsonLd
+function getBreadcrumbJsonLd(event: Event) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Events', item: 'https://seveneightfive.com/events' },
+      { '@type': 'ListItem', position: 2, name: event.title, item: `https://seveneightfive.com/events/${event.slug}` },
+    ],
   }
 }
 
@@ -326,6 +339,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
   const relatedEvents = await getRelatedEvents(event.id, event.event_types)
 
   const jsonLd = getJsonLd(event)
+  const breadcrumbJsonLd = getBreadcrumbJsonLd(event)
   const d = new Date(event.event_date + 'T12:00:00')
   const dayOfWeek = d.toLocaleDateString('en-US', { weekday: 'long' })
   const fullDate = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
@@ -339,7 +353,8 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
       <EventPageViewLogger slug={slug} />
       
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-
+<script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
