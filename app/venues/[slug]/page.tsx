@@ -387,7 +387,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
                   </svg>
                   <div>
                     <div className="address-text">{venue.address}{venue.city && `, ${venue.city}`}{venue.state && `, ${venue.state}`}</div>
-                    
+                    <a
                       href={`https://maps.google.com/?q=${encodeURIComponent(`${venue.address} ${venue.city || ''} ${venue.state || ''}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -416,7 +416,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
               ) : (
                 <div className="events-list">
                   {events.map(event => (
-                    
+                    <a
                       key={event.id}
                       href={event.slug ? `/events/${event.slug}` : event.ticket_url || '#'}
                       target={event.slug ? '_self' : '_blank'}
@@ -462,7 +462,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
             <div className="contact-strip-label">Get in Touch</div>
             <div className="contact-icons">
               {contactLinks.map((link, i) => (
-                
+                <a
                   key={i}
                   href={link.url}
                   target={link.url.startsWith('mailto') || link.url.startsWith('tel') ? '_self' : '_blank'}
