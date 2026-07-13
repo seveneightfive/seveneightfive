@@ -69,6 +69,8 @@ type PortfolioImage = {
   display_order: number
 }
 
+const SITE_URL = 'https://seveneightfive.com'
+
 // ─── SEO ─────────────────────────────────────────────────────────────────────
 
 export async function generateMetadata(
@@ -82,6 +84,7 @@ export async function generateMetadata(
   return {
     title: `${artist.name} | The 785`,
     description,
+    alternates: { canonical: `${SITE_URL}/artists/${artist.slug}` },
     openGraph: { title: artist.name, description, images: image ? [{ url: image }] : [], type: 'profile' },
     twitter: { card: 'summary_large_image', title: artist.name, description, images: image ? [image] : [] },
   }
@@ -155,19 +158,56 @@ async function getPortfolioImages(artistId: string): Promise<PortfolioImage[]> {
   return (data || []) as PortfolioImage[]
 }
 
+// ─── JSON-LD ──────────────────────────────────────────────────────────────────
+
 function getJsonLd(artist: Artist) {
+  const isMusician = artist.artist_type === 'Musician'
   const genres = [...(artist.musician_profile?.musical_genres || []), ...(artist.visual_profile?.visual_mediums || [])]
+
+  const sameAs = [
+    ...(artist.same_as || []),
+    artist.social_facebook,
+    artist.social_instagram,
+    artist.musician_profile?.artist_spotify,
+    artist.musician_profile?.artist_youtube,
+  ].filter((v, i, arr) => !!v && arr.indexOf(v) === i) as string[]
+
   return {
     '@context': 'https://schema.org',
-    '@type': artist.artist_type === 'Musician' ? 'MusicGroup' : 'Person',
+    '@type': isMusician ? 'MusicGroup' : 'Person',
     name: artist.name,
-    description: artist.bio || artist.tagline,
-    image: artist.image_url || artist.avatar_url,
-    url: artist.url || artist.artist_website,
-    sameAs: artist.same_as || [],
+    ...((artist.bio || artist.tagline) && { description: artist.bio || artist.tagline }),
+    ...(!isMusician && artist.given_name && { givenName: artist.given_name }),
+    ...(!isMusician && artist.family_name && { familyName: artist.family_name }),
+    ...((artist.image_url || artist.avatar_url) && { image: artist.image_url || artist.avatar_url }),
+    ...((artist.url || artist.artist_website) && { url: artist.url || artist.artist_website }),
+    ...(sameAs.length > 0 && { sameAs }),
     ...(genres.length > 0 && { genre: genres }),
-    ...(artist.location_city && { homeLocation: { '@type': 'Place', addressLocality: artist.location_city, addressRegion: artist.location_state } }),
+    ...(artist.location_city && {
+      homeLocation: {
+        '@type': 'Place',
+        address: {
+          '@type': 'PostalAddress',
+          addressLocality: artist.location_city,
+          ...(artist.location_state && { addressRegion: artist.location_state }),
+          addressCountry: 'US',
+        },
+      },
+    }),
+    ...(!isMusician && artist.birth_place && { birthPlace: artist.birth_place }),
     ...(artist.awards && { award: artist.awards }),
+    mainEntityOfPage: `${SITE_URL}/artists/${artist.slug}`,
+  }
+}
+
+function getBreadcrumbJsonLd(artist: Artist) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Artists', item: `${SITE_URL}/artists` },
+      { '@type': 'ListItem', position: 2, name: artist.name, item: `${SITE_URL}/artists/${artist.slug}` },
+    ],
   }
 }
 
@@ -213,6 +253,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
   const socialLinks = getSocialLinks(artist)
   const videoId = mp?.video_url ? getYouTubeId(mp.video_url) : null
   const jsonLd = getJsonLd(artist)
+  const breadcrumbJsonLd = getBreadcrumbJsonLd(artist)
   const hasMusic = !!(mp?.audio_file_url || mp?.video_url)
   const hasWork = !!(vp?.works) || portfolioImages.length > 0
 
@@ -240,7 +281,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
       hasMusic={hasMusic}
       hasWork={hasWork}
       jsonLd={jsonLd}
+      breadcrumbJsonLd={breadcrumbJsonLd}
     />
   )
 }
-
