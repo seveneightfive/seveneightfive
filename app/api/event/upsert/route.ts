@@ -10,8 +10,35 @@ function slugify(title: string, date: string): string {
   return `${base}-${date}`
 }
 
+const EVENT_TIMEZONE = 'America/Chicago'
+
+// Converts a wall-clock date + time as observed in `timeZone` into the
+// correct UTC instant (handles CST/CDT automatically, no hardcoded offsets).
+function zonedTimeToUtc(dateStr: string, timeStr: string, timeZone: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const [hour, minute] = timeStr.split(':').map(Number)
+  const utcGuess = new Date(Date.UTC(year, (month || 1) - 1, day || 1, hour || 0, minute || 0))
+  const tzString = utcGuess.toLocaleString('en-US', { timeZone })
+  const tzDate = new Date(tzString)
+  const diff = utcGuess.getTime() - tzDate.getTime()
+  return new Date(utcGuess.getTime() + diff)
+}
+
+// start_date/end_date are derived columns — never accept them directly from
+// the client. They're always computed from event_date + event_start_time /
+// event_end_time in EVENT_TIMEZONE so downstream code (sorting, calendar
+// export, "happening now" checks) can rely on them being correct timestamptz
+// values instead of null or naive UTC.
+function computeTimestamps(eventDate: string, startTime: string | null, endTime: string | null) {
+  const start = zonedTimeToUtc(eventDate, startTime || '00:00', EVENT_TIMEZONE)
+  // end_date always lands on the same calendar day as event_date; if no end
+  // time was given, default to the end of that day rather than leaving it null.
+  const end = zonedTimeToUtc(eventDate, endTime || '23:59', EVENT_TIMEZONE)
+  return { start_date: start.toISOString(), end_date: end.toISOString() }
+}
+
 const ALLOWED_FIELDS = [
-  'title', 'description', 'event_date', 'start_date', 'end_date',
+  'title', 'description', 'event_date',
   'event_start_time', 'event_end_time', 'image_url', 'ticket_price',
   'ticket_url', 'learnmore_link', 'event_types', 'star', 'venue_id',
 ]
@@ -30,6 +57,18 @@ export async function POST(request: Request) {
   for (const key of ALLOWED_FIELDS) {
     if (key in body) safeData[key] = body[key]
   }
+
+  if (!body.event_date) {
+    return NextResponse.json({ error: 'event_date is required' }, { status: 400 })
+  }
+
+  const { start_date, end_date } = computeTimestamps(
+    body.event_date,
+    body.event_start_time || null,
+    body.event_end_time || null,
+  )
+  safeData.start_date = start_date
+  safeData.end_date = end_date
 
   const slug = slugify(body.title || 'event', body.event_date || new Date().toISOString().slice(0, 10))
   safeData.slug = slug
@@ -62,7 +101,7 @@ export async function PATCH(request: Request) {
   // Verify access: creator, venue owner, or featured artist
   const { data: existing } = await supabase
     .from('events')
-    .select('id, auth_user_id, venue_id')
+    .select('id, auth_user_id, venue_id, event_date, event_start_time, event_end_time')
     .eq('id', eventId)
     .single()
 
@@ -93,6 +132,15 @@ export async function PATCH(request: Request) {
   for (const key of ALLOWED_FIELDS) {
     if (key in updates) safeData[key] = updates[key]
   }
+
+  // Recompute start_date/end_date whenever the date or either time changes,
+  // merging with the existing stored values for anything not in this update.
+  const effectiveDate = (updates.event_date ?? existing.event_date) as string
+  const effectiveStart = (updates.event_start_time ?? existing.event_start_time) as string | null
+  const effectiveEnd = (updates.event_end_time ?? existing.event_end_time) as string | null
+  const { start_date, end_date } = computeTimestamps(effectiveDate, effectiveStart, effectiveEnd)
+  safeData.start_date = start_date
+  safeData.end_date = end_date
 
   // Regenerate slug if title or date changed
   if (updates.title || updates.event_date) {
