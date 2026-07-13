@@ -34,6 +34,8 @@ type Event = {
   ticket_url: string | null
 }
 
+const SITE_URL = 'https://seveneightfive.com'
+
 // ─── SEO ─────────────────────────────────────────────────────────────────────
 
 export async function generateMetadata(
@@ -46,6 +48,7 @@ export async function generateMetadata(
   return {
     title: `${venue.name} | The 785`,
     description,
+    alternates: { canonical: `${SITE_URL}/venues/${venue.slug}` },
     openGraph: { title: venue.name, description, images: venue.image_url ? [{ url: venue.image_url }] : [], type: 'website' },
     twitter: { card: 'summary_large_image', title: venue.name, description, images: venue.image_url ? [venue.image_url] : [] },
   }
@@ -84,21 +87,58 @@ async function getVenueEvents(venueId: string): Promise<Event[]> {
   return (data || []) as Event[]
 }
 
+// ─── JSON-LD ──────────────────────────────────────────────────────────────────
+
+// Adjust these keys to match your actual venue_type tag values in Supabase
+const VENUE_TYPE_MAP: Record<string, string> = {
+  'Bar': 'BarOrPub',
+  'Brewery': 'Brewery',
+  'Nightclub': 'NightClub',
+  'Restaurant': 'Restaurant',
+  'Coffee Shop': 'CafeOrCoffeeShop',
+  'Art Gallery': 'ArtGallery',
+  'Theater': 'PerformingArtsTheater',
+  'Music Venue': 'MusicVenue',
+  'Event Space': 'EventVenue',
+}
+
 function getJsonLd(venue: Venue) {
+  const matchedTypes = (venue.venue_type || [])
+    .map(t => VENUE_TYPE_MAP[t])
+    .filter(Boolean)
+
+  const sameAs = [venue.social_instagram, venue.social_facebook].filter(Boolean) as string[]
+
   return {
     '@context': 'https://schema.org',
-    '@type': 'Place',
+    '@type': matchedTypes.length > 0 ? ['LocalBusiness', ...matchedTypes] : 'LocalBusiness',
     name: venue.name,
-    description: venue.description,
-    image: venue.image_url,
-    url: venue.website,
-    address: venue.address ? {
-      '@type': 'PostalAddress',
-      streetAddress: venue.address,
-      addressLocality: venue.city || 'Topeka',
-      addressRegion: venue.state || 'KS',
-      addressCountry: 'US',
-    } : undefined,
+    ...(venue.description && { description: venue.description }),
+    ...(venue.image_url && { image: venue.image_url }),
+    ...(venue.website && { url: venue.website }),
+    ...(venue.phone && { telephone: venue.phone }),
+    ...(sameAs.length > 0 && { sameAs }),
+    ...(venue.address && {
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: venue.address,
+        addressLocality: venue.city || 'Topeka',
+        addressRegion: venue.state || 'KS',
+        addressCountry: 'US',
+      },
+    }),
+    mainEntityOfPage: `${SITE_URL}/venues/${venue.slug}`,
+  }
+}
+
+function getBreadcrumbJsonLd(venue: Venue) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Venues', item: `${SITE_URL}/venues` },
+      { '@type': 'ListItem', position: 2, name: venue.name, item: `${SITE_URL}/venues/${venue.slug}` },
+    ],
   }
 }
 
@@ -111,6 +151,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
 
   const events = await getVenueEvents(venue.id)
   const jsonLd = getJsonLd(venue)
+  const breadcrumbJsonLd = getBreadcrumbJsonLd(venue)
 
   // Contact / social icons — order intentional: primary action first, then reach-out, then socials
   const contactLinks: { label: string; url: string; icon: React.ReactNode; color: string }[] = []
@@ -191,6 +232,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
 
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -345,7 +387,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
                   </svg>
                   <div>
                     <div className="address-text">{venue.address}{venue.city && `, ${venue.city}`}{venue.state && `, ${venue.state}`}</div>
-                    <a
+                    
                       href={`https://maps.google.com/?q=${encodeURIComponent(`${venue.address} ${venue.city || ''} ${venue.state || ''}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -374,7 +416,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
               ) : (
                 <div className="events-list">
                   {events.map(event => (
-                    <a
+                    
                       key={event.id}
                       href={event.slug ? `/events/${event.slug}` : event.ticket_url || '#'}
                       target={event.slug ? '_self' : '_blank'}
@@ -420,7 +462,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
             <div className="contact-strip-label">Get in Touch</div>
             <div className="contact-icons">
               {contactLinks.map((link, i) => (
-                <a
+                
                   key={i}
                   href={link.url}
                   target={link.url.startsWith('mailto') || link.url.startsWith('tel') ? '_self' : '_blank'}
