@@ -209,7 +209,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
         .hero-monogram { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: clamp(8rem, 30vw, 20rem); font-weight: 700; color: rgba(255,255,255,0.04); text-transform: uppercase; letter-spacing: -0.04em; user-select: none; }
         .hero-back { position: absolute; top: 20px; left: 20px; z-index: 3; display: inline-flex; align-items: center; gap: 6px; font-size: 0.7rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: #fff; text-decoration: none; background: rgba(0,0,0,0.32); backdrop-filter: blur(6px); padding: 8px 14px; border-radius: 100px; border: 1px solid rgba(255,255,255,0.16); transition: background 0.15s; }
         .hero-back:hover { background: rgba(0,0,0,0.5); }
-        .hero-body { position: relative; z-index: 2; padding: 24px 24px 32px; }
+        .hero-body { position: relative; z-index: 2; padding: 24px 32px 40px var(--page-pad); }
         .hero-eyebrow { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
         .hero-type-label { font-size: 0.65rem; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); }
         .hero-name { font-family: var(--serif); font-size: clamp(2.4rem, 8vw, 5rem); font-weight: 700; color: #fff; line-height: 0.95; letter-spacing: -0.01em; text-transform: uppercase; margin-bottom: 12px; animation: fadeUp 0.6s cubic-bezier(0.22,1,0.36,1) both; }
@@ -218,20 +218,19 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
         .hero-pill { font-size: 0.67rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.18); padding: 4px 10px; border-radius: 100px; backdrop-filter: blur(4px); display: flex; align-items: center; gap: 4px; }
 
         /* ── LAYOUT ── */
-        .venue-main { max-width: 1180px; margin: 0 auto; padding: 48px 24px 0; }
-        .venue-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 28px; align-items: start; }
+        :root { --page-pad: 64px; }
+        .venue-main { max-width: 1440px; margin: 0 auto; padding: 48px var(--page-pad) 0; }
+        .venue-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 40px; align-items: start; }
 
-        .panel { border: 1px solid var(--border); border-radius: 14px; background: var(--white); overflow: hidden; }
-        .panel-header { padding: 20px 24px 0; }
-        .panel-body { padding: 16px 24px 24px; }
+        .panel-header { padding: 0; }
+        .panel-body { padding: 16px 0 0; }
         .eyebrow { font-size: 0.65rem; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink); margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
         .eyebrow::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+        .eyebrow-accent { color: var(--accent); }
 
         /* ── ABOUT ── */
         .about-panel { position: sticky; top: 24px; }
-        .est-line { font-size: 0.75rem; font-weight: 500; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 14px; }
-        .est-line strong { color: var(--accent); font-style: normal; }
-        .desc-text { font-size: 0.98rem; font-weight: 300; line-height: 1.75; color: var(--ink); }
+        .desc-text { font-size: 0.98rem; font-weight: 400; line-height: 1.75; color: #141210; }
         .desc-text + .desc-text { margin-top: 12px; }
         .desc-empty { font-size: 0.92rem; font-style: italic; color: var(--ink-faint); }
         .address-block { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--border); display: flex; align-items: flex-start; gap: 10px; }
@@ -274,11 +273,10 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
           .about-panel { position: static; }
         }
         @media (max-width: 640px) {
+          :root { --page-pad: 20px; }
           .hero { height: 100svh; max-height: 100svh; min-height: 0; }
-          .hero-body { padding: 20px 20px 28px; }
-          .venue-main { padding: 32px 20px 0; }
-          .panel-header { padding: 18px 20px 0; }
-          .panel-body { padding: 14px 20px 20px; }
+          .hero-body { padding: 20px 20px 28px var(--page-pad); }
+          .venue-main { padding: 32px var(--page-pad) 0; }
           .contact-strip { padding: 24px 0 40px; }
         }
       `}</style>
@@ -301,16 +299,16 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
         )}
         <div className="hero-body">
           <div className="hero-eyebrow">
-            {venue.venue_type?.map(t => <span key={t} className="hero-type-label">{t}</span>)}
+            {venue.neighborhood && <span className="hero-type-label">{venue.neighborhood}</span>}
           </div>
           <h1 className="hero-name">{venue.name}</h1>
           <div className="hero-pills">
-            {(venue.neighborhood || venue.city) && (
+            {(venue.city || venue.neighborhood) && (
               <span className="hero-pill">
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
                 </svg>
-                {[venue.neighborhood, venue.city].filter(Boolean).join(' · ')}
+                {venue.city || venue.neighborhood}
               </span>
             )}
           </div>
@@ -324,13 +322,11 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
           {/* ── ABOUT (33%) ── */}
           <section className="panel about-panel">
             <div className="panel-header">
-              <div className="eyebrow">About</div>
+              <div className="eyebrow">
+                {venue.est ? <><span className="eyebrow-accent">Est.</span>&nbsp;{venue.est}</> : 'About'}
+              </div>
             </div>
             <div className="panel-body">
-              {venue.est && (
-                <div className="est-line"><strong>Est.</strong> {venue.est}</div>
-              )}
-
               {venue.description
                 ? venue.description.split('\n').filter(Boolean).map((p, i) => <p key={i} className="desc-text">{p}</p>)
                 : <p className="desc-empty">No description available.</p>
