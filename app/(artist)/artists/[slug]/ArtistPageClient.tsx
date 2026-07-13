@@ -82,6 +82,7 @@ type Props = {
   hasMusic: boolean
   hasWork: boolean
   jsonLd: object
+  breadcrumbJsonLd: object
 }
 
 // ─── SVG Icons ────────────────────────────────────────────────────────────────
@@ -171,6 +172,7 @@ export default function ArtistPageClient({
   hasMusic,
   hasWork,
   jsonLd,
+  breadcrumbJsonLd,
 }: Props) {
   const [shareOpen, setShareOpen] = useState(false)
   const [lightboxImage, setLightboxImage] = useState<PortfolioImage | null>(null)
@@ -244,8 +246,9 @@ export default function ArtistPageClient({
 
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
-      
+
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
