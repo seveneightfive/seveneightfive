@@ -392,7 +392,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
                       target="_blank"
                       rel="noopener noreferrer"
                       className="address-link"
-                    <a
+                    <a>
                       Open in Maps →
                     </a>
                   </div>
@@ -422,7 +422,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
                       target={event.slug ? '_self' : '_blank'}
                       rel="noopener noreferrer"
                       className="link-row"
-                    <a
+                    <a>
                       {event.image_url && (
                         <img
                           src={event.image_url}
@@ -469,7 +469,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
                   rel="noopener noreferrer"
                   className="contact-icon-btn"
                   style={{ color: link.color }}
-                <a
+                <a>
                   <span className="contact-icon-circle">{link.icon}</span>
                   <span className="contact-icon-label">{link.label}</span>
                 </a>
