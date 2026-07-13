@@ -171,7 +171,7 @@ function getJsonLd(event: Event) {
     '@type': schemaType,
     name: event.title,
     description: event.description,
-    url: `https://seveneightfive/events/${event.slug}`,
+    url: `https://seveneightfive.com/events/${event.slug}`,
     startDate,
     ...(endDate && { endDate }),
     image: event.image_url,
@@ -207,7 +207,7 @@ function getJsonLd(event: Event) {
       performer: event.artists.map(a => ({
         '@type': 'Person',
         name: a.name,
-        ...(a.slug && { url: `https://seveneightfive/artists/${a.slug}` }),
+        ...(a.slug && { url: `https://seveneightfive.com/artists/${a.slug}` }),
       })),
     }),
     organizer: {
