@@ -87,61 +87,57 @@ type Props = {
 // ─── SVG Icons ────────────────────────────────────────────────────────────────
 
 const IconWebsite = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6">
-    <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
-    <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
   </svg>
 )
 const IconEmail = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6">
-    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-    <polyline points="22,6 12,13 2,6"/>
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 6-10 7L2 6" />
   </svg>
 )
 const IconYouTube = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
     <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
   </svg>
 )
 const IconSpotify = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
     <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
   </svg>
 )
 const IconInstagram = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24">
-    <rect x="2" y="2" width="20" height="20" rx="5" className="icon-outline"/>
-    <circle cx="12" cy="12" r="4" className="icon-outline"/>
-    <circle cx="17.5" cy="6.5" r="1.2" className="icon-dot"/>
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <rect x="2" y="2" width="20" height="20" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
   </svg>
 )
 const IconFacebook = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
     <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
   </svg>
 )
 const IconX = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.259 5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
   </svg>
 )
 const IconSoundCloud = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
     <path d="M11.5 8.5c-.7 0-1.36.15-1.95.42C9.17 6.1 7.05 4 4.5 4 1.91 4 0 6.09 0 8.5c0 .17.01.34.03.5H0v7h15.5c1.93 0 3.5-1.57 3.5-3.5S17.43 9 15.5 9c-.17 0-.34.01-.5.03C14.47 8.77 13.04 8.5 11.5 8.5z"/>
   </svg>
 )
 const IconAppleMusic = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
     <path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.769-.73 7.7 7.7 0 00-1.996-.16c-.693.02-1.39.04-2.08.06l-5.55.15c-.7.02-1.4.04-2.1.06A8.765 8.765 0 005.9.27C4.91.51 4.07 1.04 3.43 1.8c-.62.73-1.04 1.6-1.25 2.56-.16.73-.19 1.47-.17 2.22V19.26c.02.75.07 1.5.27 2.24.36 1.38 1.2 2.46 2.46 3.14.65.35 1.35.54 2.07.62.82.09 1.64.1 2.46.1h9.3c.8 0 1.6-.01 2.4-.1.78-.08 1.52-.3 2.2-.69 1.27-.72 2.1-1.82 2.47-3.25.18-.7.22-1.42.23-2.14V12c0-1.96-.01-3.92-.01-5.876zM15.5 5.83l-6 1.67v7.1c-.32-.12-.67-.18-1.03-.18C7.06 14.42 6 15.45 6 16.71s1.06 2.29 2.47 2.29c1.41 0 2.53-1.03 2.53-2.29V9.48l4-1.12v5.76c-.32-.12-.67-.18-1.03-.18-1.41 0-2.47 1.03-2.47 2.29s1.06 2.29 2.47 2.29c1.41 0 2.53-1.03 2.53-2.29V5.83z"/>
   </svg>
 )
 const IconTikTok = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
     <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.18 8.18 0 004.79 1.54V6.78a4.85 4.85 0 01-1.02-.09z"/>
   </svg>
 )
 const IconLink = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.6">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
     <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
     <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
   </svg>
@@ -149,17 +145,17 @@ const IconLink = () => (
 
 function getSvgIcon(label: string) {
   const l = label.toLowerCase()
-  if (l.includes('instagram')) return { component: <IconInstagram />, type: 'mixed' }
-  if (l.includes('youtube')) return { component: <IconYouTube />, type: 'fill' }
-  if (l.includes('spotify')) return { component: <IconSpotify />, type: 'fill' }
-  if (l.includes('facebook')) return { component: <IconFacebook />, type: 'fill' }
-  if (l.includes('tiktok')) return { component: <IconTikTok />, type: 'fill' }
-  if (l.includes('twitter') || l.includes(' x ') || l === 'x') return { component: <IconX />, type: 'fill' }
-  if (l.includes('soundcloud')) return { component: <IconSoundCloud />, type: 'fill' }
-  if (l.includes('apple')) return { component: <IconAppleMusic />, type: 'fill' }
-  if (l.includes('email') || l.includes('mail')) return { component: <IconEmail />, type: 'stroke' }
-  if (l.includes('website') || l.includes('web')) return { component: <IconWebsite />, type: 'stroke' }
-  return { component: <IconLink />, type: 'stroke' }
+  if (l.includes('instagram')) return { component: <IconInstagram />, color: '#E1306C' }
+  if (l.includes('youtube')) return { component: <IconYouTube />, color: '#FF0000' }
+  if (l.includes('spotify')) return { component: <IconSpotify />, color: '#1DB954' }
+  if (l.includes('facebook')) return { component: <IconFacebook />, color: '#1877F2' }
+  if (l.includes('tiktok')) return { component: <IconTikTok />, color: '#1a1814' }
+  if (l.includes('twitter') || l.includes(' x ') || l === 'x') return { component: <IconX />, color: '#1a1814' }
+  if (l.includes('soundcloud')) return { component: <IconSoundCloud />, color: '#FF5500' }
+  if (l.includes('apple')) return { component: <IconAppleMusic />, color: '#FA243C' }
+  if (l.includes('email') || l.includes('mail')) return { component: <IconEmail />, color: '#1a1814' }
+  if (l.includes('website') || l.includes('web')) return { component: <IconWebsite />, color: '#1a1814' }
+  return { component: <IconLink />, color: '#1a1814' }
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -189,6 +185,8 @@ export default function ArtistPageClient({
   const heroRef = useRef<HTMLDivElement>(null)
 
   const mp = artist.musician_profile
+  const hasAudio = !!mp?.audio_file_url
+  const hasVideo = !!videoId
 
   const TYPE_LABEL: Record<string, string> = {
     Musician: 'Musician',
@@ -263,6 +261,7 @@ export default function ArtistPageClient({
           --gold: #FFCE03;
           --serif: 'Oswald', sans-serif;
           --sans: 'DM Sans', system-ui, sans-serif;
+          --page-pad: 64px;
         }
 
         html { background: var(--white); }
@@ -452,7 +451,7 @@ export default function ArtistPageClient({
           left: 0;
           right: 0;
           z-index: 2;
-          padding: 24px 22px 28px;
+          padding: 24px 32px 28px var(--page-pad);
         }
         .hero-type-label {
           font-size: 0.62rem;
@@ -502,7 +501,7 @@ export default function ArtistPageClient({
 
         /* Artist name strip inside sheet (visible when hero scrolls off) */
         .sheet-name-strip {
-          padding: 16px 22px 0;
+          padding: 16px var(--page-pad) 0;
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -541,12 +540,12 @@ export default function ArtistPageClient({
 
         /* ─── CONTENT SECTIONS ───────────────────────── */
         .artist-main {
-          max-width: 680px;
+          max-width: 1440px;
           margin: 0 auto;
-          padding: 0 22px;
+          padding: 8px var(--page-pad) 0;
         }
         .section {
-          padding: 48px 0;
+          padding: 44px 0;
           border-bottom: 1px solid var(--border);
         }
         .section:last-child { border-bottom: none; padding-bottom: 80px; }
@@ -556,7 +555,7 @@ export default function ArtistPageClient({
           font-weight: 700;
           letter-spacing: 0.2em;
           text-transform: uppercase;
-          color: var(--ink-soft);
+          color: var(--ink);
           margin-bottom: 20px;
           display: flex;
           align-items: center;
@@ -567,10 +566,23 @@ export default function ArtistPageClient({
           flex: 1;
           height: 1px;
           background: var(--border);
-          max-width: 48px;
         }
 
         /* ─── ABOUT ──────────────────────────────────── */
+        .about-grid {
+          display: grid;
+          grid-template-columns: 220px minmax(0, 1fr);
+          gap: 32px;
+          align-items: start;
+        }
+        .about-photo {
+          width: 100%;
+          aspect-ratio: 1;
+          border-radius: 10px;
+          object-fit: cover;
+          display: block;
+          background: var(--off);
+        }
         .words-by {
           font-size: 0.63rem;
           font-weight: 600;
@@ -593,9 +605,9 @@ export default function ArtistPageClient({
 
         .bio-text {
           font-size: 1rem;
-          font-weight: 300;
+          font-weight: 400;
           line-height: 1.8;
-          color: var(--ink);
+          color: #141210;
         }
         .bio-text + .bio-text { margin-top: 14px; }
         .bio-empty {
@@ -604,7 +616,7 @@ export default function ArtistPageClient({
           color: var(--ink-faint);
         }
         .awards-block {
-          margin-top: 28px;
+          margin-top: 24px;
           padding: 16px 20px;
           background: var(--accent-light);
           border-left: 3px solid var(--accent);
@@ -620,12 +632,29 @@ export default function ArtistPageClient({
         }
         .awards-text { font-size: 0.9rem; color: var(--ink-soft); line-height: 1.55; }
 
+        .contact-cta {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 22px;
+          font-size: 0.68rem;
+          font-weight: 700;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: var(--accent);
+          border: 1.5px solid var(--accent);
+          border-radius: 100px;
+          padding: 11px 22px;
+          text-decoration: none;
+          transition: background 0.15s, color 0.15s;
+        }
+        .contact-cta:hover { background: var(--accent); color: #fff; }
+
         /* ─── AUDIO / VIDEO ──────────────────────────── */
         .audio-block {
           background: var(--ink);
           border-radius: 10px;
           padding: 20px 22px;
-          margin-bottom: 20px;
         }
         .audio-track-name {
           font-family: var(--serif);
@@ -637,6 +666,13 @@ export default function ArtistPageClient({
           margin-bottom: 14px;
         }
         audio { width: 100%; height: 32px; }
+
+        .video-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+          gap: 32px;
+          align-items: center;
+        }
         .video-container {
           border-radius: 10px;
           overflow: hidden;
@@ -651,19 +687,25 @@ export default function ArtistPageClient({
           height: 100%;
           border: none;
         }
-        .video-meta { margin-top: 12px; font-size: 0.82rem; color: var(--ink-faint); font-style: italic; line-height: 1.5; }
-        .video-meta strong { color: var(--ink-soft); font-style: normal; }
+        .video-kicker-title {
+          font-family: var(--serif);
+          font-size: 1.05rem;
+          font-weight: 500;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: var(--ink);
+          margin-bottom: 8px;
+        }
+        .video-meta { font-size: 0.85rem; color: var(--ink-soft); line-height: 1.6; }
 
         /* ─── WORKS / PORTFOLIO ──────────────────────── */
         .works-image { width: 100%; border-radius: 10px; display: block; }
         .works-text { font-size: 0.95rem; line-height: 1.7; color: var(--ink-soft); }
         .portfolio-grid {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
+          grid-template-columns: repeat(4, 1fr);
           gap: 10px;
-          margin-top: 8px;
         }
-        @media (min-width: 520px) { .portfolio-grid { grid-template-columns: repeat(3, 1fr); } }
         .portfolio-item { display: flex; flex-direction: column; gap: 6px; }
         .portfolio-img {
           width: 100%; aspect-ratio: 4/3; object-fit: cover;
@@ -702,52 +744,47 @@ export default function ArtistPageClient({
         .events-empty-title { font-family: var(--serif); font-size: 1rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); }
         .events-empty-sub { font-size: 0.85rem; color: var(--ink-faint); }
 
-        /* ─── LINKS — 5-per-row smaller icon grid ────── */
-        .links-icon-grid {
-          display: grid;
-          grid-template-columns: repeat(5, 1fr);
-          gap: 10px;
+        /* ─── CONTACT ICON STRIP — small circles, like the venue page ── */
+        .contact-icons {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 14px;
         }
-
-        .link-tile {
-          aspect-ratio: 1;
-          border-radius: 12px;
-          background: var(--accent);
+        .contact-icon-btn {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+          text-decoration: none;
+          width: 84px;
+        }
+        .contact-icon-circle {
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
-          cursor: pointer;
-          text-decoration: none;
-          border: none;
-          transition: background 0.18s, transform 0.12s;
-          -webkit-tap-highlight-color: transparent;
-          overflow: hidden;
+          border: 1.5px solid var(--border);
+          transition: transform 0.15s, border-color 0.15s, background 0.15s;
         }
-        .link-tile:active { transform: scale(0.88); }
-        .link-tile:hover { background: var(--gold); }
-
-        .link-tile.stroke-icon svg {
-          fill: none; stroke: white; stroke-width: 1.6px; transition: stroke 0.18s;
+        .contact-icon-btn:hover .contact-icon-circle {
+          transform: translateY(-3px);
+          border-color: currentColor;
+          background: var(--off);
         }
-        .link-tile.stroke-icon:hover svg { stroke: #5a2000; }
-
-        .link-tile.fill-icon svg {
-          fill: white; transition: fill 0.18s;
+        .contact-icon-label {
+          font-size: 0.68rem;
+          font-weight: 500;
+          letter-spacing: 0.03em;
+          color: var(--ink-soft);
+          text-align: center;
         }
-        .link-tile.fill-icon:hover svg { fill: #5a2000; }
-
-        .link-tile.mixed-icon svg .icon-outline {
-          fill: none; stroke: white; stroke-width: 1.6px; transition: stroke 0.18s;
-        }
-        .link-tile.mixed-icon svg .icon-dot {
-          fill: white; stroke: none; transition: fill 0.18s;
-        }
-        .link-tile.mixed-icon:hover svg .icon-outline { stroke: #5a2000; }
-        .link-tile.mixed-icon:hover svg .icon-dot { fill: #5a2000; }
 
         /* ─── FOOTER ─────────────────────────────────── */
         .artist-footer {
-          padding: 28px 24px 48px;
+          padding: 28px var(--page-pad) 48px;
           text-align: center;
           border-top: 1px solid var(--border);
         }
@@ -858,10 +895,16 @@ export default function ArtistPageClient({
         }
 
         /* ─── SAFE AREA / MOBILE ─────────────────────── */
+        @media (max-width: 860px) {
+          .about-grid { grid-template-columns: 1fr; }
+          .about-photo { max-width: 200px; }
+          .video-grid { grid-template-columns: 1fr; }
+        }
         @media (max-width: 640px) {
-          .hero-body { padding: 20px 18px 24px; }
-          .artist-main { padding: 0 18px; }
+          :root { --page-pad: 20px; }
+          .hero-body { padding: 20px 20px 24px var(--page-pad); }
           .section { padding: 36px 0; }
+          .portfolio-grid { grid-template-columns: repeat(2, 1fr); }
         }
 
         /* ─── HEART BUTTON ───────────────────────────── */
@@ -1009,63 +1052,48 @@ export default function ArtistPageClient({
 
             {/* ── ABOUT ── */}
             <section id="about" className="section">
-              {artist.bio_written_by_785 && (
-                <div className="words-by">Words by <span>785 Staff</span></div>
-              )}
+              <div className="about-grid">
+                {heroImage && (
+                  <img src={heroImage} alt={artist.name} className="about-photo" />
+                )}
+                <div>
+                  <div className="eyebrow">About</div>
 
-              {artist.tagline && artist.bio && (
-                <div className="pull-quote">&ldquo;{artist.tagline}&rdquo;</div>
-              )}
+                  {artist.bio_written_by_785 && (
+                    <div className="words-by">Words by <span>785 Staff</span></div>
+                  )}
 
-              {artist.bio
-                ? artist.bio.split('\n').filter(Boolean).map((p, i) => (
-                    <p key={i} className="bio-text">{p}</p>
-                  ))
-                : <p className="bio-empty">Bio coming soon.</p>
-              }
+                  {artist.tagline && artist.bio && (
+                    <div className="pull-quote">&ldquo;{artist.tagline}&rdquo;</div>
+                  )}
 
-              {artist.awards?.trim() && (
-                <div className="awards-block">
-                  <div className="awards-label">Awards &amp; Recognition</div>
-                  <div className="awards-text">{artist.awards}</div>
+                  {artist.bio
+                    ? artist.bio.split('\n').filter(Boolean).map((p, i) => (
+                        <p key={i} className="bio-text">{p}</p>
+                      ))
+                    : <p className="bio-empty">Bio coming soon.</p>
+                  }
+
+                  {artist.artist_email && (
+                    <a href={`mailto:${artist.artist_email}`} className="contact-cta">
+                      Get in touch →
+                    </a>
+                  )}
+
+                  {artist.awards?.trim() && (
+                    <div className="awards-block">
+                      <div className="awards-label">Awards &amp; Recognition</div>
+                      <div className="awards-text">{artist.awards}</div>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </section>
 
-            {/* ── MUSIC / MEDIA ── */}
-            {hasMusic && (
-              <section id="music" className="section">
-                {mp?.audio_file_url && (
-                  <div className="audio-block" style={{ marginBottom: videoId ? 20 : 0 }}>
-                    <div className="audio-track-name">{mp.audio_title || 'Listen'}</div>
-                    <audio controls src={mp.audio_file_url} />
-                  </div>
-                )}
-                {videoId && (
-                  <>
-                    <div className="video-container">
-                      <iframe
-                        src={`https://www.youtube.com/embed/${videoId}`}
-                        title={mp?.video_title || artist.name}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-                    {(mp?.video_title || mp?.artistvideoabout) && (
-                      <p className="video-meta">
-                        {mp?.video_title && <strong>{mp.video_title}</strong>}
-                        {mp?.video_title && mp?.artistvideoabout && ' — '}
-                        {mp?.artistvideoabout}
-                      </p>
-                    )}
-                  </>
-                )}
-              </section>
-            )}
-
-            {/* ── WORK ── */}
+            {/* ── PORTFOLIO / WORKS ── */}
             {hasWork && (
               <section id="work" className="section">
+                <div className="eyebrow">Portfolio</div>
                 {artist.visual_profile?.works && (
                   artist.visual_profile.works.startsWith('http')
                     ? <img
@@ -1099,8 +1127,45 @@ export default function ArtistPageClient({
               </section>
             )}
 
+            {/* ── AUDIO ── */}
+            {hasAudio && (
+              <section id="music" className="section">
+                <div className="eyebrow">Listen</div>
+                <div className="audio-block">
+                  <div className="audio-track-name">{mp?.audio_title || 'Listen'}</div>
+                  <audio controls src={mp!.audio_file_url!} />
+                </div>
+              </section>
+            )}
+
+            {/* ── VIDEO — 66/33 split ── */}
+            {hasVideo && (
+              <section id="video" className="section">
+                <div className="eyebrow">Video</div>
+                <div className="video-grid">
+                  <div className="video-container">
+                    <iframe
+                      src={`https://www.youtube.com/embed/${videoId}`}
+                      title={mp?.video_title || artist.name}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                  <div>
+                    {mp?.video_title && (
+                      <div className="video-kicker-title">{mp.video_title}</div>
+                    )}
+                    {mp?.artistvideoabout && (
+                      <p className="video-meta">{mp.artistvideoabout}</p>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
+
             {/* ── EVENTS ── */}
             <section id="events" className="section">
+              <div className="eyebrow">Upcoming Events</div>
               {events.length === 0 ? (
                 <div className="events-empty">
                   <div className="events-empty-title">No upcoming events</div>
@@ -1155,23 +1220,24 @@ export default function ArtistPageClient({
               )}
             </section>
 
-            {/* ── LINKS — 5 per row, no subheading ── */}
+            {/* ── LINKS — small circular icons, matches the venue page ── */}
             {socialLinks.length > 0 && (
               <section id="links" className="section">
-                <div className="links-icon-grid">
+                <div className="eyebrow">Find them online</div>
+                <div className="contact-icons">
                   {socialLinks.map((link, i) => {
-                    const { component, type } = getSvgIcon(link.label)
+                    const { component, color } = getSvgIcon(link.label)
                     return (
                       <a
                         key={i}
                         href={link.url}
                         target={link.url.startsWith('mailto') ? '_self' : '_blank'}
                         rel="noopener noreferrer"
-                        className={`link-tile ${type}-icon`}
-                        title={link.label}
-                        aria-label={link.label}
+                        className="contact-icon-btn"
+                        style={{ color }}
                       >
-                        {component}
+                        <span className="contact-icon-circle">{component}</span>
+                        <span className="contact-icon-label">{link.label}</span>
                       </a>
                     )
                   })}
