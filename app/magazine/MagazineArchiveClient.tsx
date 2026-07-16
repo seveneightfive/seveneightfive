@@ -4,8 +4,16 @@ import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import type { Issue } from './page'
 
-export default function MagazineArchiveClient({ issues }: { issues: Issue[] }) {
-  const [open, setOpen] = useState<Issue | null>(null)
+export default function MagazineArchiveClient({
+  issues,
+  autoOpenId = null,
+}: {
+  issues: Issue[]
+  autoOpenId?: string | null
+}) {
+  const [open, setOpen] = useState<Issue | null>(
+    autoOpenId ? issues.find((i) => i.id === autoOpenId) ?? null : null
+  )
 
   // Lock body scroll while the fullscreen viewer is open, and let Esc close it.
   useEffect(() => {
@@ -38,7 +46,7 @@ export default function MagazineArchiveClient({ issues }: { issues: Issue[] }) {
               <img
                 src={issue.cover_image_url}
                 alt={issue.title}
-                className="aspect-[0.77/1] w-full object-cover"
+                className="aspect-[0.8/1] w-full object-cover"
                 loading="lazy"
               />
             </div>
