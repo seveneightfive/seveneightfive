@@ -13,6 +13,14 @@ import { stripe } from '@/lib/stripe'
  *   headline, ad_copy, content, ad_image_url,
  *   button_text, button_link, start_date, duration (5 | 14)
  * }
+ *
+ * `allow_promotion_codes: true` below turns on Stripe's built-in promo
+ * code field in Checkout. Create/manage codes in the Stripe Dashboard
+ * under Product catalog → Coupons, then Promotion codes. A 100%-off code
+ * takes the charge to $0 and Stripe skips asking for a card — the
+ * checkout.session.completed webhook fires the same way regardless of
+ * amount, so the ad still flips to payment_status: 'paid' / status:
+ * 'active' automatically. No other code changes needed for that case.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -98,6 +106,7 @@ if (Number(maxOverlap ?? 0) >= MAX_PER_DAY) {
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
+      allow_promotion_codes: true,
       line_items: [
         {
           price_data: {
