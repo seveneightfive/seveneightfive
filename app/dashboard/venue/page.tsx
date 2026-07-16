@@ -131,19 +131,6 @@ function VenuePageInner() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      {/* Page header */}
-      <div>
-        <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
-          Creator
-        </p>
-        <h1 className="mb-2 font-display text-3xl font-bold leading-none text-gray-900 dark:text-white">
-          {venue?.name}
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Edit your venue details. Changes appear on the public venues directory.
-        </p>
-      </div>
-
       {/* Form */}
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
         {/* Image */}
@@ -321,7 +308,7 @@ function Field({
       </label>
       {children}
       {hint && (
-        <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">{hint}</p>
+        <p className="mt-1.5 text-xs text-gray-600 dark:text-gray-300">{hint}</p>
       )}
     </div>
   )
