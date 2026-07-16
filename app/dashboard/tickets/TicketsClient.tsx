@@ -73,20 +73,12 @@ export default function TicketsClient({
   return (
     <>
       <div className="space-y-6">
-        {/* Page header */}
-        <div>
-          <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
-            Attending
-          </p>
-          <h1 className="mb-2 font-display text-3xl font-bold leading-none text-gray-900 dark:text-white">
-            My Tickets
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {upcomingTickets.length + pastTickets.length > 0
-              ? `${upcomingTickets.length} upcoming · ${pastTickets.length} past`
-              : "You haven't purchased any tickets yet."}
-          </p>
-        </div>
+        {/* Summary line — page title/subtitle now live in AppHeader */}
+        <p className="text-sm text-gray-600 dark:text-gray-300">
+          {upcomingTickets.length + pastTickets.length > 0
+            ? `${upcomingTickets.length} upcoming · ${pastTickets.length} past`
+            : "You haven't purchased any tickets yet."}
+        </p>
 
         {/* Upcoming */}
         <Section label="Upcoming">
@@ -143,7 +135,7 @@ export default function TicketsClient({
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">
+      <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-600 dark:text-gray-300">
         {label}
       </p>
       {children}
@@ -158,7 +150,7 @@ function List({ children }: { children: React.ReactNode }) {
 function Empty({ children }: { children: React.ReactNode }) {
   return (
     <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-5 py-6 text-center dark:border-gray-700 dark:bg-white/[0.02]">
-      <p className="text-sm text-gray-500 dark:text-gray-400">{children}</p>
+      <p className="text-sm text-gray-600 dark:text-gray-300">{children}</p>
     </div>
   )
 }
@@ -195,7 +187,7 @@ function TicketRow({
         <div className="truncate font-display text-sm font-semibold uppercase tracking-wide text-gray-900 dark:text-white">
           {ticket.event_title}
         </div>
-        <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+        <div className="mt-0.5 text-xs text-gray-600 dark:text-gray-300">
           {[ticket.event_start_time, ticket.venue_name]
             .filter(Boolean)
             .join(' · ')}
@@ -228,7 +220,7 @@ function StatusBadge({ status }: { status: string }) {
     used: {
       label: 'Used',
       classes:
-        'bg-gray-100 text-gray-500 border-gray-200 dark:bg-white/[0.06] dark:text-gray-400 dark:border-gray-700',
+        'bg-gray-100 text-gray-600 border-gray-200 dark:bg-white/[0.06] dark:text-gray-300 dark:border-gray-700',
     },
     refunded: {
       label: 'Refunded',
@@ -239,7 +231,7 @@ function StatusBadge({ status }: { status: string }) {
   const m = map[status] ?? {
     label: status,
     classes:
-      'bg-gray-100 text-gray-500 border-gray-200 dark:bg-white/[0.06] dark:text-gray-400 dark:border-gray-700',
+      'bg-gray-100 text-gray-600 border-gray-200 dark:bg-white/[0.06] dark:text-gray-300 dark:border-gray-700',
   }
   return (
     <span
@@ -279,7 +271,7 @@ function Modal({
           <button
             type="button"
             onClick={onClose}
-            className="absolute right-4 top-4 text-gray-400 transition hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+            className="absolute right-4 top-4 text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -295,7 +287,7 @@ function Modal({
               <h2 className="font-display text-xl font-bold uppercase tracking-wide text-gray-900 dark:text-white">
                 {ticket.event_title}
               </h2>
-              <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
+              <div className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-300">
                 <div>{formatDate(ticket.event_date)}</div>
                 {ticket.event_start_time && (
                   <div>{ticket.event_start_time}</div>
@@ -342,7 +334,7 @@ function Modal({
 
                   {/* Ticket ID */}
                   <div className="rounded-lg bg-gray-50 p-3 dark:bg-white/[0.02]">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400 mb-1">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300 mb-1">
                       Ticket ID
                     </p>
                     <p className="font-mono text-xs text-gray-700 break-all dark:text-gray-300">
@@ -353,7 +345,7 @@ function Modal({
                   {/* Used notice */}
                   {ticket.status === 'used' && (
                     <div className="rounded-lg bg-gray-50 p-3 text-center dark:bg-white/[0.02]">
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                      <p className="text-xs text-gray-600 dark:text-gray-300">
                         This ticket was scanned at the door. Thanks for coming!
                       </p>
                     </div>
@@ -364,7 +356,7 @@ function Modal({
           </div>
 
           {/* Close hint */}
-          <div className="border-t border-gray-100 px-5 py-3 text-center text-xs text-gray-400 dark:border-gray-800 dark:text-gray-500">
+          <div className="border-t border-gray-100 px-5 py-3 text-center text-xs text-gray-600 dark:border-gray-800 dark:text-gray-300">
             Press Esc or click outside to close
           </div>
         </div>
