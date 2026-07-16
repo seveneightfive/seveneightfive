@@ -146,24 +146,16 @@ function EventsPageInner() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      {/* Page header */}
+      {/* Summary + New Event — page title/subtitle now live in AppHeader */}
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
-            Creator
-          </p>
-          <h1 className="mb-2 font-display text-3xl font-bold leading-none text-gray-900 dark:text-white">
-            Events
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {events.length === 0
-              ? "You haven't created any events yet."
-              : `${upcoming.length} upcoming · ${past.length} past`}
-          </p>
-        </div>
+        <p className="text-sm text-gray-600 dark:text-gray-300">
+          {events.length === 0
+            ? "You haven't created any events yet."
+            : `${upcoming.length} upcoming · ${past.length} past`}
+        </p>
         <Link
           href="/dashboard/events/edit"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
         >
           <Plus className="h-4 w-4" />
           New Event
@@ -177,7 +169,7 @@ function EventsPageInner() {
           <p className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">
             No events yet
           </p>
-          <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mb-6 text-sm text-gray-600 dark:text-gray-300">
             Create your first event to get started.
           </p>
           <Link
@@ -220,7 +212,7 @@ function Section({
 }) {
   return (
     <div>
-      <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 dark:text-gray-500">
+      <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-gray-600 dark:text-gray-300">
         {label}
       </p>
       <div className="flex flex-col gap-2.5">{children}</div>
@@ -248,7 +240,7 @@ function EventCard({
         <div className="truncate font-display text-sm font-semibold uppercase tracking-wide text-gray-900 dark:text-white">
           {event.title}
         </div>
-        <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        <div className="mt-1 text-xs text-gray-600 dark:text-gray-300">
           {formatDate(event.event_date)}
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -316,7 +308,7 @@ function IconButton({
       onClick={(e) => e.stopPropagation()}
       aria-label={label}
       title={label}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
+      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
     >
       {children}
     </a>
