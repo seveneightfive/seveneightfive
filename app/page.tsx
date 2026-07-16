@@ -4,6 +4,18 @@ import type { HeroSlide } from './HeroSlider'
 
 export const revalidate = 3600
 
+/**
+ * Deterministic pseudo-random index in [0, max). Same seed always
+ * produces the same result — that's the point: "random-looking" day to
+ * day, but stable across every request within the same day rather than
+ * reshuffling on every page load.
+ */
+function seededIndex(seed: number, max: number): number {
+  const x = Math.sin(seed) * 10000
+  const frac = x - Math.floor(x)
+  return Math.floor(frac * max)
+}
+
 type EventRow = {
   id: string
   title: string
@@ -89,6 +101,56 @@ export default async function HomePage() {
       .eq('active', true)
       .order('order', { ascending: true }),
   ])
+
+  // "Explore our Archives" — a different issue each day, picked pseudo-
+  // randomly rather than marching through in issue-number order. Still
+  // deterministic for a given day (same seed → same result), so it's
+  // stable across every request/revalidation within the same UTC day —
+  // just not a predictable sequential pattern.
+  const { count: numberedIssueCount } = await supabase
+    .from('magazine_issues')
+    .select('id', { count: 'exact', head: true })
+    .not('issue_number', 'is', null)
+
+  let archiveIssue: {
+    id: string
+    issue_number: number | null
+    title: string
+    cover_image_url: string
+    callout: { headline: string; teaser: string } | null
+  } | null = null
+
+  if (numberedIssueCount && numberedIssueCount > 0) {
+    const daysSinceEpoch = Math.floor(Date.now() / 86_400_000)
+    const issueOffset = seededIndex(daysSinceEpoch, numberedIssueCount)
+
+    const { data: archiveRow } = await supabase
+      .from('magazine_issues')
+      .select('id, issue_number, title, cover_image_url')
+      .not('issue_number', 'is', null)
+      .order('issue_number', { ascending: true })
+      .range(issueOffset, issueOffset)
+      .maybeSingle()
+
+    let callout: { headline: string; teaser: string } | null = null
+
+    if (archiveRow) {
+      const { data: callouts } = await supabase
+        .from('magazine_issue_callouts')
+        .select('headline, teaser')
+        .eq('issue_id', archiveRow.id)
+        .eq('active', true)
+
+      if (callouts && callouts.length > 0) {
+        // Different seed input than the issue pick above, so which
+        // callout shows doesn't move in lockstep with which issue shows.
+        const calloutOffset = seededIndex(daysSinceEpoch + 7919, callouts.length)
+        callout = callouts[calloutOffset]
+      }
+    }
+
+    archiveIssue = archiveRow ? { ...archiveRow, callout } : null
+  }
 
   // Count upcoming events at NOTO venues
   const notoVenueIds = (notoVenues ?? []).map((v: { id: string }) => v.id)
@@ -184,6 +246,7 @@ export default async function HomePage() {
       notoVenueCount={notoVenueIds.length}
       notoEventCount={notoEventCount ?? 0}
       heroSlides={heroSlides}
+      archiveIssue={archiveIssue}
     />
   )
 }
