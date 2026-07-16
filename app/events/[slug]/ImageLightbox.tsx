@@ -1,45 +1,45 @@
 'use client'
-
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 
+/**
+ * Standalone clickable image with a fullscreen lightbox on click.
+ *
+ * Previously this rendered position: absolute; inset: 0 with a dark
+ * gradient fade, built for the old full-bleed hero banner where white
+ * title text sat on top of it. Now that the image stands on its own next
+ * to the details column (nothing overlaid on top of it), both of those
+ * are gone:
+ *   - No more position: absolute — it just fills its parent normally, so
+ *     the parent (.event-image-wrap) controls the size/aspect ratio via
+ *     ordinary CSS instead of needing to be a positioned ancestor.
+ *   - No more opacity/gradient darkening — the photo shows at full
+ *     brightness since there's no text it needs to stay legible under.
+ */
 export default function ImageLightbox({ src, alt }: { src: string; alt: string }) {
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
-
   useEffect(() => { setMounted(true) }, [])
 
   return (
-    <>
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <img
         src={src}
         alt={alt}
         onClick={() => setOpen(true)}
         style={{
           cursor: 'zoom-in',
-          position: 'absolute',
-          inset: 0,
+          display: 'block',
           width: '100%',
           height: '100%',
           objectFit: 'cover',
-          opacity: 0.75,
-          zIndex: 0,
         }}
       />
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'linear-gradient(180deg, transparent 30%, rgba(26,24,20,0.95) 100%)',
-          pointerEvents: 'none',
-          zIndex: 1,
-        }}
-      />
+
       {/* ── EXPAND HINT ── */}
       <div style={{
         position: 'absolute',
         top: 12, right: 12,
-        zIndex: 2,
         background: 'rgba(0,0,0,0.4)',
         color: 'white',
         fontSize: '0.65rem',
@@ -92,6 +92,6 @@ export default function ImageLightbox({ src, alt }: { src: string; alt: string }
         </div>,
         document.body
       )}
-    </>
+    </div>
   )
 }
