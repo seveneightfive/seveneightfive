@@ -252,19 +252,33 @@ function getJsonLd(event: Event) {
     }),
     eventStatus: 'https://schema.org/EventScheduled',
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
-    ...(event.venue && {
-      location: {
-        '@type': 'Place',
-        name: event.venue.name,
-        address: {
-          '@type': 'PostalAddress',
-          streetAddress: event.venue.address,
-          addressLocality: event.venue.city || 'Topeka',
-          addressRegion: event.venue.state || 'KS',
-          addressCountry: 'US',
+    // Required by Google whenever eventAttendanceMode is offline — this used
+    // to be conditional on event.venue, which is why ~42 events with no
+    // venue_id set were showing up in Search Console as "Missing field
+    // location." Falling back to a generic Topeka, KS Place (no venue name)
+    // keeps every event's markup valid even before a venue gets attached.
+    location: event.venue
+      ? {
+          '@type': 'Place',
+          name: event.venue.name,
+          address: {
+            '@type': 'PostalAddress',
+            streetAddress: event.venue.address,
+            addressLocality: event.venue.city || 'Topeka',
+            addressRegion: event.venue.state || 'KS',
+            addressCountry: 'US',
+          },
+        }
+      : {
+          '@type': 'Place',
+          name: 'Topeka, KS',
+          address: {
+            '@type': 'PostalAddress',
+            addressLocality: 'Topeka',
+            addressRegion: 'KS',
+            addressCountry: 'US',
+          },
         },
-      },
-    }),
     ...(event.ticket_price !== null && {
       offers: {
         '@type': 'Offer',
