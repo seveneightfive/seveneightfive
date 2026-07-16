@@ -221,18 +221,6 @@ function PayoutsPageInner() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
-          Creator
-        </p>
-        <h1 className="mb-2 font-display text-3xl font-bold leading-none text-gray-900 dark:text-white">
-          Payouts & Selling
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Connect your bank to sell tickets, accept donations, and receive payouts.
-        </p>
-      </div>
-
       {stripeConnected && (
         <div className="flex gap-2 rounded-lg border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
           <Check className="h-4 w-4 shrink-0" />
@@ -407,7 +395,7 @@ function PayoutsPageInner() {
                 disabled={savingProfile}
                 className="w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 disabled:opacity-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90 dark:focus:border-brand-500 placeholder:text-gray-400 dark:placeholder:text-gray-500"
               />
-              <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+              <p className="mt-1.5 text-xs text-gray-600 dark:text-gray-300">
                 Buyers contact this email for refunds and questions.
               </p>
             </div>
