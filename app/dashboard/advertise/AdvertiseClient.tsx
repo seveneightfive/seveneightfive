@@ -335,27 +335,18 @@ export default function AdvertiseClient({
       label: 'Ended',
       kind: 'ended' as const,
       classes:
-        'bg-gray-100 text-gray-500 border-gray-200 dark:bg-white/[0.06] dark:text-gray-400 dark:border-gray-700',
+        'bg-gray-100 text-gray-600 border-gray-200 dark:bg-white/[0.06] dark:text-gray-300 dark:border-gray-700',
     }
   }
 
   // ─── Render ─────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
-            Publisher &amp; Buyer
-          </p>
-          <h1 className="mb-2 font-display text-3xl font-bold leading-none text-gray-900 dark:text-white">
-            Advertise
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Promote your business or event to the Topeka community.
-          </p>
-        </div>
-        {ads.length > 0 && !showForm && (
+      {/* Action row — the page title/subtitle now live in the dashboard's
+          top header (AppHeader), so this is just the "+ Place New Ad"
+          shortcut, not a second page header. */}
+      {ads.length > 0 && !showForm && (
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={openCreate}
@@ -364,8 +355,8 @@ export default function AdvertiseClient({
             <Plus className="h-4 w-4" />
             Place New Ad
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {successParam && (
         <Notice tone="success">
@@ -406,31 +397,31 @@ export default function AdvertiseClient({
                       {info.label}
                     </span>
                     {ad.payment_status === 'paid' && (
-                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                      <span className="text-xs text-gray-600 dark:text-gray-300">
                         {formatDate(ad.start_date)} → {formatDate(ad.end_date)}
                       </span>
                     )}
                   </div>
                   {ad.headline && (
-                    <div className="font-display text-lg font-semibold uppercase tracking-wide text-gray-900 dark:text-white">
+                    <div className="font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
                       {ad.headline}
                     </div>
                   )}
                   {ad.ad_copy && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{ad.ad_copy}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">{ad.ad_copy}</p>
                   )}
-                  <div className="mt-1 flex flex-wrap items-center gap-4 text-xs text-gray-400 dark:text-gray-500">
+                  <div className="mt-1 flex flex-wrap items-center gap-4 text-xs text-gray-600 dark:text-gray-300">
                     <span>
-                      <strong className="font-semibold text-gray-700 dark:text-gray-200">{ad.views}</strong>{' '}
+                      <strong className="font-semibold text-gray-800 dark:text-gray-100">{ad.views}</strong>{' '}
                       views
                     </span>
                     <span>
-                      <strong className="font-semibold text-gray-700 dark:text-gray-200">{ad.clicks}</strong>{' '}
+                      <strong className="font-semibold text-gray-800 dark:text-gray-100">{ad.clicks}</strong>{' '}
                       clicks
                     </span>
                     {ad.clicks > 0 && ad.views > 0 && (
                       <span>
-                        <strong className="font-semibold text-gray-700 dark:text-gray-200">
+                        <strong className="font-semibold text-gray-800 dark:text-gray-100">
                           {((ad.clicks / ad.views) * 100).toFixed(1)}%
                         </strong>{' '}
                         CTR
@@ -486,10 +477,12 @@ export default function AdvertiseClient({
                 </div>
                 {ad.ad_image_url && (
                   // eslint-disable-next-line @next/next/no-img-element
+                  // Matches the real placement now: fixed 16:9, same as
+                  // AdvertisementBanner.tsx on the live site.
                   <img
                     src={ad.ad_image_url}
                     alt={ad.headline || ''}
-                    className="h-32 w-full object-cover md:h-full md:w-36"
+                    className="aspect-video w-full object-cover md:aspect-video md:h-full md:w-56"
                   />
                 )}
               </div>
@@ -513,7 +506,7 @@ export default function AdvertiseClient({
               <button
                 type="button"
                 onClick={closeForm}
-                className="text-gray-400 transition hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                className="text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                 aria-label="Close form"
               >
                 <X className="h-5 w-5" />
@@ -574,7 +567,11 @@ export default function AdvertiseClient({
                   />
                 </Field>
 
-                <Field label="Ad Image" optional hint="Square image (800×800px or larger). Max 5MB. JPG or PNG.">
+                <Field
+                  label="Ad Image"
+                  optional
+                  hint="16:9, 1280×720 or larger (e.g. 1920×1080). Shows full-width on mobile, left column on desktop — full width either way, so bigger is better."
+                >
                   <input
                     ref={fileRef}
                     type="file"
@@ -585,7 +582,7 @@ export default function AdvertiseClient({
                   {form.ad_image_url ? (
                     <div className="relative overflow-hidden rounded-lg">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={form.ad_image_url} alt="Preview" className="block h-36 w-full object-cover" />
+                      <img src={form.ad_image_url} alt="Preview" className="block aspect-video w-full object-cover" />
                       <button
                         type="button"
                         onClick={() => setForm((f) => ({ ...f, ad_image_url: '' }))}
@@ -600,7 +597,7 @@ export default function AdvertiseClient({
                       type="button"
                       onClick={() => fileRef.current?.click()}
                       disabled={uploading}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-3.5 text-sm text-gray-500 transition hover:border-accent-500 dark:border-gray-700 dark:bg-white/[0.02] dark:text-gray-400 dark:hover:border-accent-500"
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-3.5 text-sm text-gray-600 transition hover:border-accent-500 dark:border-gray-700 dark:bg-white/[0.02] dark:text-gray-300 dark:hover:border-accent-500"
                     >
                       <Upload className="h-4 w-4" />
                       {uploading ? 'Uploading…' : 'Upload image'}
@@ -675,10 +672,10 @@ export default function AdvertiseClient({
                 {/* Price strip */}
                 <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-white/[0.02]">
                   <div>
-                    <div className="text-xs text-gray-400 dark:text-gray-500">
+                    <div className="text-xs text-gray-600 dark:text-gray-300">
                       Total · {form.duration}-day banner placement
                     </div>
-                    <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    <div className="mt-0.5 text-xs text-gray-600 dark:text-gray-300">
                       {formatDate(form.start_date)} → {formatDate(endDate)}
                     </div>
                   </div>
@@ -706,25 +703,31 @@ export default function AdvertiseClient({
                 </button>
 
                 {!isEditingPaidAd && (
-                  <p className="text-center text-xs leading-relaxed text-gray-400 dark:text-gray-500">
+                  <p className="text-center text-xs leading-relaxed text-gray-600 dark:text-gray-300">
                     Secure checkout via Stripe. Your ad activates immediately after payment. Appears on the home page and events page.
                   </p>
                 )}
               </div>
 
-              {/* Live preview */}
+              {/* Live preview — mirrors the real card: full-width, fixed
+                  16:9 image, text below (this panel is narrower than the
+                  live desktop placement, so it naturally previews close to
+                  the mobile/stacked layout — see the note below it for
+                  what changes on wider screens). */}
               <div className="flex flex-col gap-4 bg-gray-50 p-6 dark:bg-white/[0.02] md:sticky md:top-0">
-                <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
+                <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
                   Live Preview
                 </div>
 
                 <div className="overflow-hidden rounded-xl bg-[#1a1814]">
                   {form.ad_image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={form.ad_image_url} alt="Preview" className="block max-h-36 w-full object-cover" />
+                    <div className="aspect-video w-full overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={form.ad_image_url} alt="Preview" className="h-full w-full object-cover" />
+                    </div>
                   ) : (
-                    <div className="flex h-24 w-full items-center justify-center bg-white/5 text-xs text-white/20">
-                      Image will appear here
+                    <div className="flex aspect-video w-full items-center justify-center bg-white/5 text-xs text-white/25">
+                      16:9 image goes here
                     </div>
                   )}
                   <div className="flex flex-col gap-2.5 px-5 py-5">
@@ -757,12 +760,13 @@ export default function AdvertiseClient({
                   </div>
                 </div>
 
-                <p className="text-xs leading-relaxed text-gray-400 dark:text-gray-500">
+                <p className="text-xs leading-relaxed text-gray-600 dark:text-gray-300">
                   This ad will appear on the{' '}
-                  <strong className="font-semibold text-gray-600 dark:text-gray-300">home page</strong>{' '}
+                  <strong className="font-semibold text-gray-800 dark:text-gray-100">home page</strong>{' '}
                   (below featured events) and the{' '}
-                  <strong className="font-semibold text-gray-600 dark:text-gray-300">events page</strong>{' '}
-                  (between event groups).
+                  <strong className="font-semibold text-gray-800 dark:text-gray-100">events page</strong>{' '}
+                  (between event groups). Stacked like this on mobile; on desktop the image
+                  sits in a left column with your text to the right, same 16:9 image.
                 </p>
               </div>
             </div>
@@ -773,11 +777,11 @@ export default function AdvertiseClient({
       {/* Empty state */}
       {ads.length === 0 && !showForm && (
         <div className="rounded-2xl border border-gray-200 bg-white px-6 py-16 text-center dark:border-gray-800 dark:bg-white/[0.03]">
-          <Megaphone className="mx-auto mb-4 h-10 w-10 text-gray-300 dark:text-gray-600" strokeWidth={1.5} />
+          <Megaphone className="mx-auto mb-4 h-10 w-10 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
           <p className="mb-2 font-display text-xl font-semibold uppercase text-gray-900 dark:text-white">
             No Ads Yet
           </p>
-          <p className="mx-auto mb-6 max-w-md text-sm text-gray-500 dark:text-gray-400">
+          <p className="mx-auto mb-6 max-w-md text-sm text-gray-600 dark:text-gray-300">
             Reach the Topeka community with a banner placement — from $10 for 5 days.
           </p>
           <button
@@ -807,7 +811,7 @@ function AvailabilityNotice({
 }) {
   if (checking && !availability) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-xs text-gray-500 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-400">
+      <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-xs text-gray-600 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-300">
         Checking availability…
       </div>
     )
@@ -871,17 +875,17 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-600 dark:text-gray-300">
+      <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.14em] text-gray-800 dark:text-gray-200">
         {label}
         {required && <span className="ml-1 text-brand-600 dark:text-brand-400">*</span>}
         {optional && (
-          <span className="ml-1 font-normal normal-case tracking-normal text-gray-400 dark:text-gray-500">
+          <span className="ml-1 font-normal normal-case tracking-normal text-gray-500 dark:text-gray-400">
             (optional)
           </span>
         )}
       </label>
       {children}
-      {hint && <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{hint}</p>}
     </div>
   )
 }
