@@ -190,29 +190,21 @@ export default function AppearancesPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      {/* Page header */}
-      <div>
-        <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
-          Creator
-        </p>
-        <h1 className="mb-2 font-display text-3xl font-bold leading-none text-gray-900 dark:text-white">
-          Your Appearances
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Upcoming events you&apos;re featured in. Search below to add yourself
-          to any event.
-        </p>
-      </div>
+      {/* Summary line — page title/subtitle now live in AppHeader */}
+      <p className="text-sm text-gray-600 dark:text-gray-300">
+        Upcoming events you&apos;re featured in. Search below to add yourself
+        to any event.
+      </p>
 
       {/* Upcoming appearances */}
       <div>
-        <h2 className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
+        <h2 className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
           Upcoming Events You&apos;re Featured In
         </h2>
 
         {appearances.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-10 text-center dark:border-gray-700 dark:bg-white/[0.02]">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-gray-600 dark:text-gray-300">
               You&apos;re not connected to any upcoming events yet. Search below
               to add yourself.
             </p>
@@ -232,7 +224,7 @@ export default function AppearancesPage() {
                     {event.title}
                   </div>
                   {event.venue_name && (
-                    <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    <div className="mt-0.5 text-xs text-gray-600 dark:text-gray-300">
                       {event.venue_name}
                     </div>
                   )}
@@ -243,7 +235,7 @@ export default function AppearancesPage() {
                       href={`/events/${event.slug}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/[0.1] dark:hover:text-gray-300"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.1] dark:hover:text-gray-300"
                       title="View event"
                     >
                       <ExternalLink className="h-4 w-4" />
@@ -252,7 +244,7 @@ export default function AppearancesPage() {
                   <button
                     onClick={() => handleRemove(event.id, event.title)}
                     disabled={removing === event.id}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition hover:bg-brand-50 hover:text-brand-600 disabled:opacity-50 dark:hover:bg-brand-500/15 dark:hover:text-brand-400"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition hover:bg-brand-50 hover:text-brand-600 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-brand-500/15 dark:hover:text-brand-400"
                     title="Remove"
                   >
                     {removing === event.id ? (
@@ -270,7 +262,7 @@ export default function AppearancesPage() {
 
       {/* Search to add */}
       <div className="space-y-3">
-        <h2 className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
+        <h2 className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
           Find &amp; Add Yourself to an Event
         </h2>
 
@@ -283,14 +275,14 @@ export default function AppearancesPage() {
         />
 
         {searching && (
-          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
             <Loader2 className="h-4 w-4 animate-spin" />
             Searching…
           </div>
         )}
 
         {!searching && search && searchResults.length === 0 && (
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-gray-600 dark:text-gray-300">
             No upcoming events found for "{search}"
           </p>
         )}
@@ -310,13 +302,13 @@ export default function AppearancesPage() {
                     {event.title}
                   </div>
                   {event.venue_name && (
-                    <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    <div className="mt-0.5 text-xs text-gray-600 dark:text-gray-300">
                       {event.venue_name}
                     </div>
                   )}
                 </div>
                 {addedIds.has(event.id) ? (
-                  <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-gray-400 dark:text-gray-500">
+                  <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-gray-600 dark:text-gray-300">
                     Added ✓
                   </span>
                 ) : (
