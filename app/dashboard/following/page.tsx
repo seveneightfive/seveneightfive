@@ -133,20 +133,12 @@ export default async function FollowingPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400 mb-1">
-          Artists &amp; Venues
-        </p>
-        <h1 className="font-display text-3xl font-bold leading-none text-gray-900 dark:text-white mb-2">
-          Following
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          {items.length > 0
-            ? `${items.length} total — ${artistCount} ${artistCount === 1 ? 'artist' : 'artists'}, ${venueCount} ${venueCount === 1 ? 'venue' : 'venues'}`
-            : "You haven't followed anyone yet."}
-        </p>
-      </div>
+      {/* Summary line — page title/subtitle now live in AppHeader */}
+      <p className="text-sm text-gray-600 dark:text-gray-300">
+        {items.length > 0
+          ? `${items.length} total — ${artistCount} ${artistCount === 1 ? 'artist' : 'artists'}, ${venueCount} ${venueCount === 1 ? 'venue' : 'venues'}`
+          : "You haven't followed anyone yet."}
+      </p>
 
       {/* List card */}
       <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
@@ -193,13 +185,13 @@ function FollowRowItem({ item }: { item: FollowedItem }) {
             <span className="text-[10px] font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">
               {typeLabel}
             </span>
-            <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            <span className="text-[10px] uppercase tracking-wider text-gray-600 dark:text-gray-300">
               · {item.kind === 'artist' ? 'Artist' : 'Venue'}
             </span>
           </div>
         </div>
         <span
-          className="text-gray-300 group-hover:text-gray-500 dark:text-gray-600"
+          className="text-gray-400 group-hover:text-gray-600 dark:text-gray-500"
           aria-hidden
         >
           →
@@ -241,7 +233,7 @@ function EmptyState() {
       <p className="font-display text-xl font-semibold text-gray-900 dark:text-white mb-2">
         Nothing followed yet
       </p>
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
+      <p className="text-sm text-gray-600 dark:text-gray-300 mb-6 max-w-md mx-auto">
         Follow artists and venues to see them here. You&apos;ll be the first to
         hear when they post events, announcements, or new ticket drops.
       </p>
