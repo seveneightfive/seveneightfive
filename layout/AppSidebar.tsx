@@ -16,26 +16,19 @@ import {
   TableIcon,
   UserCircleIcon,
 } from '@/icons/index'
-import { DollarSign, X, Phone, LogOut, Moon, Sun } from 'lucide-react'
+import { DollarSign, X, Phone, LogOut, Moon, Sun, ArrowLeft } from 'lucide-react'
 import ContactModal from '@/components/common/ContactModal'
 import type { HeaderUser } from '@/app/dashboard/DashboardShell'
 
 /**
  * Sidebar — always-dark, always-static shell.
  *
- * Changes from the previous version:
- *  - No more collapse/hover-expand on desktop. The sidebar is a fixed
- *    290px column at all times on lg+. The old isExpanded/isHovered width
- *    math is gone; the only responsive behavior left is mobile open/close.
- *  - The sidebar now always renders dark (bg-gray-950), independent of the
- *    site's light/dark theme toggle. That toggle still controls the main
- *    content area — it now lives down in this component, at the bottom,
- *    next to the account block.
- *  - Avatar identity + sign out (previously in AppHeader/AvatarMenu) and
- *    the theme toggle (previously in AppHeader) both live here now.
- *  - Payouts moved from Creator Hub into Account, per request.
- *  - Logo is always the white mark, since the sidebar background is
- *    always dark now.
+ * Change in this version: the logo now links to the public site ("/")
+ * instead of "/dashboard". On mobile there was previously no way back to
+ * the regular site once you were in the dashboard — no visible nav item
+ * pointed there. Logo-as-home-link is a common pattern but easy to miss,
+ * so there's also now an explicit small "Back to site" link right below
+ * it for anyone who wouldn't think to tap the logo.
  */
 
 const LOGO_WHITE =
@@ -265,12 +258,12 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
           lg:w-[290px] lg:translate-x-0
         `}
       >
-        {/* Logo */}
+        {/* Logo — now links to the public site, not /dashboard */}
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
-          <Link href="/dashboard" className="flex items-center" onClick={closeMobileMenu}>
+          <Link href="/" className="flex items-center" onClick={closeMobileMenu}>
             <Image
               src={LOGO_WHITE}
-              alt="785 Magazine"
+              alt="785 Magazine — back to seveneightfive.com"
               width={140}
               height={56}
               priority
@@ -285,6 +278,20 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
           >
             <X className="h-6 w-6" />
           </button>
+        </div>
+
+        {/* Explicit "back to site" link — the logo alone is an easy-to-miss
+            affordance, so this spells it out for anyone who wouldn't
+            think to tap it. */}
+        <div className="border-b border-white/10 px-4 py-2.5">
+          <Link
+            href="/"
+            onClick={closeMobileMenu}
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-gray-400 transition hover:bg-white/5 hover:text-white"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to seveneightfive.com
+          </Link>
         </div>
 
         {/* Nav */}
