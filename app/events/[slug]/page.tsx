@@ -418,7 +418,6 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
   const breadcrumbJsonLd = getBreadcrumbJsonLd(event)
   const d = new Date(event.event_date + 'T12:00:00')
   const dayOfWeek = d.toLocaleDateString('en-US', { weekday: 'long' })
-  const fullDate = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
   const isToday = d.toDateString() === new Date().toDateString()
   const ctaUrl = event.ticket_url || event.learnmore_link
   const categoryLabel = event.event_types?.[0] || null
@@ -441,16 +440,27 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         }
         html, body { background: var(--white); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
 
-        /* PAGE WRAP — this is the "use more of the viewport" fix: 680px → 1240px */
-        .page-wrap { max-width: 1240px; margin: 0 auto; padding: 40px 32px 0; }
+        /* PAGE WRAP */
+        .page-wrap { max-width: 1240px; margin: 0 auto; padding: 0 32px 0; }
 
-        /* TOP EYEBROW + TITLE (no more dark overlay hero banner) */
-        .top-eyebrow { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
-        .page-title { font-family: var(--serif); font-size: clamp(2rem, 4.2vw, 3.4rem); font-weight: 700; text-transform: uppercase; line-height: 1.02; letter-spacing: -0.01em; margin-bottom: 14px; }
-        .top-date-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 32px; }
-        .top-date { font-size: 0.95rem; font-weight: 500; color: var(--ink-soft); }
-        .top-today { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); background: var(--accent-light); border: 1px solid rgba(200,6,80,0.25); padding: 4px 10px; border-radius: 100px; }
-        .top-star { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: white; background: var(--accent); padding: 4px 10px; border-radius: 100px; }
+        /* FADED HERO BAND — viewport-relative, not a fixed px height */
+        .hero-band { position: relative; height: clamp(160px, 30vh, 320px); overflow: hidden; margin: 0 -32px 28px; }
+        .hero-band img { width: 100%; height: 100%; object-fit: cover; opacity: 0.32; display: block; }
+        .hero-fade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, var(--white) 94%); }
+        .back-link { position: absolute; left: 32px; top: 20px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 600; color: var(--ink); background: var(--white); border: 1px solid var(--border); padding: 7px 14px; border-radius: 100px; text-decoration: none; }
+        .back-link:hover { border-color: var(--ink); }
+
+        .hero-bottom { position: absolute; left: 32px; bottom: 22px; display: flex; align-items: flex-end; gap: 16px; }
+        .date-badge { background: var(--ink); color: white; border-radius: 8px; padding: 8px 13px; text-align: center; min-width: 58px; flex-shrink: 0; }
+        .date-badge .dow { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.6; }
+        .date-badge .day { font-family: var(--serif); font-size: 1.35rem; font-weight: 700; line-height: 1.05; }
+        .date-badge .mon { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.6; }
+        .top-eyebrow { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+        .page-title { font-family: var(--serif); font-size: clamp(1.5rem, 3vw, 2.3rem); font-weight: 700; text-transform: uppercase; line-height: 1.05; letter-spacing: -0.01em; }
+        @media (max-width: 640px) {
+          .hero-band { margin: 0 -20px 24px; }
+          .back-link, .hero-bottom { left: 20px; }
+        }
 
         /* TWO-COLUMN: image standing alone LEFT, details block RIGHT */
         .event-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 40px; align-items: start; }
@@ -465,7 +475,8 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         }
 
         .event-types-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; }
-        .hero-type-tag { font-size: 0.66rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); background: var(--accent-light); border: 1px solid rgba(200,6,80,0.2); padding: 4px 11px; border-radius: 100px; }
+        .hero-type-tag { font-size: 0.66rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); background: var(--accent-light); border: 1px solid rgba(200,6,80,0.2); padding: 4px 11px; border-radius: 100px; text-decoration: none; transition: background 0.15s; }
+        .hero-type-tag:hover { background: rgba(200,6,80,0.18); }
 
         /* DETAILS SIDEBAR (right column) */
         .details-col { display: flex; flex-direction: column; gap: 20px; }
@@ -490,24 +501,32 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         .artist-type { font-size: 0.78rem; color: var(--ink-faint); margin-top: 1px; }
         .artist-arrow { color: var(--ink-faint); flex-shrink: 0; }
 
-        /* BIG BLOCK BUTTONS — the Symphony Space "BUY TICKETS" look */
-        .btn-stack { display: flex; flex-direction: column; gap: 10px; }
-        .btn-block { display: flex; align-items: center; justify-content: center; width: 100%; padding: 17px 20px; border-radius: 8px; font-family: var(--serif); font-size: 0.92rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; text-decoration: none; text-align: center; transition: all 0.15s; cursor: pointer; border: 2px solid var(--ink); }
-        .btn-block.primary { background: var(--accent); color: white; border-color: var(--accent); }
-        .btn-block.primary:hover { background: #a30440; border-color: #a30440; }
-        .btn-block.dark { background: var(--ink); color: white; }
-        .btn-block.dark:hover { background: #000; }
-        .btn-block.outline { background: transparent; color: var(--ink); }
+        /* ACTION ROW — primary CTA + Follow (heart) + Calendar + Share, one row */
+        .action-row { display: flex; align-items: center; gap: 8px; }
+        .btn-block { display: flex; align-items: center; justify-content: center; flex: 1.6; padding: 15px 18px; border-radius: 8px; font-family: var(--serif); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; text-decoration: none; text-align: center; transition: all 0.15s; cursor: pointer; border: none; background: var(--accent); color: white; }
+        .btn-block:hover { background: #a30440; }
+        .btn-block.outline { background: transparent; color: var(--ink); border: 2px solid var(--ink); }
         .btn-block.outline:hover { background: var(--ink); color: white; }
+        .action-icon-btn { flex: 0 0 auto; }
+        @media (max-width: 480px) {
+          .action-row { flex-wrap: wrap; }
+          .btn-block { flex: 1 1 100%; }
+        }
 
-        .util-row { display: flex; gap: 8px; margin-top: 4px; }
-        .util-row > * { flex: 1; }
-
-        /* CALLOUT BOXES — Venue / Meet the Artist, replacing "Did You Know" */
+        /* CALLOUT BOXES — Venue, replacing "Did You Know" */
         .callout-box { display: flex; gap: 16px; align-items: flex-start; background: var(--warm); border-radius: 14px; padding: 20px; text-decoration: none; color: var(--ink); transition: background 0.15s; }
         .callout-box:hover { background: #ece4d8; }
-        .callout-box.artist { background: var(--accent-light); }
-        .callout-box.artist:hover { background: #fbe2d8; }
+
+        /* ARTIST FEATURE CARD — rectangular image left, content right */
+        .artist-card { display: flex; overflow: hidden; border-radius: 14px; background: var(--accent-light); text-decoration: none; color: var(--ink); transition: background 0.15s; }
+        .artist-card:hover { background: #fbe2d8; }
+        .artist-card-img { width: 110px; flex-shrink: 0; object-fit: cover; align-self: stretch; background: var(--border); }
+        .artist-card-img-placeholder { width: 110px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 1.8rem; color: var(--accent); background: var(--border); }
+        .artist-card-body { padding: 16px 20px; display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 0; }
+        .artist-card-eyebrow { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-soft); }
+        .artist-card-name { font-family: var(--serif); font-size: 1.25rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; line-height: 1.15; }
+        .artist-card-type { font-size: 0.88rem; color: var(--ink-soft); }
+        .artist-card-link { margin-top: 6px; font-size: 0.8rem; font-weight: 600; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
         .callout-badge { width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0; object-fit: cover; background: white; border: 2px solid rgba(0,0,0,0.06); }
         .callout-badge-placeholder { width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0; background: white; border: 2px solid rgba(0,0,0,0.06); display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 1.3rem; color: var(--ink-faint); }
         .callout-eyebrow { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
@@ -562,15 +581,30 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
 
       <main className="page-wrap">
 
-        {/* TOP: eyebrow + title + date row */}
-        <div className="top-eyebrow">
-          {[event.venue?.name, categoryLabel].filter(Boolean).join(' / ')}
-        </div>
-        <h1 className="page-title">{event.title}</h1>
-        <div className="top-date-row">
-          <span className="top-date">{isToday ? 'Today' : dayOfWeek}, {fullDate}</span>
-          {isToday && <span className="top-today">Today</span>}
-          {event.star && <span className="top-star">Featured</span>}
+        {/* FADED HERO BAND */}
+        <div className="hero-band">
+          {event.image_url && <img src={event.image_url} alt="" />}
+          <div className="hero-fade" />
+          <a href="/events" className="back-link">← All Events</a>
+          <div className="hero-bottom">
+            <div className="date-badge">
+              <div className="dow">{dayOfWeek.slice(0, 3)}</div>
+              <div className="day">{d.getDate()}</div>
+              <div className="mon">{d.toLocaleDateString('en-US', { month: 'short' })}</div>
+            </div>
+            <div>
+              <div className="top-eyebrow">
+                {[event.venue?.name, categoryLabel].filter(Boolean).join(' / ')}
+              </div>
+              <h1 className="page-title">{event.title}</h1>
+              {(isToday || event.star) && (
+                <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                  {isToday && <span className="top-today">Today</span>}
+                  {event.star && <span className="top-star">Featured</span>}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* TWO COLUMN: image left, details right */}
@@ -586,7 +620,9 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
             </div>
             {event.event_types && event.event_types.length > 0 && (
               <div className="event-types-row">
-                {event.event_types.map(t => <span key={t} className="hero-type-tag">{t}</span>)}
+                {event.event_types.map(t => (
+                  <a key={t} href={`/events?type=${encodeURIComponent(t)}`} className="hero-type-tag">{t}</a>
+                ))}
               </div>
             )}
           </div>
@@ -597,13 +633,6 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
             {/* Info card */}
             <div className="info-card">
               <div className="info-grid">
-
-                <div className="info-cell">
-                  <div className="info-label">Date</div>
-                  <div className="info-value">
-                    <strong>{isToday ? 'Today | ' : ''}{dayOfWeek}</strong><br />{fullDate}
-                  </div>
-                </div>
 
                 <div className="info-cell">
                   <div className="info-label">Time</div>
@@ -639,30 +668,36 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
               </div>
             </div>
 
-            {/* Buttons — big block style */}
-            <div className="btn-stack">
-              {event.ticketing_enabled && event.id && event.slug && (
+            {/* Actions — one row: primary CTA + Follow (heart) + Calendar + Share */}
+            <div className="action-row">
+              {event.ticketing_enabled && event.id && event.slug ? (
                 <TicketPurchaseButton eventId={event.id} eventSlug={event.slug} />
-              )}
-              {ctaUrl && !event.ticketing_enabled && (
-                <a href={ctaUrl} target="_blank" rel="noopener noreferrer" className="btn-block primary">
+              ) : ctaUrl ? (
+                <a href={ctaUrl} target="_blank" rel="noopener noreferrer" className="btn-block">
                   {event.ticket_url ? 'Get Tickets' : 'Learn More'}
                 </a>
-              )}
-              {ctaUrl && event.ticketing_enabled && event.learnmore_link && (
-                <a href={event.learnmore_link} target="_blank" rel="noopener noreferrer" className="btn-block outline">
-                  Learn More
-                </a>
+              ) : (
+                <span />
               )}
 
-              <div className="util-row">
+              <div className="action-icon-btn">
                 <FollowFavoriteButtons
                   entityType="event"
                   entityId={event.id}
-                  showFollow={true}
-                  showFavorite={false}
+                  heartOnly
                   className="ffb-light"
                 />
+              </div>
+              {/* NOTE: heartOnly's default styling (ffb-heart-btn) assumes a
+                  dark background — it uses white-ish borders/icon strokes
+                  meant to sit over a photo. Here it's sitting on the light
+                  --off sidebar background instead, so this may need its own
+                  light-mode variant added inside FollowFavoriteButtons.tsx
+                  (similar to how ffb-light already overrides the pill-style
+                  Follow button) rather than relying on the className alone —
+                  check how it actually looks once rendered. */}
+
+              <div className="action-icon-btn">
                 <AddToCalendar
                   title={event.title}
                   date={event.event_date}
@@ -674,11 +709,19 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
                   description={event.description}
                   slug={event.slug ?? event.id}
                 />
+              </div>
+              <div className="action-icon-btn">
                 <ShareButtons
                   title={event.title}
                   description={event.description}
                 />
               </div>
+              {/* NOTE: couldn't fetch AddToCalendar.tsx / ShareButtons.tsx to
+                  check their internal button markup — GitHub's API was
+                  returning 503s while building this. They're dropped in
+                  here as-is; if their default size/shape doesn't sit well
+                  next to the heart button and CTA, send a screenshot and
+                  I'll true up the sizing. */}
             </div>
 
             {/* Venue callout — replaces the pink "Did You Know" box */}
@@ -709,20 +752,20 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
               <a
                 key={artist.id}
                 href={artist.slug ? `/artists/${artist.slug}` : '#'}
-                className="callout-box artist"
+                className="artist-card"
               >
                 {artist.avatar_url
-                  ? <img src={artist.avatar_url} alt={artist.name} className="callout-badge" />
-                  : <div className="callout-badge-placeholder">{artist.name[0]}</div>
+                  ? <img src={artist.avatar_url} alt={artist.name} className="artist-card-img" />
+                  : <div className="artist-card-img-placeholder">{artist.name[0]}</div>
                 }
-                <div>
-                  <div className="callout-eyebrow">Meet the Artist</div>
-                  <div className="callout-title">{artist.name}</div>
-                  <div className="callout-sub">
-                    {artist.tagline || artist.artist_type || 'View full profile'}
-                  </div>
+                <div className="artist-card-body">
+                  <div className="artist-card-eyebrow">Meet the Artist</div>
+                  <div className="artist-card-name">{artist.name}</div>
+                  {artist.artist_type && (
+                    <div className="artist-card-type">{artist.artist_type}</div>
+                  )}
+                  <div className="artist-card-link">View Artist Page →</div>
                 </div>
-                <span className="callout-arrow">→</span>
               </a>
             ))}
 
