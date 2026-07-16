@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import MagazineArchiveClient from './MagazineArchiveClient'
 
 export const metadata: Metadata = {
-  title: 'Magazine Archive — 785 Magazine',
+  title: 'Magazine Archive — seveneightfive Magazine',
   description:
     'Browse back issues of seveneightfive magazine — flip through every past issue online.',
 }
@@ -26,10 +26,8 @@ export default async function MagazineArchivePage() {
   const { data } = await supabase
     .from('magazine_issues')
     .select('id, issue_number, title, cover_image_url, flipbook_url, published_date, featured')
-    // Rows with a published_date sort by that; anything not yet dated
-    // (freshly synced from Heyzine, not filled in yet) sorts to the end
-    // rather than jumbling the order.
-    .order('published_date', { ascending: false, nullsFirst: false })
+    // Sort by issue number.
+    .order('issue_number', { ascending: false, nullsFirst: false })
 
   const issues: Issue[] = data ?? []
 
