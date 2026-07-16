@@ -458,11 +458,10 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           .event-grid { grid-template-columns: 1fr; gap: 28px; }
         }
 
-        .event-image-wrap { border-radius: 14px; overflow: hidden; background: var(--off); }
-        .event-image-wrap img { display: block; width: 100%; height: auto; aspect-ratio: 4/5; object-fit: cover; }
-        .event-image-noimg { aspect-ratio: 4/5; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #2a2620, #1a1814); font-family: var(--serif); font-size: 6rem; font-weight: 700; color: rgba(255,255,255,0.08); }
+        .event-image-wrap { position: relative; border-radius: 14px; overflow: hidden; background: var(--off); aspect-ratio: 4/5; }
+        .event-image-noimg { position: relative; aspect-ratio: 4/5; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #2a2620, #1a1814); font-family: var(--serif); font-size: 6rem; font-weight: 700; color: rgba(255,255,255,0.08); }
         @media (max-width: 900px) {
-          .event-image-wrap img, .event-image-noimg { aspect-ratio: 16/10; }
+          .event-image-wrap, .event-image-noimg { aspect-ratio: 16/10; }
         }
 
         .event-types-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; }
