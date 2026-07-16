@@ -33,6 +33,14 @@ type Artist = {
   upcomingCount: number
 }
 
+type ArchiveIssue = {
+  id: string
+  issue_number: number | null
+  title: string
+  cover_image_url: string
+  callout: { headline: string; teaser: string } | null
+}
+
 const STATIC_NEIGHBORHOODS = [
   { large: false, label: 'Nightlife',   name: 'Local Pubs',     count: '18 bars',    bg: 'linear-gradient(160deg, #1a1a1a, #3d3d3d)' },
   { large: false, label: 'Culture',     name: 'The Golden Mile',         count: '9 galleries',bg: 'linear-gradient(160deg, #2a4000, #4a7000)' },
@@ -47,6 +55,7 @@ export default function HomeClient({
   notoVenueCount,
   notoEventCount,
   heroSlides,
+  archiveIssue,
 }: {
   events: Event[]
   artists: Artist[]
@@ -54,6 +63,7 @@ export default function HomeClient({
   notoVenueCount: number
   notoEventCount: number
   heroSlides: HeroSlide[]
+  archiveIssue: ArchiveIssue | null
 }) {
   return (
     <>
@@ -106,6 +116,89 @@ export default function HomeClient({
     )}
   </div>
 </section>
+
+        {/* ── Explore our Archives ── */}
+        {archiveIssue && (
+          <section id="explore-archives" className={styles.contentWrap}>
+            <div className={styles.sectionHeader}>
+              <h2>Explore our Archives</h2>
+              <Link href="/magazine">Browse the Archive →</Link>
+            </div>
+            <p
+              style={{
+                margin: '-8px 0 16px',
+                fontSize: '0.85rem',
+                color: '#888',
+                fontFamily: 'Oswald, sans-serif',
+              }}
+            >
+              Great stories that are still relevant today.
+            </p>
+            <Link
+              href={
+                archiveIssue.issue_number
+                  ? `/magazine?issue=${archiveIssue.issue_number}`
+                  : '/magazine'
+              }
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 24,
+                background: '#1a1814',
+                borderRadius: 12,
+                overflow: 'hidden',
+                textDecoration: 'none',
+              }}
+            >
+              <img
+                src={archiveIssue.cover_image_url}
+                alt={archiveIssue.title}
+                style={{
+                  width: 140,
+                  aspectRatio: '0.8',
+                  objectFit: 'cover',
+                  flexShrink: 0,
+                }}
+              />
+              <div style={{ padding: '20px 24px 20px 0', color: 'white' }}>
+                {archiveIssue.issue_number && (
+                  <div
+                    style={{
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                      letterSpacing: '0.14em',
+                      textTransform: 'uppercase',
+                      color: '#FFCE03',
+                      marginBottom: 6,
+                    }}
+                  >
+                    Issue {archiveIssue.issue_number}
+                  </div>
+                )}
+                <div
+                  style={{
+                    fontFamily: 'Oswald, sans-serif',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    fontSize: '1.4rem',
+                    lineHeight: 1.1,
+                    marginBottom: 8,
+                  }}
+                >
+                  {/* When this issue has a story callout, lead with that
+                      instead of the plain issue title — it's the specific
+                      hook that gets someone to click. */}
+                  {archiveIssue.callout ? archiveIssue.callout.headline : archiveIssue.title}
+                </div>
+                <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)' }}>
+                  {archiveIssue.callout
+                    ? archiveIssue.callout.teaser
+                    : `From ${archiveIssue.title} — flip through this one →`}
+                </div>
+              </div>
+            </Link>
+          </section>
+        )}
 
         {/* ── Featured Artists ── */}
        <section id="artists" className={styles.contentWrap}>
