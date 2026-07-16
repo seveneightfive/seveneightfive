@@ -39,6 +39,7 @@ export default function SiteNav() {
           <Link href="/events"    className={`${styles.navLink} ${isActive('/events')    ? styles.activeNav : ''}`}>Events</Link>
           <Link href="/artists"   className={`${styles.navLink} ${isActive('/artists')   ? styles.activeNav : ''}`}>Artist Directory</Link>
           <Link href="/venues"    className={`${styles.navLink} ${isActive('/venues')    ? styles.activeNav : ''}`}>Venues</Link>
+          <Link href="/magazine"  className={`${styles.navLink} ${isActive('/magazine')  ? styles.activeNav : ''}`}>Archive</Link>
           <Link href="/dashboard" className={`${styles.navLink} ${isActive('/dashboard') ? styles.activeNav : ''}`}>Dashboard</Link>
         </nav>
       </header>
@@ -54,6 +55,12 @@ export default function SiteNav() {
       </header>
 
       {/* ── Mobile Bottom Nav ── */}
+      {/* Intentionally left at 4 items (Events, Artists, Venues, MY 785) —
+          adding a 5th icon here would crowd the primary, highest-frequency
+          nav on the smallest screens. Discoverability for Archive on
+          mobile instead comes from the homepage "Latest Issue" teaser and
+          the desktop nav link above. Easy to add a 5th tab here later if
+          you want it more prominent than that. */}
       <nav className={styles.bottomnav}>
         <Link href="/events" className={`${styles.bnLink} ${isActive('/events') ? styles.active : ''}`}>
           <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" width="22" height="22">
