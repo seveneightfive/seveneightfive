@@ -2,52 +2,47 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useSidebar } from '@/context/SidebarContext'
+import { useTheme } from '@/context/ThemeContext'
+import { createClient } from '@/lib/supabaseBrowser'
 import {
   CalenderIcon,
   ChevronDownIcon,
   GridIcon,
-  HorizontaLDots,
   ListIcon,
   PageIcon,
   PieChartIcon,
-  PlugInIcon,
   TableIcon,
   UserCircleIcon,
 } from '@/icons/index'
-import { DollarSign, X, Phone } from 'lucide-react'
-import SidebarWidget from './SidebarWidget'
+import { DollarSign, X, Phone, LogOut, Moon, Sun } from 'lucide-react'
 import ContactModal from '@/components/common/ContactModal'
+import type { HeaderUser } from '@/app/dashboard/DashboardShell'
 
 /**
- * Sidebar with action-oriented IA:
+ * Sidebar — always-dark, always-static shell.
  *
- *   CREATE + MANAGE: Dashboard, My Pages, Events, Save the Date, Advertise, Payouts
- *   ACCOUNT:         My Tickets, Following, Settings, Contact 785, Sign Out
- *
- * Logo: links to the public seveneightfive.com homepage (was /dashboard,
- * which was redundant — clicking the logo while *on* the dashboard did
- * nothing useful). Now it lets people pop back to the public magazine.
- *
- * Logo source: served from Supabase storage at the URL below. This was
- * confirmed working; the previous `/images/logo/*.png` paths weren't
- * resolving in production.
+ * Changes from the previous version:
+ *  - No more collapse/hover-expand on desktop. The sidebar is a fixed
+ *    290px column at all times on lg+. The old isExpanded/isHovered width
+ *    math is gone; the only responsive behavior left is mobile open/close.
+ *  - The sidebar now always renders dark (bg-gray-950), independent of the
+ *    site's light/dark theme toggle. That toggle still controls the main
+ *    content area — it now lives down in this component, at the bottom,
+ *    next to the account block.
+ *  - Avatar identity + sign out (previously in AppHeader/AvatarMenu) and
+ *    the theme toggle (previously in AppHeader) both live here now.
+ *  - Payouts moved from Creator Hub into Account, per request.
+ *  - Logo is always the white mark, since the sidebar background is
+ *    always dark now.
  */
-
-const LOGO_BLACK =
-  'https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785%20BG%20MAGAZINE.png'
 
 const LOGO_WHITE =
   'https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785-Splash-512-White.png'
 
-type SubItem = {
-  name: string
-  path: string
-  pro?: boolean
-  new?: boolean
-}
-  
+type SubItem = { name: string; path: string; pro?: boolean; new?: boolean }
+
 type NavItem = {
   name: string
   icon: React.ReactNode
@@ -56,10 +51,13 @@ type NavItem = {
   onClick?: () => void
 }
 
-const AppSidebar: React.FC = () => {
-  const { isExpanded, isMobileOpen, isHovered, setIsHovered, toggleMobileSidebar } = useSidebar()
+const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser }) => {
+  const { isMobileOpen, toggleMobileSidebar } = useSidebar()
   const pathname = usePathname()
+  const router = useRouter()
+  const { theme, toggleTheme } = useTheme()
   const [contactOpen, setContactOpen] = useState(false)
+  const isGuest = !headerUser
 
   const createManageItems: NavItem[] = [
     { icon: <GridIcon />, name: 'Dashboard', path: '/dashboard' },
@@ -75,31 +73,23 @@ const AppSidebar: React.FC = () => {
     { icon: <CalenderIcon />, name: 'Events', path: '/dashboard/events' },
     { icon: <CalenderIcon />, name: 'Save the Date', path: '/save-the-date' },
     { icon: <PieChartIcon />, name: 'Advertise', path: '/dashboard/advertise' },
-    {
-      icon: <DollarSign className="w-5 h-5" />,
-      name: 'Payouts',
-      path: '/dashboard/payouts',
-    },
   ]
 
   const accountItems: NavItem[] = [
     { icon: <TableIcon />, name: 'My Tickets', path: '/dashboard/tickets' },
     { icon: <UserCircleIcon />, name: 'Following', path: '/dashboard/following' },
+    { icon: <DollarSign className="w-5 h-5" />, name: 'Payouts', path: '/dashboard/payouts' },
     { icon: <ListIcon />, name: 'Settings', path: '/dashboard/settings' },
     {
       icon: <Phone className="w-5 h-5" />,
       name: 'Contact 785',
       onClick: () => setContactOpen(true),
     },
-    { icon: <PlugInIcon />, name: 'Sign Out', path: '/api/auth/signout' },
   ]
 
   type MenuType = 'create' | 'account'
 
-  const [openSubmenu, setOpenSubmenu] = useState<{
-    type: MenuType
-    index: number
-  } | null>(null)
+  const [openSubmenu, setOpenSubmenu] = useState<{ type: MenuType; index: number } | null>(null)
   const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>({})
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
@@ -145,9 +135,7 @@ const AppSidebar: React.FC = () => {
 
   const handleSubmenuToggle = (index: number, menuType: MenuType) => {
     setOpenSubmenu((prev) =>
-      prev && prev.type === menuType && prev.index === index
-        ? null
-        : { type: menuType, index }
+      prev && prev.type === menuType && prev.index === index ? null : { type: menuType, index }
     )
   }
 
@@ -155,34 +143,32 @@ const AppSidebar: React.FC = () => {
     if (isMobileOpen) toggleMobileSidebar()
   }
 
+  const handleLogout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
   const renderMenuItems = (items: NavItem[], menuType: MenuType) => (
-    <ul className="flex flex-col gap-4">
+    <ul className="flex flex-col gap-1">
       {items.map((nav, index) => (
         <li key={nav.name}>
           {nav.subItems ? (
             <button
               onClick={() => handleSubmenuToggle(index, menuType)}
-              className={`menu-item group w-full ${
+              className={`flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
                 openSubmenu?.type === menuType && openSubmenu?.index === index
-                  ? 'menu-item-active'
-                  : 'menu-item-inactive'
-              } cursor-pointer justify-start lg:justify-start`}
+                  ? 'bg-white/10 text-white'
+                  : 'text-gray-300 hover:bg-white/5 hover:text-white'
+              }`}
             >
-              <span
-                className={`${
-                  openSubmenu?.type === menuType && openSubmenu?.index === index
-                    ? 'menu-item-icon-active'
-                    : 'menu-item-icon-inactive'
-                }`}
-              >
-                {nav.icon}
-              </span>
-              <span className="menu-item-text flex-1 text-left">{nav.name}</span>
+              <span className="shrink-0">{nav.icon}</span>
+              <span className="flex-1">{nav.name}</span>
               <ChevronDownIcon
-                className={`w-5 h-5 transition-transform duration-200 ${
+                className={`h-5 w-5 shrink-0 transition-transform duration-200 ${
                   openSubmenu?.type === menuType && openSubmenu?.index === index
-                    ? 'rotate-180 text-brand-500'
-                    : ''
+                    ? 'rotate-180 text-brand-400'
+                    : 'text-gray-500'
                 }`}
               />
             </button>
@@ -193,30 +179,26 @@ const AppSidebar: React.FC = () => {
                 closeMobileMenu()
                 nav.onClick?.()
               }}
-              className="menu-item group menu-item-inactive cursor-pointer justify-start lg:justify-start w-full"
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-gray-300 transition-colors hover:bg-white/5 hover:text-white"
             >
-              <span className="menu-item-icon-inactive">{nav.icon}</span>
-              <span className="menu-item-text">{nav.name}</span>
+              <span className="shrink-0">{nav.icon}</span>
+              <span>{nav.name}</span>
             </button>
           ) : (
             nav.path && (
               <Link
                 href={nav.path}
                 onClick={closeMobileMenu}
-                className={`menu-item group ${
-                  isActive(nav.path) ? 'menu-item-active' : 'menu-item-inactive'
-                } justify-start lg:justify-start`}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  isActive(nav.path)
+                    ? 'bg-brand-600/20 text-white ring-1 ring-inset ring-brand-500/30'
+                    : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                }`}
               >
-                <span
-                  className={`${
-                    isActive(nav.path)
-                      ? 'menu-item-icon-active'
-                      : 'menu-item-icon-inactive'
-                  }`}
-                >
+                <span className={`shrink-0 ${isActive(nav.path) ? 'text-brand-400' : 'text-gray-400'}`}>
                   {nav.icon}
                 </span>
-                <span className="menu-item-text">{nav.name}</span>
+                <span>{nav.name}</span>
               </Link>
             )
           )}
@@ -234,43 +216,29 @@ const AppSidebar: React.FC = () => {
                     : '0px',
               }}
             >
-              <ul className="mt-2 space-y-1 ml-9">
+              <ul className="mt-1 space-y-1 py-1 pl-11">
                 {nav.subItems.map((subItem) => (
                   <li key={subItem.name}>
                     <Link
                       href={subItem.path}
                       onClick={closeMobileMenu}
-                      className={`menu-dropdown-item ${
+                      className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
                         isActive(subItem.path)
-                          ? 'menu-dropdown-item-active'
-                          : 'menu-dropdown-item-inactive'
+                          ? 'text-white font-semibold'
+                          : 'text-gray-400 hover:text-white'
                       }`}
                     >
                       {subItem.name}
-                      <span className="flex items-center gap-1 ml-auto">
-                        {subItem.new && (
-                          <span
-                            className={`ml-auto ${
-                              isActive(subItem.path)
-                                ? 'menu-dropdown-badge-active'
-                                : 'menu-dropdown-badge-inactive'
-                            } menu-dropdown-badge`}
-                          >
-                            new
-                          </span>
-                        )}
-                        {subItem.pro && (
-                          <span
-                            className={`ml-auto ${
-                              isActive(subItem.path)
-                                ? 'menu-dropdown-badge-active'
-                                : 'menu-dropdown-badge-inactive'
-                            } menu-dropdown-badge`}
-                          >
-                            pro
-                          </span>
-                        )}
-                      </span>
+                      {subItem.new && (
+                        <span className="rounded bg-brand-600/30 px-1.5 py-0.5 text-[10px] uppercase text-brand-300">
+                          new
+                        </span>
+                      )}
+                      {subItem.pro && (
+                        <span className="rounded bg-brand-600/30 px-1.5 py-0.5 text-[10px] uppercase text-brand-300">
+                          pro
+                        </span>
+                      )}
                     </Link>
                   </li>
                 ))}
@@ -286,128 +254,117 @@ const AppSidebar: React.FC = () => {
     <>
       {isMobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
           onClick={() => toggleMobileSidebar()}
         />
       )}
 
       <aside
-        className={`fixed top-0 left-0 flex flex-col bg-white dark:bg-gray-900 text-gray-900 dark:text-white h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 dark:border-gray-800
-            ${
-  isMobileOpen
-    ? 'w-screen max-w-none'
-    : isExpanded
-    ? 'w-[290px]'
-    : isHovered
-    ? 'w-[290px]'
-    : 'w-[90px]'
-}
-          ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
-          lg:translate-x-0
-          ${isExpanded ? 'lg:w-[290px]' : isHovered ? 'lg:w-[290px]' : 'lg:w-[90px]'}
-          pt-0
-          lg:mt-0
+        className={`fixed top-0 left-0 z-50 flex h-screen flex-col border-r border-white/10 bg-gray-950 transition-transform duration-300 ease-in-out
+          ${isMobileOpen ? 'w-screen max-w-none translate-x-0' : 'w-[290px] -translate-x-full'}
+          lg:w-[290px] lg:translate-x-0
         `}
-        onMouseEnter={() => !isExpanded && setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
       >
-        {/* Mobile close + logo */}
-<div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800">
-  <button
+        {/* Logo */}
+        <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
+          <Link href="/dashboard" className="flex items-center" onClick={closeMobileMenu}>
+            <Image
+              src={LOGO_WHITE}
+              alt="785 Magazine"
+              width={140}
+              height={56}
+              priority
+              unoptimized
+              className="h-11 w-auto"
+            />
+          </Link>
+          <button
             onClick={() => toggleMobileSidebar()}
-            className="lg:hidden text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            className="text-gray-400 hover:text-white lg:hidden"
             aria-label="Close menu"
           >
             <X className="h-6 w-6" />
           </button>
-
-          {/*
-            Logo: opens the public seveneightfive.com homepage in the same tab.
-            Using <a> (not <Link>) since this is leaving the Next.js app to
-            the public site.
-          */}
-            <a
-  href="/dashboard"
-  className="flex items-center justify-center"
-  aria-label="Creator Hub"
-  onClick={closeMobileMenu}
->
-  {isExpanded || isHovered || isMobileOpen ? (
-    <>
-      <Image
-        src={LOGO_BLACK}
-        alt="785 Magazine"
-        width={140}
-        height={56}
-        priority
-        unoptimized
-        className="h-12 w-auto dark:hidden"
-      />
-
-      <Image
-        src={LOGO_WHITE}
-        alt="785 Magazine"
-        width={140}
-        height={56}
-        priority
-        unoptimized
-        className="hidden h-12 w-auto dark:block"
-      />
-    </>
-  ) : (
-    <Image
-      src={LOGO_BLACK}
-      alt="785"
-      width={42}
-      height={42}
-      priority
-      unoptimized
-      className="h-auto w-[36px]"
-    />
-  )}
-</a>
         </div>
 
-        <div className="flex flex-col overflow-y-auto duration-300 ease-linear flex-1 no-scrollbar px-5 py-6">
-          <nav className="mb-6">
-            <div className="flex flex-col gap-6">
-              <div>
-                <h2
-                  className={`mb-4 font-body text-xs uppercase flex leading-[20px] text-gray-400 font-semibold tracking-wider ${
-                    !isExpanded && !isHovered && !isMobileOpen
-                      ? 'lg:justify-center'
-                      : 'justify-start'
-                  }`}
-                >
-                  {isExpanded || isHovered || isMobileOpen ? (
-                    'Creator Hub'
-                  ) : (
-                    <HorizontaLDots />
-                  )}
-                </h2>
-                {renderMenuItems(createManageItems, 'create')}
-              </div>
-
-              <div>
-                <h2
-                  className={`mb-4 font-body text-xs uppercase flex leading-[20px] text-gray-400 font-semibold tracking-wider ${
-                    !isExpanded && !isHovered && !isMobileOpen
-                      ? 'lg:justify-center'
-                      : 'justify-start'
-                  }`}
-                >
-                  {isExpanded || isHovered || isMobileOpen ? (
-                    'Account'
-                  ) : (
-                    <HorizontaLDots />
-                  )}
-                </h2>
-                {renderMenuItems(accountItems, 'account')}
-              </div>
+        {/* Nav */}
+        <div className="no-scrollbar flex flex-1 flex-col overflow-y-auto px-4 py-6">
+          <nav className="flex flex-col gap-6">
+            <div>
+              <h2 className="mb-2 px-3 font-body text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                Creator Hub
+              </h2>
+              {renderMenuItems(createManageItems, 'create')}
+            </div>
+            <div>
+              <h2 className="mb-2 px-3 font-body text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                Account
+              </h2>
+              {renderMenuItems(accountItems, 'account')}
             </div>
           </nav>
+        </div>
 
-          {(isExpanded || isHovered || isMobileOpen) && <SidebarWidget />}
+        {/* Bottom: theme toggle + identity/sign-in */}
+        <div className="border-t border-white/10 px-4 py-4">
+          <button
+            onClick={toggleTheme}
+            className="mb-3 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-300 transition-colors hover:bg-white/5 hover:text-white"
+          >
+            {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+          </button>
+
+          {isGuest ? (
+            <div className="flex gap-2">
+              <Link
+                href="/login"
+                className="flex-1 rounded-lg border border-white/15 px-3 py-2 text-center text-sm font-semibold text-gray-200 transition hover:bg-white/5"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/signup"
+                className="flex-1 rounded-lg bg-brand-600 px-3 py-2 text-center text-sm font-semibold text-white transition hover:bg-brand-700"
+              >
+                Sign Up
+              </Link>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full ${
+                  headerUser?.avatarUrl ? '' : 'bg-brand-600'
+                }`}
+              >
+                {headerUser?.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={headerUser.avatarUrl}
+                    alt={headerUser.fullName}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="font-display text-xs font-bold uppercase text-white">
+                    {headerUser?.initials}
+                  </span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-display text-sm font-bold uppercase tracking-wide text-white">
+                  {headerUser?.fullName}
+                </div>
+                <div className="truncate text-xs text-gray-500">{headerUser?.phoneOrEmail}</div>
+              </div>
+              <button
+                onClick={handleLogout}
+                aria-label="Sign out"
+                className="shrink-0 rounded-lg p-2 text-gray-400 transition hover:bg-white/5 hover:text-white"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 
