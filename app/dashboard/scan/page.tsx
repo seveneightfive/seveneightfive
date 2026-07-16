@@ -160,19 +160,6 @@ export default function ScanPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      {/* Page header */}
-      <div>
-        <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
-          Operations
-        </p>
-        <h1 className="mb-2 font-display text-3xl font-bold leading-none text-gray-900 dark:text-white">
-          Scan Tickets
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Validate attendee tickets at the door using QR codes.
-        </p>
-      </div>
-
       {/* Tabs */}
       <div className="flex gap-2 rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-800 dark:bg-white/[0.02]">
         <button
@@ -207,14 +194,14 @@ export default function ScanPage() {
           {cameraState === 'starting' && (
             <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 bg-white px-6 py-16 dark:border-gray-700 dark:bg-white/[0.02]">
               <Loader2 className="mb-3 h-8 w-8 animate-spin text-gray-400" />
-              <p className="text-sm text-gray-500 dark:text-gray-400">Starting camera…</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300">Starting camera…</p>
             </div>
           )}
 
           {cameraState === 'error' && (
             <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-gray-300 bg-white px-6 py-12 dark:border-gray-700 dark:bg-white/[0.02]">
               <XCircle className="h-8 w-8 text-brand-500" />
-              <p className="text-center text-sm text-gray-500 dark:text-gray-400">{cameraError}</p>
+              <p className="text-center text-sm text-gray-600 dark:text-gray-300">{cameraError}</p>
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -366,7 +353,7 @@ export default function ScanPage() {
       )}
 
       {isIdle && tab === 'manual' && (
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-gray-600 dark:text-gray-300">
           Enter the ticket ID shown below the QR code on the attendee&apos;s ticket.
         </p>
       )}
