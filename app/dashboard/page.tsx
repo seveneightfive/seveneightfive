@@ -225,7 +225,7 @@ export default async function DashboardPage() {
           <h1 className="font-display text-4xl font-semibold uppercase tracking-tight leading-none text-gray-900 dark:text-white">
             {isGuest ? 'Hey, Topeka' : `Hey, ${firstName}`}
           </h1>
-          <p className="mt-2 font-body text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-2 font-body text-sm text-gray-600 dark:text-gray-300">
             {isGuest
               ? 'Discover local artists, events, and venues — or add your own.'
               : "Here's what's yours, and what's next."}
@@ -267,7 +267,7 @@ export default async function DashboardPage() {
                       <div className="truncate font-display text-base font-medium tracking-wide text-gray-900 dark:text-white">
                         {t.event_title}
                       </div>
-                      <div className="mt-0.5 truncate font-body text-xs text-gray-500 dark:text-gray-400">
+                      <div className="mt-0.5 truncate font-body text-xs text-gray-600 dark:text-gray-300">
                         {t.venue_name || 'Venue TBA'}
                         {t.tier_name ? ` · ${t.tier_name}` : ''}
                       </div>
@@ -320,7 +320,7 @@ export default async function DashboardPage() {
                   </li>
                 ))}
                 {allPages.length > 2 && (
-                  <li className="pt-3 font-body text-xs text-gray-500 dark:text-gray-400">
+                  <li className="pt-3 font-body text-xs text-gray-600 dark:text-gray-300">
                     + {allPages.length - 2} more
                   </li>
                 )}
@@ -408,7 +408,7 @@ export default async function DashboardPage() {
                         {ad.status === 'active' ? 'Active' : 'Ended'}
                       </Badge>
                     </div>
-                    <div className="font-body text-xs text-gray-500 dark:text-gray-400">
+                    <div className="font-body text-xs text-gray-600 dark:text-gray-300">
                       {ad.views || 0} views · {ad.clicks || 0} clicks
                     </div>
                   </div>
@@ -437,7 +437,7 @@ export default async function DashboardPage() {
               <GuestSlot>Sign in and connect Stripe to start receiving payouts</GuestSlot>
             ) : (
               <>
-                <p className="mb-4 font-body text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                <p className="mb-4 font-body text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
                   {profile?.stripe_account_status === 'active'
                     ? 'Your account is connected. Payouts land in your bank within ~2 business days.'
                     : isCreator
@@ -475,7 +475,7 @@ export default async function DashboardPage() {
                   title="Save the Date"
                   noMargin
                 />
-                <p className="mt-2 font-body text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-2 font-body text-xs text-gray-600 dark:text-gray-300">
                   Claim your date before the details are finalized — no account needed.
                 </p>
               </div>
@@ -494,7 +494,7 @@ export default async function DashboardPage() {
                         {sd.title}
                       </div>
                       {sd.location_name && (
-                        <div className="mt-0.5 truncate font-body text-xs text-gray-500 dark:text-gray-400">
+                        <div className="mt-0.5 truncate font-body text-xs text-gray-600 dark:text-gray-300">
                           {sd.location_name}
                         </div>
                       )}
@@ -513,7 +513,7 @@ export default async function DashboardPage() {
           >
             <CardHead label="Creative Calls" title="Opportunities" />
 
-            <p className="mb-4 font-body text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+            <p className="mb-4 font-body text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
               Post gigs, grants, residencies, open calls, commissions, or collaborations.
             </p>
 
@@ -572,7 +572,7 @@ export default async function DashboardPage() {
 
         {/* FOOTER LINK STRIP — Settings card replaced by this */}
         {!isGuest && (
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 pt-4 font-body text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-800">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 pt-4 font-body text-xs text-gray-600 dark:text-gray-300 border-t border-gray-100 dark:border-gray-800">
             <Link
               href="/dashboard/settings"
               className="transition hover:text-gray-900 dark:hover:text-white"
@@ -620,13 +620,13 @@ function CardHead({
     <div className={noMargin ? '' : 'mb-4'}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-body text-[10px] font-bold uppercase tracking-[0.14em] text-gray-400 dark:text-gray-500 mb-1">
+          <p className="font-body text-[10px] font-bold uppercase tracking-[0.14em] text-gray-600 dark:text-gray-300 mb-1">
             {label}
           </p>
           <h3 className="font-display text-xl font-semibold uppercase tracking-wide text-gray-900 dark:text-white leading-none">
             {title}
             {meta !== undefined && (
-              <span className="ml-2 font-body text-sm font-medium text-gray-400 dark:text-gray-500 normal-case tracking-normal">
+              <span className="ml-2 font-body text-sm font-medium text-gray-600 dark:text-gray-300 normal-case tracking-normal">
                 {meta}
               </span>
             )}
@@ -677,7 +677,7 @@ function EmptyHint({
 }) {
   return (
     <div className="font-body">
-      <p className="text-sm text-gray-500 dark:text-gray-400">{primary}</p>
+      <p className="text-sm text-gray-600 dark:text-gray-300">{primary}</p>
       <p className="mt-1 text-xs font-bold text-brand-600 dark:text-brand-400">
         {action}
       </p>
@@ -688,7 +688,7 @@ function EmptyHint({
 function GuestSlot({ children }: { children: React.ReactNode }) {
   return (
     <div className="font-body space-y-1">
-      <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+      <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
         {children}
       </p>
       <span className="inline-block text-xs font-bold text-brand-600 dark:text-brand-400">
@@ -805,7 +805,7 @@ function CreateBtn({
         {title}
       </h3>
 
-      <p className="mx-auto mt-2 max-w-[220px] font-body text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+      <p className="mx-auto mt-2 max-w-[220px] font-body text-sm leading-relaxed text-gray-600 dark:text-gray-300">
         {text}
       </p>
 
