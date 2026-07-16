@@ -417,19 +417,6 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
-      <div>
-        <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
-          Account
-        </p>
-        <h1 className="mb-2 font-display text-3xl font-bold leading-none text-gray-900 dark:text-white">
-          Settings
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Manage your account, notifications, and preferences.
-        </p>
-      </div>
-
       {/* Tab navigation */}
       <div className="flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-800 dark:bg-white/[0.02]">
         {[
@@ -462,7 +449,7 @@ export default function SettingsPage() {
               <h2 className="font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
                 Edit Profile
               </h2>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
                 Update your name, username, and avatar.
               </p>
             </div>
@@ -500,7 +487,7 @@ export default function SettingsPage() {
                 <p className="font-semibold text-gray-900 dark:text-white">
                   {fullName || 'Your Name'}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-gray-600 dark:text-gray-300">
                   {username ? `@${username}` : 'No username set'}
                 </p>
               </div>
@@ -543,7 +530,7 @@ export default function SettingsPage() {
                     {usernameError}
                   </p>
                 ) : checkingUsername ? (
-                  <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+                  <p className="mt-1.5 text-xs text-gray-600 dark:text-gray-300">
                     Checking availability…
                   </p>
                 ) : username && !usernameError ? (
@@ -551,7 +538,7 @@ export default function SettingsPage() {
                     ✓ Available
                   </p>
                 ) : (
-                  <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+                  <p className="mt-1.5 text-xs text-gray-600 dark:text-gray-300">
                     3–20 chars, lowercase letters, numbers, underscores only.
                   </p>
                 )}
@@ -587,7 +574,7 @@ export default function SettingsPage() {
                     {uploadError}
                   </p>
                 )}
-                <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+                <p className="mt-1.5 text-xs text-gray-600 dark:text-gray-300">
                   Square images work best. Max 8MB.
                 </p>
               </div>
@@ -610,7 +597,7 @@ export default function SettingsPage() {
               <h2 className="font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
                 Update Email
               </h2>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
                 Change the email address associated with your account.
               </p>
             </div>
@@ -663,7 +650,7 @@ export default function SettingsPage() {
                     type="email"
                     value={currentEmail}
                     disabled
-                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-500 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-500"
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-600 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-400"
                   />
                 </div>
 
@@ -681,7 +668,7 @@ export default function SettingsPage() {
                     placeholder="you@example.com"
                     className="w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90 dark:focus:border-brand-500 placeholder:text-gray-400 dark:placeholder:text-gray-500"
                   />
-                  <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+                  <p className="mt-1.5 text-xs text-gray-600 dark:text-gray-300">
                     A confirmation link will be sent to both your current and new
                     email addresses. You must confirm from both to complete the
                     change.
@@ -707,7 +694,7 @@ export default function SettingsPage() {
               <h2 className="font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
                 Phone Number
               </h2>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
                 Used for SMS event reminders. Never shared publicly.
               </p>
             </div>
@@ -732,7 +719,7 @@ export default function SettingsPage() {
               </label>
               <div className="flex gap-2">
                 <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 px-3 dark:border-gray-800 dark:bg-white/[0.02]">
-                  <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+                  <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">
                     🇺🇸 +1
                   </span>
                 </div>
@@ -744,7 +731,7 @@ export default function SettingsPage() {
                   className="flex-1 rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90 dark:focus:border-brand-500 placeholder:text-gray-400 dark:placeholder:text-gray-500"
                 />
               </div>
-              <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+              <p className="mt-1.5 text-xs text-gray-600 dark:text-gray-300">
                 We'll only use this for account recovery and SMS reminders you opt
                 into.
               </p>
@@ -778,7 +765,7 @@ export default function SettingsPage() {
               <h2 className="font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
                 Notifications
               </h2>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
                 Choose how and when 785 reaches out to you.
               </p>
             </div>
@@ -902,7 +889,7 @@ function NotificationToggle({
         <p className="text-sm font-semibold text-gray-900 dark:text-white">
           {item.label}
         </p>
-        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+        <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-300">
           {item.desc}
         </p>
       </div>
