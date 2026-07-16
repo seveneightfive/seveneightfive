@@ -207,10 +207,10 @@ export default function EventImagePicker({
           }`}
         >
           <ImageIcon className="h-8 w-8 text-gray-400" />
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-gray-600 dark:text-gray-300">
             No image yet — choose an option below
           </p>
-          <p className="hidden text-xs text-gray-400 dark:text-gray-500 sm:block">
+          <p className="hidden text-xs text-gray-600 dark:text-gray-300 sm:block">
             …or drag &amp; drop a file here
           </p>
         </div>
@@ -310,7 +310,7 @@ export default function EventImagePicker({
         </div>
       )}
 
-      <p className="text-xs text-gray-500 dark:text-gray-500">
+      <p className="text-xs text-gray-600 dark:text-gray-300">
         JPG, PNG, WEBP, or HEIC up to {maxSizeMB}MB. HEIC files from iPhones are converted automatically.
       </p>
     </div>
