@@ -64,7 +64,7 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
       ],
     },
     { icon: <CalenderIcon />, name: 'Events', path: '/dashboard/events' },
-    { icon: <CalenderIcon />, name: 'Save the Date', path: '/save-the-date' },
+    { icon: <CalenderIcon />, name: 'Save the Date', path: '/dashboard/save-the-date' },
     { icon: <PieChartIcon />, name: 'Advertise', path: '/dashboard/advertise' },
   ]
 
