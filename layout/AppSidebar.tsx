@@ -54,15 +54,7 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
 
   const createManageItems: NavItem[] = [
     { icon: <GridIcon />, name: 'Dashboard', path: '/dashboard' },
-    {
-      icon: <PageIcon />,
-      name: 'My Pages',
-      subItems: [
-        { name: 'Artist Page', path: '/dashboard/edit' },
-        { name: 'Venue Page', path: '/dashboard/venue' },
-        { name: 'Appearances', path: '/dashboard/appearances' },
-      ],
-    },
+    { icon: <PageIcon />, name: 'My Pages', path: '/dashboard/pages' },
     { icon: <CalenderIcon />, name: 'Events', path: '/dashboard/events' },
     { icon: <CalenderIcon />, name: 'Save the Date', path: '/dashboard/save-the-date' },
     { icon: <PieChartIcon />, name: 'Advertise', path: '/dashboard/advertise' },
