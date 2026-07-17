@@ -418,7 +418,7 @@ function EditPageInner() {
       </div>
         <div className="flex shrink-0 items-center gap-2">
 +          {artist?.slug && (
-+            
++            <a
 +              href={`/artists/${artist.slug}`}
 +              target="_blank"
 +              rel="noopener noreferrer"
