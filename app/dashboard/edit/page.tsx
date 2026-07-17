@@ -352,9 +352,6 @@ function EditPageInner() {
     ])
   }
 
-  // Reorder by swapping a row up or down WITHIN the active (non-deleted) list.
-  // We map back to the full list (including deleted rows) so display_order is
-  // correctly persisted on save.
   const movePortfolioImage = (activeIndex: number, dir: -1 | 1) => {
     const active = portfolioImages.filter((p) => !p._deleted)
     const newIndex = activeIndex + dir
@@ -380,15 +377,6 @@ function EditPageInner() {
     { id: 'appearances', label: 'Appearances' },
   ]
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // RENDER
-  // The dashboard shell provides the top header. This page adds:
-  //   1. A page-title block with Save button (sticky, sits below AppHeader)
-  //   2. A tab bar to switch form sections
-  //   3. The active form section
-  //   4. A duplicate save button at the bottom for long-form convenience
-  // ─────────────────────────────────────────────────────────────────────────
-
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       {/* Page header + sticky save bar */}
@@ -403,7 +391,7 @@ function EditPageInner() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {artist?.slug && (
-            <a
+            
               href={`/artists/${artist.slug}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -415,21 +403,6 @@ function EditPageInner() {
           )}
           <SaveButton saving={saving} saved={saved} onClick={handleSave} />
         </div>
-      </div>
-        <div className="flex shrink-0 items-center gap-2">
-+          {artist?.slug && (
-+            <a
-+              href={`/artists/${artist.slug}`}
-+              target="_blank"
-+              rel="noopener noreferrer"
-+              className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 px-4 py-2 font-display text-xs font-semibold uppercase tracking-wider text-gray-700 transition hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-white/[0.08]"
-+            >
-+              View
-+              <ArrowUpRight className="h-3.5 w-3.5" />
-+            </a>
-+          )}
-+          <SaveButton saving={saving} saved={saved} onClick={handleSave} />
-+        </div>
       </div>
 
       {/* Tab bar */}
@@ -449,7 +422,7 @@ function EditPageInner() {
               className={`relative whitespace-nowrap rounded-t-lg border-b-2 px-3 py-3 text-xs font-semibold uppercase tracking-[0.1em] transition ${
                 activeSection === s.id
                   ? 'border-brand-600 bg-brand-50 text-brand-700 dark:border-brand-400 dark:bg-brand-500/10 dark:text-brand-400'
-                : 'border-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.05] dark:hover:text-gray-200'
+                  : 'border-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.05] dark:hover:text-gray-200'
               }`}
             >
               {s.label}
@@ -793,9 +766,6 @@ function EditPageInner() {
 
       {/* ── PORTFOLIO ── */}
       {activeSection === 'portfolio' && artist && (() => {
-        // Build the "active" view (filtering out deleted rows). We also keep
-        // a parallel map from active index → original index so caption edits
-        // update the right row of `portfolioImages` even after reordering.
         const activeRows = portfolioImages
           .map((img, originalIdx) => ({ img, originalIdx }))
           .filter(({ img }) => !img._deleted)
@@ -832,7 +802,6 @@ function EditPageInner() {
                       type="text"
                       value={img.caption}
                       onChange={(e) =>
-                        // Use originalIdx — survives reordering.
                         setPortfolioImages((prev) =>
                           prev.map((p, idx) =>
                             idx === originalIdx ? { ...p, caption: e.target.value } : p
@@ -917,6 +886,11 @@ function EditPageInner() {
         )
       })()}
 
+      {/* ── APPEARANCES ── */}
+      {activeSection === 'appearances' && artist && (
+        <AppearancesTab artistId={artist.id} />
+      )}
+
       {/* Bottom save (full-width for long forms) */}
       <button
         type="button"
@@ -957,7 +931,7 @@ function Field({
   return (
     <div>
       <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.16em] text-gray-700 dark:text-gray-200">
-         {label}
+        {label}
       </label>
       {children}
       {hint && (
