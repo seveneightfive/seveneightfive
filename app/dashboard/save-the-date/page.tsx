@@ -61,6 +61,9 @@ interface AddEventForm {
   submitter_phone: string
 }
 
+type DisplayMode = 'calendar' | 'list'
+type ListView = 'month' | 'year'
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 const EVENT_TYPES: SaveTheDateEventType[] = [
   'Fundraiser',
@@ -361,6 +364,9 @@ function AddEventModal({
 }
 
 // ─── Event Detail Modal ───────────────────────────────────────────────────────
+// Icon-free date/location (no more 📅 / 📍 — just clear labels). Organizer,
+// Expected Capacity, and Needs now live at the end, after the description,
+// per request — rather than scattered above it.
 function EventDetailModal({ event, onClose }: { event: SaveTheDate; onClose: () => void }) {
   const startFmt = formatTime(event.start_time)
   const endFmt = formatTime(event.end_time)
@@ -371,14 +377,13 @@ function EventDetailModal({ event, onClose }: { event: SaveTheDate; onClose: () 
           <div>
             <span className="event-type-badge">{event.event_type}</span>
             <h2>{event.title}</h2>
-            {event.organizer && <p className="detail-organizer">{event.organizer}</p>}
           </div>
           <button className="close-btn" onClick={onClose}>✕</button>
         </div>
         <div className="detail-body">
           <div className="detail-row">
-            <span className="detail-icon">📅</span>
-            <div>
+            <div className="detail-label">Date</div>
+            <div className="detail-value">
               <strong>{formatDate(event.event_date)}</strong>
               {event.event_end_date && event.event_end_date !== event.event_date && (
                 <span> – {formatDate(event.event_end_date)}</span>
@@ -392,24 +397,36 @@ function EventDetailModal({ event, onClose }: { event: SaveTheDate; onClose: () 
           </div>
           {event.location_name && (
             <div className="detail-row">
-              <span className="detail-icon">📍</span>
-              <div><strong>{event.location_name}</strong></div>
+              <div className="detail-label">Location</div>
+              <div className="detail-value"><strong>{event.location_name}</strong></div>
             </div>
           )}
-          {event.expected_capacity && (
-            <div className="detail-row">
-              <span className="detail-icon">👥</span>
-              <div><strong>{event.expected_capacity.toLocaleString()}</strong> expected attendees</div>
+
+          {(event.is_annual || event.is_nonprofit) && (
+            <div className="detail-tags">
+              {event.is_annual && <span className="tag">Annual Event</span>}
+              {event.is_nonprofit && <span className="tag">Nonprofit</span>}
             </div>
           )}
-          <div className="detail-tags">
-            {event.is_annual && <span className="tag">Annual Event</span>}
-            {event.is_nonprofit && <span className="tag">Nonprofit</span>}
-          </div>
+
           {event.about && (
             <div className="detail-section">
               <h4>About</h4>
               <p>{event.about}</p>
+            </div>
+          )}
+
+          {/* Organizer, capacity, and needs — after the description */}
+          {event.organizer && (
+            <div className="detail-section">
+              <h4>Organizer</h4>
+              <p>{event.organizer}</p>
+            </div>
+          )}
+          {event.expected_capacity && (
+            <div className="detail-section">
+              <h4>Expected Capacity</h4>
+              <p>{event.expected_capacity.toLocaleString()} attendees</p>
             </div>
           )}
           {event.needs && (
@@ -418,6 +435,7 @@ function EventDetailModal({ event, onClose }: { event: SaveTheDate; onClose: () 
               <p>{event.needs}</p>
             </div>
           )}
+
           {event.submitter_name && (
             <div className="detail-section contact-section">
               <h4>Contact</h4>
@@ -475,7 +493,7 @@ function AgendaList({
                 <span className="agenda-type-chip">{ev.event_type}</span>
               </div>
               {ev.location_name && (
-                <div className="agenda-location">📍 {ev.location_name}</div>
+                <div className="agenda-location">@ {ev.location_name}</div>
               )}
               {isMultiDay && (
                 <div className="agenda-multiday">through {formatDate(ev.event_end_date)}</div>
@@ -488,10 +506,90 @@ function AgendaList({
   )
 }
 
+// ─── Calendar Grid (month view) ───────────────────────────────────────────────
+function CalendarGrid({
+  month,
+  year,
+  events,
+  loading,
+  onSelect,
+}: {
+  month: number
+  year: number
+  events: SaveTheDate[]
+  loading: boolean
+  onSelect: (e: SaveTheDate) => void
+}) {
+  if (loading) return <div className="cal-grid-loading">Loading events…</div>
+
+  const firstOfMonth = new Date(year, month, 1)
+  const startWeekday = firstOfMonth.getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const daysInPrevMonth = new Date(year, month, 0).getDate()
+
+  const byDay: Record<number, SaveTheDate[]> = {}
+  events.forEach((ev) => {
+    const day = parseInt(ev.event_date.split('-')[2], 10)
+    if (!byDay[day]) byDay[day] = []
+    byDay[day].push(ev)
+  })
+
+  const cells: { day: number; inMonth: boolean; events: SaveTheDate[] }[] = []
+  for (let i = startWeekday - 1; i >= 0; i--) {
+    cells.push({ day: daysInPrevMonth - i, inMonth: false, events: [] })
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push({ day: d, inMonth: true, events: byDay[d] || [] })
+  }
+  while (cells.length % 7 !== 0) {
+    cells.push({ day: cells.length, inMonth: false, events: [] })
+  }
+
+  const today = new Date()
+  const isCurrentMonth = today.getMonth() === month && today.getFullYear() === year
+
+  return (
+    <div className="cal-grid">
+      <div className="cal-grid-dow">
+        {DAY_NAMES.map((d) => <div key={d} className="cal-grid-dow-cell">{d}</div>)}
+      </div>
+      <div className="cal-grid-body">
+        {cells.map((cell, i) => (
+          <div
+            key={i}
+            className={`cal-grid-cell${cell.inMonth ? '' : ' cal-grid-cell-out'}${
+              cell.inMonth && isCurrentMonth && cell.day === today.getDate() ? ' cal-grid-cell-today' : ''
+            }`}
+          >
+            <div className="cal-grid-daynum">{cell.day}</div>
+            <div className="cal-grid-events">
+              {cell.events.slice(0, 3).map((ev) => (
+                <button
+                  key={ev.id}
+                  type="button"
+                  className="cal-grid-chip"
+                  onClick={() => onSelect(ev)}
+                  title={ev.title}
+                >
+                  {ev.title}
+                </button>
+              ))}
+              {cell.events.length > 3 && (
+                <div className="cal-grid-more">+{cell.events.length - 3} more</div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function SaveTheDatePage() {
   const today = new Date()
-  const [view, setView] = useState<'month' | 'year'>('year')
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('list')
+  const [view, setView] = useState<ListView>('year')
   const [month, setMonth] = useState<number>(today.getMonth())
   const [year, setYear] = useState<number>(today.getFullYear())
   const [events, setEvents] = useState<SaveTheDate[]>([])
@@ -501,6 +599,10 @@ export default function SaveTheDatePage() {
   const [selectedEvent, setSelectedEvent] = useState<SaveTheDate | null>(null)
   const [prefill, setPrefill] = useState({ name: '', email: '', phone: '' })
   const [prefillReady, setPrefillReady] = useState(false)
+
+  // Calendar view is always month-scoped — "year" grid doesn't make sense
+  // as a calendar, so the period toggle only applies in list mode.
+  const periodMode: ListView = displayMode === 'calendar' ? 'month' : view
 
   // Load user profile for form pre-fill
   useEffect(() => {
@@ -557,28 +659,28 @@ export default function SaveTheDatePage() {
   }, [year])
 
   useEffect(() => {
-    if (view === 'month') fetchMonthEvents()
+    if (periodMode === 'month') fetchMonthEvents()
     else fetchYearEvents()
-  }, [view, fetchMonthEvents, fetchYearEvents])
+  }, [periodMode, fetchMonthEvents, fetchYearEvents])
 
   function prevPeriod() {
-    if (view === 'year') { setYear((y) => y - 1); return }
+    if (periodMode === 'year') { setYear((y) => y - 1); return }
     if (month === 0) { setMonth(11); setYear((y) => y - 1) }
     else setMonth((m) => m - 1)
   }
   function nextPeriod() {
-    if (view === 'year') { setYear((y) => y + 1); return }
+    if (periodMode === 'year') { setYear((y) => y + 1); return }
     if (month === 11) { setMonth(0); setYear((y) => y + 1) }
     else setMonth((m) => m + 1)
   }
 
-  function toggleView() {
+  function toggleListPeriod() {
     setView((v) => v === 'month' ? 'year' : 'month')
   }
 
   // Group year events by month
   const byMonth: Record<number, SaveTheDate[]> = {}
-  if (view === 'year') {
+  if (displayMode === 'list' && view === 'year') {
     yearEvents.forEach((ev) => {
       const m = parseInt(ev.event_date.split('-')[1], 10) - 1
       if (!byMonth[m]) byMonth[m] = []
@@ -586,157 +688,205 @@ export default function SaveTheDatePage() {
     })
   }
 
-  const displayLabel = view === 'year' ? String(year) : `${MONTH_NAMES[month]} ${year}`
-  const allEvents = view === 'year' ? yearEvents : events
+  const displayLabel = periodMode === 'year' ? String(year) : `${MONTH_NAMES[month]} ${year}`
+  const allEvents = periodMode === 'year' ? yearEvents : events
 
   return (
     <>
       <style>{`
+        :root {
+          --ink: #1a1814; --ink-soft: #6b6560; --ink-faint: #8a847d;
+          --white: #ffffff; --off: #f7f6f4; --warm: #f2ede6;
+          --accent: #c80650; --accent-light: #fdf1ec; --border: #ece8e2;
+          --gold: #FFCE03;
+          --serif: 'Oswald', sans-serif; --sans: 'DM Sans', system-ui, sans-serif;
+        }
+        /* Page-scoped override — the site default body background is a
+           warm off-white; this page reads better flat white, matching the
+           /events/[slug] page it should feel like a companion to. */
+        html, body { background: var(--white) !important; }
+
         .std-page {
-          font-family: 'DM Sans', -apple-system, sans-serif;
-          max-width: 860px;
+          font-family: var(--sans);
+          max-width: 900px;
           margin: 0 auto;
           padding: 0 24px 80px;
-          color: #111;
+          color: var(--ink);
+          -webkit-font-smoothing: antialiased;
         }
         .std-topnav {
           display: flex;
           align-items: center;
           justify-content: space-between;
           padding: 16px 0;
-          border-bottom: 1px solid #eee;
+          border-bottom: 1px solid var(--border);
           margin-bottom: 32px;
         }
         .std-back {
-          font-family: 'Oswald', sans-serif;
+          font-family: var(--serif);
           font-size: 0.72rem;
+          font-weight: 600;
           letter-spacing: 0.18em;
           text-transform: uppercase;
-          color: rgba(0,0,0,0.35);
+          color: var(--ink-faint);
           text-decoration: none;
           transition: color 0.15s;
         }
-        .std-back:hover { color: #111; }
+        .std-back:hover { color: var(--ink); }
         .std-page-label {
-          font-family: 'Oswald', sans-serif;
+          font-family: var(--serif);
           font-size: 0.72rem;
+          font-weight: 600;
           letter-spacing: 0.18em;
           text-transform: uppercase;
-          color: rgba(0,0,0,0.25);
+          color: var(--ink-faint);
         }
         .std-header {
           display: flex;
           align-items: flex-start;
           justify-content: space-between;
           gap: 24px;
-          margin-bottom: 32px;
+          margin-bottom: 28px;
         }
         .std-header h1 {
-          font-family: 'Oswald', sans-serif;
+          font-family: var(--serif);
           font-size: 2rem;
           font-weight: 700;
-          letter-spacing: 0.04em;
+          letter-spacing: 0.01em;
           text-transform: uppercase;
-          margin-bottom: 6px;
-          line-height: 1;
+          margin-bottom: 8px;
+          line-height: 1.05;
+          color: var(--ink);
         }
-        .std-header p { font-size: 14px; color: #555; max-width: 520px; line-height: 1.5; }
-        .btn-primary { background: #111; color: #fff; border: none; padding: 10px 18px; font-size: 14px; font-weight: 600; border-radius: 8px; cursor: pointer; white-space: nowrap; transition: opacity 0.15s; }
-        .btn-primary:hover { opacity: 0.82; }
+        .std-header p { font-size: 0.95rem; font-weight: 400; color: var(--ink-soft); max-width: 520px; line-height: 1.55; }
+        .btn-primary { background: var(--accent); color: #fff; border: none; padding: 11px 20px; font-family: var(--serif); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; border-radius: 8px; cursor: pointer; white-space: nowrap; transition: opacity 0.15s; }
+        .btn-primary:hover { opacity: 0.85; }
         .btn-primary:disabled { opacity: 0.4; cursor: default; }
-        .btn-ghost { background: transparent; color: #111; border: 1.5px solid #ddd; padding: 9px 16px; font-size: 14px; font-weight: 500; border-radius: 8px; cursor: pointer; transition: border-color 0.15s; }
-        .btn-ghost:hover { border-color: #aaa; }
-        .btn-outline { background: #fff; color: #111; border: 1.5px solid #ddd; padding: 8px 14px; font-size: 13px; font-weight: 500; border-radius: 7px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: border-color 0.15s, background 0.15s; }
-        .btn-outline:hover { border-color: #999; background: #f5f5f5; }
+        .btn-ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--border); padding: 9px 16px; font-size: 14px; font-weight: 500; border-radius: 8px; cursor: pointer; transition: border-color 0.15s; }
+        .btn-ghost:hover { border-color: var(--ink-faint); }
+        .btn-outline { background: #fff; color: var(--ink); border: 1.5px solid var(--border); padding: 8px 14px; font-size: 13px; font-weight: 600; border-radius: 7px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: border-color 0.15s, background 0.15s; }
+        .btn-outline:hover { border-color: var(--ink-faint); background: var(--off); }
+
+        /* Mode toggle — Calendar / List */
+        .mode-toggle { display: inline-flex; gap: 2px; background: var(--off); border-radius: 8px; padding: 3px; margin-bottom: 16px; }
+        .mode-toggle-btn { font-family: var(--serif); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px 18px; border-radius: 6px; border: none; background: transparent; color: var(--ink-soft); cursor: pointer; transition: background 0.15s, color 0.15s; }
+        .mode-toggle-btn.active { background: var(--ink); color: #fff; }
+
         .cal-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
         .cal-month-label {
-          font-family: 'Oswald', sans-serif;
+          font-family: var(--serif);
           font-size: 22px;
           font-weight: 700;
-          letter-spacing: 0.04em;
+          letter-spacing: 0.02em;
           text-transform: uppercase;
           min-width: 180px;
+          color: var(--ink);
         }
-        .cal-nav { background: none; border: 1.5px solid #ddd; border-radius: 7px; width: 34px; height: 34px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: border-color 0.15s; }
-        .cal-nav:hover { border-color: #999; }
-        .view-toggle { background: none; border: 1.5px solid #ddd; border-radius: 7px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: border-color 0.15s, background 0.15s, color 0.15s; font-family: 'Oswald', sans-serif; letter-spacing: 0.06em; text-transform: uppercase; }
-        .view-toggle:hover { border-color: #999; }
-        .view-toggle.active { background: #111; border-color: #111; color: #fff; }
+        .cal-nav { background: none; border: 1.5px solid var(--border); border-radius: 7px; width: 34px; height: 34px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: border-color 0.15s; color: var(--ink); }
+        .cal-nav:hover { border-color: var(--ink-faint); }
+        .view-toggle { background: none; border: 1.5px solid var(--border); border-radius: 7px; padding: 6px 14px; font-size: 13px; font-weight: 700; cursor: pointer; transition: border-color 0.15s, background 0.15s, color 0.15s; font-family: var(--serif); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); }
+        .view-toggle:hover { border-color: var(--ink-faint); }
+        .view-toggle.active { background: var(--ink); border-color: var(--ink); color: #fff; }
         .download-group { margin-left: auto; display: flex; gap: 8px; }
-        .agenda-list { border: 1.5px solid #e5e5e5; border-radius: 12px; overflow: hidden; }
-        .agenda-empty { padding: 48px 24px; text-align: center; color: #999; font-size: 15px; }
-        .agenda-empty strong { display: block; color: #555; margin-bottom: 4px; font-size: 16px; }
-        .agenda-item { display: grid; grid-template-columns: 90px 1fr; border-bottom: 1px solid #eee; cursor: pointer; transition: background 0.12s; }
+
+        .agenda-list { border: 1.5px solid var(--border); border-radius: 12px; overflow: hidden; }
+        .agenda-empty { padding: 48px 24px; text-align: center; color: var(--ink-faint); font-size: 15px; }
+        .agenda-empty strong { display: block; color: var(--ink-soft); margin-bottom: 4px; font-size: 16px; font-weight: 600; }
+        .agenda-item { display: grid; grid-template-columns: 90px 1fr; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; }
         .agenda-item:last-child { border-bottom: none; }
-        .agenda-item:hover { background: #fafafa; }
-        .agenda-date { padding: 16px 16px 16px 20px; border-right: 1px solid #eee; background: #fafafa; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 70px; }
-        .agenda-date-day { font-family: 'Oswald', sans-serif; font-size: 22px; font-weight: 700; line-height: 1; }
-        .agenda-date-dow { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+        .agenda-item:hover { background: var(--off); }
+        .agenda-date { padding: 16px 16px 16px 20px; border-right: 1px solid var(--border); background: var(--off); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 70px; }
+        .agenda-date-day { font-family: var(--serif); font-size: 22px; font-weight: 700; line-height: 1; color: var(--ink); }
+        .agenda-date-dow { font-size: 11px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
         .agenda-content { padding: 14px 20px; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
-        .agenda-title { font-size: 15px; font-weight: 600; }
+        .agenda-title { font-size: 15px; font-weight: 600; color: var(--ink); }
         .agenda-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-        .agenda-organizer { font-size: 13px; color: #666; }
-        .agenda-type-chip { font-size: 11px; font-weight: 600; color: #555; background: #f0f0f0; border-radius: 4px; padding: 2px 7px; letter-spacing: 0.3px; }
-        .agenda-location { font-size: 12px; color: #999; }
-        .agenda-multiday { font-size: 11px; color: #888; font-style: italic; }
+        .agenda-organizer { font-size: 13px; font-weight: 500; color: var(--ink-soft); }
+        .agenda-type-chip { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); background: var(--accent-light); border-radius: 100px; padding: 3px 10px; }
+        .agenda-location { font-size: 12px; font-weight: 500; color: var(--ink-faint); }
+        .agenda-multiday { font-size: 11px; font-weight: 500; color: var(--ink-faint); font-style: italic; }
+
         .year-month-section { margin-bottom: 36px; }
         .year-month-heading {
-          font-family: 'Oswald', sans-serif;
+          font-family: var(--serif);
           font-size: 13px;
           font-weight: 700;
           letter-spacing: 0.14em;
           text-transform: uppercase;
-          color: #888;
+          color: var(--ink-soft);
           padding: 10px 0 8px;
-          border-bottom: 2px solid #111;
+          border-bottom: 2px solid var(--ink);
           margin-bottom: 8px;
           display: flex;
           align-items: baseline;
           gap: 10px;
         }
-        .year-month-count { font-size: 11px; font-weight: 500; color: #aaa; letter-spacing: 0; }
-        .year-month-empty { font-size: 13px; color: #ccc; padding: 12px 0; font-style: italic; }
-        .loading-state { padding: 40px 24px; text-align: center; color: #aaa; font-size: 14px; }
-        .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .year-month-count { font-size: 11px; font-weight: 600; color: var(--ink-faint); letter-spacing: 0; }
+        .year-month-empty { font-size: 13px; font-weight: 500; color: var(--ink-faint); padding: 12px 0; font-style: italic; }
+        .loading-state { padding: 40px 24px; text-align: center; color: var(--ink-faint); font-size: 14px; font-weight: 500; }
+
+        /* Calendar grid */
+        .cal-grid { border: 1.5px solid var(--border); border-radius: 12px; overflow: hidden; }
+        .cal-grid-loading { padding: 40px 24px; text-align: center; color: var(--ink-faint); font-size: 14px; font-weight: 500; border: 1.5px solid var(--border); border-radius: 12px; }
+        .cal-grid-dow { display: grid; grid-template-columns: repeat(7, 1fr); background: var(--off); border-bottom: 1px solid var(--border); }
+        .cal-grid-dow-cell { padding: 10px 8px; text-align: center; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em; color: var(--ink-faint); }
+        .cal-grid-body { display: grid; grid-template-columns: repeat(7, 1fr); }
+        .cal-grid-cell { min-height: 96px; padding: 8px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
+        .cal-grid-cell:nth-child(7n) { border-right: none; }
+        .cal-grid-cell-out { background: var(--off); }
+        .cal-grid-cell-out .cal-grid-daynum { color: var(--ink-faint); }
+        .cal-grid-cell-today { background: var(--accent-light); }
+        .cal-grid-daynum { font-size: 0.78rem; font-weight: 700; color: var(--ink); }
+        .cal-grid-events { display: flex; flex-direction: column; gap: 3px; }
+        .cal-grid-chip { display: block; width: 100%; text-align: left; background: var(--accent); color: #fff; border: none; border-radius: 4px; padding: 2px 6px; font-size: 0.7rem; font-weight: 600; font-family: var(--sans); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cal-grid-chip:hover { opacity: 0.85; }
+        .cal-grid-more { font-size: 0.66rem; font-weight: 600; color: var(--ink-faint); padding: 0 2px; }
+        @media (max-width: 640px) {
+          .cal-grid-cell { min-height: 70px; padding: 5px; }
+          .cal-grid-chip { font-size: 0.62rem; }
+        }
+
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(26,24,20,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
         .modal { background: #fff; border-radius: 14px; width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,0.18); }
         .modal-detail { max-width: 520px; }
         .modal-header { display: flex; align-items: flex-start; justify-content: space-between; padding: 24px 24px 0; gap: 12px; }
-        .modal-header h2 { font-size: 20px; font-weight: 700; margin-top: 4px; }
-        .close-btn { background: none; border: none; font-size: 18px; cursor: pointer; color: #999; padding: 0; line-height: 1; flex-shrink: 0; }
-        .close-btn:hover { color: #111; }
+        .modal-header h2 { font-family: var(--serif); font-size: 1.35rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; margin-top: 6px; color: var(--ink); }
+        .close-btn { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--ink-faint); padding: 0; line-height: 1; flex-shrink: 0; }
+        .close-btn:hover { color: var(--ink); }
         .modal-form { padding: 20px 24px 24px; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
         .form-group { display: flex; flex-direction: column; gap: 5px; }
         .form-group.full { grid-column: 1 / -1; }
-        .form-group label { font-size: 13px; font-weight: 600; color: #333; }
-        .optional { font-weight: 400; color: #999; }
-        .form-group input, .form-group select, .form-group textarea { border: 1.5px solid #ddd; border-radius: 7px; padding: 9px 12px; font-size: 14px; font-family: inherit; color: #111; outline: none; transition: border-color 0.15s; background: #fff; }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #111; }
+        .form-group label { font-size: 13px; font-weight: 600; color: var(--ink); }
+        .optional { font-weight: 400; color: var(--ink-faint); }
+        .form-group input, .form-group select, .form-group textarea { border: 1.5px solid var(--border); border-radius: 7px; padding: 9px 12px; font-size: 14px; font-family: inherit; color: var(--ink); outline: none; transition: border-color 0.15s; background: #fff; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--ink); }
         .form-group textarea { resize: vertical; }
         .checkboxes { flex-direction: column; justify-content: flex-end; gap: 10px; }
-        .checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; cursor: pointer; }
+        .checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--ink); }
         .checkbox-label input { width: 16px; height: 16px; cursor: pointer; }
-        .submitter-confirm { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 12px; background: #f5f5f5; border-radius: 7px; font-size: 13px; }
-        .submitter-confirm-label { font-weight: 600; color: #555; white-space: nowrap; }
-        .submitter-confirm-value { color: #333; }
-        .form-error { color: #C80650; font-size: 13px; margin-top: 10px; padding: 10px 12px; background: #fce8ef; border-radius: 6px; }
+        .submitter-confirm { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 12px; background: var(--off); border-radius: 7px; font-size: 13px; }
+        .submitter-confirm-label { font-weight: 700; color: var(--ink-soft); white-space: nowrap; }
+        .submitter-confirm-value { color: var(--ink); font-weight: 500; }
+        .form-error { color: var(--accent); font-size: 13px; font-weight: 500; margin-top: 10px; padding: 10px 12px; background: var(--accent-light); border-radius: 6px; }
         .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-        .event-type-badge { font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: #666; background: #f0f0f0; border-radius: 4px; padding: 3px 8px; display: inline-block; margin-bottom: 6px; }
-        .detail-organizer { font-size: 14px; color: #666; margin-top: 2px; }
+        .event-type-badge { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); background: var(--accent-light); border-radius: 100px; padding: 4px 11px; display: inline-block; margin-bottom: 6px; }
         .detail-body { padding: 20px 24px 28px; }
-        .detail-row { display: flex; gap: 12px; margin-bottom: 14px; font-size: 14px; align-items: flex-start; }
-        .detail-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
-        .detail-sub { color: #666; font-size: 13px; margin-top: 2px; }
-        .detail-tags { display: flex; gap: 8px; flex-wrap: wrap; margin: 2px 0 16px; }
-        .tag { font-size: 12px; font-weight: 600; border: 1.5px solid #ddd; border-radius: 5px; padding: 3px 10px; color: #444; }
-        .detail-section { margin-top: 16px; }
-        .detail-section h4 { font-size: 12px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
-        .detail-section p { font-size: 14px; color: #333; line-height: 1.6; }
-        .needs-section { background: #fffbf0; border-radius: 8px; padding: 12px 14px; border-left: 3px solid #FFCE03; }
+        .detail-row { margin-bottom: 16px; font-size: 14px; }
+        .detail-label { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 4px; }
+        .detail-value { font-size: 1rem; font-weight: 400; color: var(--ink); }
+        .detail-value strong { font-weight: 600; }
+        .detail-sub { color: var(--ink-soft); font-size: 13px; font-weight: 500; margin-top: 2px; }
+        .detail-tags { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 16px; }
+        .tag { font-size: 12px; font-weight: 700; border: 1.5px solid var(--border); border-radius: 5px; padding: 3px 10px; color: var(--ink-soft); }
+        .detail-section { margin-top: 18px; }
+        .detail-section h4 { font-family: var(--serif); font-size: 0.72rem; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; }
+        .detail-section p { font-size: 14px; font-weight: 400; color: var(--ink); line-height: 1.6; }
+        .needs-section { background: #fffbf0; border-radius: 8px; padding: 12px 14px; border-left: 3px solid var(--gold); }
         .needs-section h4 { color: #a07b00; }
-        .needs-section p { color: #555; }
-        .contact-section { background: #f8f8f8; border-radius: 8px; padding: 12px 14px; }
-        .contact-section a { color: #111; text-decoration: underline; }
+        .needs-section p { color: var(--ink-soft); }
+        .contact-section { background: var(--off); border-radius: 8px; padding: 12px 14px; }
+        .contact-section a { color: var(--ink); text-decoration: underline; }
         @media (max-width: 560px) {
           .std-header { flex-direction: column; }
           .form-grid { grid-template-columns: 1fr; }
@@ -771,14 +921,31 @@ export default function SaveTheDatePage() {
           </button>
         </div>
 
+        <div className="mode-toggle">
+          <button
+            className={`mode-toggle-btn${displayMode === 'calendar' ? ' active' : ''}`}
+            onClick={() => setDisplayMode('calendar')}
+          >
+            Calendar
+          </button>
+          <button
+            className={`mode-toggle-btn${displayMode === 'list' ? ' active' : ''}`}
+            onClick={() => setDisplayMode('list')}
+          >
+            List
+          </button>
+        </div>
+
         <div className="cal-controls">
           <button className="cal-nav" onClick={prevPeriod}>‹</button>
-          <button
-            className={`view-toggle${view === 'year' ? ' active' : ''}`}
-            onClick={toggleView}
-          >
-            Year
-          </button>
+          {displayMode === 'list' && (
+            <button
+              className={`view-toggle${view === 'year' ? ' active' : ''}`}
+              onClick={toggleListPeriod}
+            >
+              Year
+            </button>
+          )}
           <button className="cal-nav" onClick={nextPeriod}>›</button>
           <span className="cal-month-label">{displayLabel}</span>
           <div className="download-group">
@@ -787,7 +954,17 @@ export default function SaveTheDatePage() {
           </div>
         </div>
 
-        {view === 'month' && (
+        {displayMode === 'calendar' && (
+          <CalendarGrid
+            month={month}
+            year={year}
+            events={events}
+            loading={loading}
+            onSelect={setSelectedEvent}
+          />
+        )}
+
+        {displayMode === 'list' && view === 'month' && (
           <div className="agenda-list">
             <AgendaList
               events={events}
@@ -798,7 +975,7 @@ export default function SaveTheDatePage() {
           </div>
         )}
 
-        {view === 'year' && (
+        {displayMode === 'list' && view === 'year' && (
           loading ? (
             <div className="agenda-list">
               <div className="loading-state">Loading events…</div>
@@ -836,7 +1013,7 @@ export default function SaveTheDatePage() {
       {showAdd && (
         <AddEventModal
           onClose={() => setShowAdd(false)}
-          onSuccess={() => view === 'month' ? fetchMonthEvents() : fetchYearEvents()}
+          onSuccess={() => periodMode === 'month' ? fetchMonthEvents() : fetchYearEvents()}
           prefill={prefill}
         />
       )}
