@@ -1,6 +1,13 @@
 // app/sellers/[slug]/page.tsx
 // Public seller profile page — Stripe Connect compliant
 // URL: https://seveneightfive.com/sellers/[slug]
+//
+// This page now renders standalone — no global SiteNav (see the
+// '/sellers/' entry added to IMMERSIVE_PREFIXES in SiteNav.tsx). That's
+// deliberate: sellers link to this page directly from their own websites
+// as their ticketing hub, and having the full seveneightfive.com nav
+// wrapped around it looked like an embed rather than something that
+// belongs to them.
 
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
@@ -77,17 +84,38 @@ export default async function SellerPage({
   const upcoming = seller.events.filter(isUpcoming);
   const past = seller.events.filter((e) => !isUpcoming(e));
 
+  // No website/logo field exists on SellerProfile yet — this stays hidden
+  // until one gets added. Treating it as `unknown` here rather than typing
+  // it against the real interface so this doesn't silently break once a
+  // real field shows up with a different name.
+  const sellerWebsite = (seller as Record<string, unknown>).website_url as string | undefined;
+
   return (
     <main className="seller-page">
+      {/* UTILITY BAR — logo/name, optional Event Website link, Manage Tickets */}
+      <div className="utilityBar">
+        <Link href={`/sellers/${slug}`} className="utilityBar__brand">
+          {seller.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={seller.avatar_url} alt="" className="utilityBar__logo" />
+          ) : null}
+          <span>{displayName}</span>
+        </Link>
+        <div className="utilityBar__actions">
+          {sellerWebsite && (
+            <a href={sellerWebsite} target="_blank" rel="noopener noreferrer" className="utilityBar__link">
+              Event Website
+            </a>
+          )}
+          <Link href={`/tickets/lookup?seller=${slug}`} className="utilityBar__manage">
+            Manage Tickets
+          </Link>
+        </div>
+      </div>
+
       {/* HERO */}
       <section className="hero">
         <div className="hero__row">
-          {seller.avatar_url && (
-            <div className="hero__avatar">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={seller.avatar_url} alt={displayName} />
-            </div>
-          )}
           <div className="hero__text">
             <p className="hero__kicker">SELLER</p>
             <h1 className="hero__name">{displayName}</h1>
@@ -227,39 +255,32 @@ export default async function SellerPage({
         </p>
       </section>
 
-      {/* CONTACT */}
+      {/* CONTACT — condensed to one line: Seller | Email | Phone | Platform */}
       <section className="section">
         <h2 className="section__title">Contact</h2>
-
-        <dl className="contact">
-          <div className="contact__row">
-            <dt>Seller</dt>
-            <dd>{displayName}</dd>
-          </div>
-          <div className="contact__row">
-            <dt>Email</dt>
-            <dd>
-              <a href={`mailto:${contactEmail}`}>{contactEmail}</a>
-            </dd>
-          </div>
+        <p className="contactLine">
+          <span className="contactLine__label">Seller</span> {displayName}
+          <span className="contactLine__sep">|</span>
+          <a href={`mailto:${contactEmail}`}>{contactEmail}</a>
           {seller.phone_number && (
-            <div className="contact__row">
-              <dt>Phone</dt>
-              <dd>
-                <a href={`tel:${seller.phone_number}`}>{seller.phone_number}</a>
-              </dd>
-            </div>
+            <>
+              <span className="contactLine__sep">|</span>
+              <a href={`tel:${seller.phone_number}`}>{seller.phone_number}</a>
+            </>
           )}
-          <div className="contact__row">
-            <dt>Platform</dt>
-            <dd>
-              <Link href="/">seveneightfive.com</Link>
-            </dd>
-          </div>
-        </dl>
+          <span className="contactLine__sep">|</span>
+          <Link href="/">seveneightfive.com</Link>
+        </p>
       </section>
 
-      {/* STRIPE COMPLIANCE LINE */}
+      {/* FOOTER — ticketing brand line + required Stripe compliance line.
+          The Stripe line stays exactly as-is; it's a compliance
+          requirement, not a design choice, so it's additive here rather
+          than replaced by the branding line. */}
+      <div className="footerBrand">
+        <span>Event ticketing by</span>
+        <Link href="/" className="footerBrand__mark">seveneightfive</Link>
+      </div>
       <p className="stripe-line">Payments processed securely by Stripe</p>
 
       <style>{styles}</style>
@@ -280,7 +301,7 @@ const styles = `
     font-family: var(--font-dm-sans), system-ui, sans-serif;
     max-width: 1100px;
     margin: 0 auto;
-    padding: 1.5rem clamp(1rem, 4vw, 2.5rem) 3rem;
+    padding: 0 clamp(1rem, 4vw, 2.5rem) 3rem;
     line-height: 1.5;
   }
 
@@ -292,6 +313,75 @@ const styles = `
     letter-spacing: 0.01em;
   }
 
+  /* UTILITY BAR — since there's no global site nav on this page anymore,
+     this is the only chrome at the top: brand mark, optional external
+     website link, Manage Tickets. */
+  .utilityBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.1rem 0;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 0.5rem;
+  }
+  .utilityBar__brand {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: var(--ink);
+    text-decoration: none;
+    font-family: var(--font-oswald), system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    min-width: 0;
+  }
+  .utilityBar__brand span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .utilityBar__logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+  .utilityBar__actions {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    flex-shrink: 0;
+  }
+  .utilityBar__link {
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    white-space: nowrap;
+  }
+  .utilityBar__manage {
+    font-family: var(--font-oswald), system-ui, sans-serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink);
+    border: 1px solid var(--ink);
+    border-radius: 999px;
+    padding: 0.5rem 1.1rem;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+  }
+  .utilityBar__manage:hover {
+    background: var(--ink);
+    color: #fff;
+  }
+
   /* HERO */
   .hero {
     padding: clamp(1.5rem, 4vw, 2.5rem) 0;
@@ -301,20 +391,6 @@ const styles = `
     display: flex;
     gap: clamp(1rem, 3vw, 2rem);
     align-items: center;
-  }
-  .hero__avatar {
-    flex-shrink: 0;
-    width: clamp(80px, 12vw, 128px);
-    height: clamp(80px, 12vw, 128px);
-    border-radius: 50%;
-    overflow: hidden;
-    border: 2px solid var(--ink);
-  }
-  .hero__avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
   }
   .hero__text { flex: 1; min-width: 0; }
   .hero__kicker {
@@ -372,7 +448,7 @@ const styles = `
   .prose { font-size: 1rem; max-width: 62ch; margin: 0; }
   .prose--muted { color: var(--muted); }
 
-  /* EVENT CARDS — matches home page pattern */
+  /* EVENT CARDS */
   .events { display: flex; flex-direction: column; gap: 0.75rem; }
   .eventCard {
     display: grid;
@@ -474,41 +550,56 @@ const styles = `
   }
   .policy__footnote a { color: var(--ink); }
 
-  /* CONTACT */
-  .contact { margin: 0; }
-  .contact__row {
-    display: grid;
-    grid-template-columns: 120px 1fr;
-    gap: 1rem;
-    padding: 0.65rem 0;
-    border-top: 1px solid var(--rule);
+  /* CONTACT — single condensed line */
+  .contactLine {
+    margin: 0;
     font-size: 0.95rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
   }
-  .contact__row:first-child { border-top: none; padding-top: 0; }
-  .contact dt {
+  .contactLine__label {
     font-family: var(--font-oswald), system-ui, sans-serif;
     font-size: 0.72rem;
     letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--muted);
-    align-self: center;
     font-weight: 500;
   }
-  .contact dd { margin: 0; }
-  .contact a {
+  .contactLine__sep {
+    color: var(--rule);
+    padding: 0 0.15rem;
+  }
+  .contactLine a {
     color: var(--ink);
     text-decoration: underline;
     text-underline-offset: 3px;
   }
 
+  /* FOOTER BRAND */
+  .footerBrand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    margin-top: 2rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .footerBrand__mark {
+    color: var(--accent);
+    font-weight: 700;
+    text-decoration: none;
+  }
+
   /* STRIPE LINE */
   .stripe-line {
     text-align: center;
-    margin: 2rem 0 0;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--rule);
+    margin: 0.75rem 0 0;
+    padding-top: 1rem;
     font-family: var(--font-oswald), system-ui, sans-serif;
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--muted);
@@ -516,10 +607,12 @@ const styles = `
 
   /* MOBILE */
   @media (max-width: 640px) {
+    .utilityBar { flex-wrap: wrap; }
     .hero__row { flex-direction: column; align-items: flex-start; gap: 1rem; }
     .eventCard { grid-template-columns: 56px 1fr 64px; gap: 0.75rem; padding: 0.7rem; }
     .eventDate .day { font-size: 1.5rem; }
     .eventThumb { width: 64px; height: 64px; }
-    .contact__row { grid-template-columns: 1fr; gap: 0.2rem; }
+    .contactLine { flex-direction: column; align-items: flex-start; gap: 0.25rem; }
+    .contactLine__sep { display: none; }
   }
 `;
