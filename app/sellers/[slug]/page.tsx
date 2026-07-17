@@ -88,7 +88,7 @@ export default async function SellerPage({
   // until one gets added. Treating it as `unknown` here rather than typing
   // it against the real interface so this doesn't silently break once a
   // real field shows up with a different name.
-  const sellerWebsite = (seller as Record<string, unknown>).website_url as string | undefined;
+  const sellerWebsite = (seller as unknown as Record<string, unknown>).website_url as string | undefined;
 
   return (
     <main className="seller-page">
