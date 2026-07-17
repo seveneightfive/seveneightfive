@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   DollarSign,
   Wallet,
+  Percent,
   AlertCircle,
   ArrowUpRight,
 } from 'lucide-react'
@@ -17,10 +18,13 @@ import {
 /**
  * /dashboard/events/[id]/tickets
  *
- * Per-event ticket management surface. Now includes two tabs:
- * - Ticketing: Tier editor, tier performance, attendee list
- * - Marketing: Event URL, QR code, social shares, analytics
+ * Per-event ticket management surface. Two tabs:
+ * - Ticketing: Tier editor, tier performance, attendee list, door check-in
+ * - Marketing: Event URL, QR code, social shares, traffic analytics
  */
+
+const sectionHeadingCls =
+  'mb-4 border-b border-gray-100 pb-3 font-display text-xl font-bold uppercase tracking-wide text-gray-900 dark:border-gray-800 dark:text-white'
 
 export default function EventTicketsPage() {
   const params = useParams()
@@ -33,6 +37,7 @@ export default function EventTicketsPage() {
   const [tiers, setTiers] = useState<any[]>([])
   const [tickets, setTickets] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'ticketing' | 'marketing'>('ticketing')
+  const [checkInCopied, setCheckInCopied] = useState(false)
 
   const supabase = createClient()
 
@@ -148,8 +153,19 @@ export default function EventTicketsPage() {
     return sum + (price - price * 0.029 - 1.0)
   }, 0)
   const checkedIn = eventTickets.filter((t) => t.status === 'used').length
+  const checkInRate = totalSold > 0 ? (checkedIn / totalSold) * 100 : 0
 
   const stripeReady = profile?.stripe_account_status === 'enabled'
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://seveneightfive.com'
+  const checkInUrl = event.slug ? `${siteUrl}/events/${event.slug}/checkin` : ''
+
+  const copyCheckInUrl = () => {
+    if (!checkInUrl) return
+    navigator.clipboard.writeText(checkInUrl)
+    setCheckInCopied(true)
+    setTimeout(() => setCheckInCopied(false), 2000)
+  }
 
   const formatDate = (d: string) =>
     new Date(d + 'T12:00:00').toLocaleDateString('en-US', {
@@ -168,12 +184,12 @@ export default function EventTicketsPage() {
     })
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
-            Creator | Tickets
+            Creator
           </p>
           <h1 className="mb-2 font-display text-3xl font-bold leading-tight text-gray-900 dark:text-white">
             {event.title}
@@ -217,37 +233,36 @@ export default function EventTicketsPage() {
         </div>
       )}
 
-      {/* Tab switcher */}
-      <div className="border-b border-gray-200 dark:border-gray-800">
-        <div className="flex gap-6">
-          <button
-            onClick={() => setActiveTab('ticketing')}
-            className={`px-4 py-3 text-sm font-semibold transition ${
-              activeTab === 'ticketing'
-                ? 'border-b-2 border-brand-600 text-brand-600 dark:text-brand-400'
-                : 'border-b-2 border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
-            }`}
-          >
-            Ticketing
-          </button>
-          <button
-            onClick={() => setActiveTab('marketing')}
-            className={`px-4 py-3 text-sm font-semibold transition ${
-              activeTab === 'marketing'
-                ? 'border-b-2 border-brand-600 text-brand-600 dark:text-brand-400'
-                : 'border-b-2 border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
-            }`}
-          >
-            Marketing
-          </button>
-        </div>
+      {/* Tab switcher — pill buttons instead of underlined text so the
+          active tab reads clearly at a glance */}
+      <div className="inline-flex gap-1 rounded-xl bg-gray-100 p-1 dark:bg-white/[0.05]">
+        <button
+          onClick={() => setActiveTab('ticketing')}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+            activeTab === 'ticketing'
+              ? 'bg-white text-brand-700 shadow-sm dark:bg-gray-900 dark:text-brand-400'
+              : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+          }`}
+        >
+          Ticketing
+        </button>
+        <button
+          onClick={() => setActiveTab('marketing')}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+            activeTab === 'marketing'
+              ? 'bg-white text-brand-700 shadow-sm dark:bg-gray-900 dark:text-brand-400'
+              : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+          }`}
+        >
+          Marketing
+        </button>
       </div>
 
       {/* Ticketing Tab */}
       {activeTab === 'ticketing' && (
         <>
           {/* Stat cards */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <StatCard
               icon={<Ticket className="h-4 w-4" />}
               label="Tickets Sold"
@@ -258,6 +273,12 @@ export default function EventTicketsPage() {
               icon={<CheckCircle2 className="h-4 w-4" />}
               label="Checked In"
               value={String(checkedIn)}
+              tone="neutral"
+            />
+            <StatCard
+              icon={<Percent className="h-4 w-4" />}
+              label="Check-In Rate"
+              value={`${checkInRate.toFixed(1)}%`}
               tone="neutral"
             />
             <StatCard
@@ -276,10 +297,8 @@ export default function EventTicketsPage() {
 
           {/* Tier editor */}
           <Card>
-            <h2 className="mb-1 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
-              Ticket Tiers
-            </h2>
-            <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+            <h2 className={sectionHeadingCls}>Ticket Tiers</h2>
+            <p className="mb-4 -mt-2 text-xs text-gray-500 dark:text-gray-400">
               Set up tier names, prices, and limits. Buyers see active tiers on the
               public event page.
             </p>
@@ -292,9 +311,7 @@ export default function EventTicketsPage() {
           {/* Tier performance */}
           {eventTiers.length > 0 && (
             <Card>
-              <h2 className="mb-4 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
-                Tier Performance
-              </h2>
+              <h2 className={sectionHeadingCls}>Tier Performance</h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -352,10 +369,33 @@ export default function EventTicketsPage() {
             </Card>
           )}
 
+          {/* Door Check-In — moved here from Marketing since it's a
+              ticketing/ops concern, not a promotion channel */}
+          <Card>
+            <h2 className={sectionHeadingCls}>Door Check-In</h2>
+            <p className="mb-2 -mt-2 text-sm text-gray-600 dark:text-gray-400">
+              Share this link with staff to check in attendees at the door. No app download needed:
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={checkInUrl}
+                readOnly
+                className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-300"
+              />
+              <button
+                onClick={copyCheckInUrl}
+                className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+              >
+                {checkInCopied ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+          </Card>
+
           {/* Attendees */}
           <Card>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+            <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3 dark:border-gray-800">
+              <h2 className="font-display text-xl font-bold uppercase tracking-wide text-gray-900 dark:text-white">
                 Attendees
               </h2>
               {totalSold > 0 && (
