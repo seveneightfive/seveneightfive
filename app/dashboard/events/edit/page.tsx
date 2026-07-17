@@ -720,12 +720,6 @@ function EventEditInner() {
         </div>
       )}
 
-      {/* Bottom save button (edit mode only — new events publish from the Featured Artists card above) */}
-      {!isNew && (
-        <button onClick={handleSave} disabled={saving} className="w-full rounded-lg bg-brand-600 px-4 py-3.5 font-display text-sm font-semibold uppercase tracking-wider text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50">
-          {saving ? 'Saving…' : 'Save Changes'}
-        </button>
-      )}
     </div>
   )
 }
