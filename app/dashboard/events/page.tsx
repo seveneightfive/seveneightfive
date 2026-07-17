@@ -6,11 +6,10 @@ import { createClient } from '@/lib/supabaseBrowser'
 import Link from 'next/link'
 import {
   Calendar,
-  ExternalLink,
   Plus,
   Ticket,
   Music,
-  Pencil,
+  Eye,
 } from 'lucide-react'
 
 type EventRow = {
@@ -20,7 +19,9 @@ type EventRow = {
   slug: string | null
   status: string
   ticketing_enabled: boolean | null
+  image_url: string | null
   source: 'created' | 'venue' | 'artist'
+  views: number
 }
 
 function formatDate(dateStr: string) {
@@ -73,15 +74,14 @@ function EventsPageInner() {
         return
       }
 
+      const SELECT = 'id, title, event_date, slug, status, ticketing_enabled, image_url'
+
       // Fetch in parallel:
       //   1. Events the user CREATED (events.auth_user_id = user.id)
       //   2. Venues the user OWNS — so we can look up events at those venues
       //   3. Artist records the user OWNS — so we can look up events linked to them
       const [createdRes, venuesRes, artistsRes] = await Promise.all([
-        supabase
-          .from('events')
-          .select('id, title, event_date, slug, status, ticketing_enabled')
-          .eq('auth_user_id', user.id),
+        supabase.from('events').select(SELECT).eq('auth_user_id', user.id),
         supabase.from('venues').select('id').eq('auth_user_id', user.id),
         supabase.from('artists').select('id').eq('auth_user_id', user.id),
       ])
@@ -91,10 +91,7 @@ function EventsPageInner() {
       const myArtistIds = (artistsRes.data || []).map((a) => a.id)
 
       const venueEventsRes = myVenueIds.length
-        ? await supabase
-            .from('events')
-            .select('id, title, event_date, slug, status, ticketing_enabled')
-            .in('venue_id', myVenueIds)
+        ? await supabase.from('events').select(SELECT).in('venue_id', myVenueIds)
         : { data: [] as any[] }
       const venueEvents = venueEventsRes.data || []
 
@@ -106,10 +103,7 @@ function EventsPageInner() {
           .in('artist_id', myArtistIds)
         const linkedIds = (linksRes.data || []).map((l) => l.event_id)
         if (linkedIds.length) {
-          const r = await supabase
-            .from('events')
-            .select('id, title, event_date, slug, status, ticketing_enabled')
-            .in('id', linkedIds)
+          const r = await supabase.from('events').select(SELECT).in('id', linkedIds)
           artistEvents = r.data || []
         }
       }
@@ -117,9 +111,24 @@ function EventsPageInner() {
       // Merge + dedupe. Prefer 'created' > 'venue' > 'artist' for the source
       // label so we show the strongest relationship.
       const byId = new Map<string, EventRow>()
-      for (const e of artistEvents) byId.set(e.id, { ...e, source: 'artist' })
-      for (const e of venueEvents) byId.set(e.id, { ...e, source: 'venue' })
-      for (const e of created) byId.set(e.id, { ...e, source: 'created' })
+      for (const e of artistEvents) byId.set(e.id, { ...e, source: 'artist', views: 0 })
+      for (const e of venueEvents) byId.set(e.id, { ...e, source: 'venue', views: 0 })
+      for (const e of created) byId.set(e.id, { ...e, source: 'created', views: 0 })
+
+      // Page-view counts come from the pre-aggregated event_analytics table
+      // (same source the Marketing tab's "Total Views" stat uses) — one
+      // batched lookup instead of a query per card.
+      const allIds = Array.from(byId.keys())
+      if (allIds.length) {
+        const { data: analyticsRows } = await supabase
+          .from('event_analytics')
+          .select('event_id, total_page_views')
+          .in('event_id', allIds)
+        for (const row of analyticsRows || []) {
+          const existing = byId.get(row.event_id)
+          if (existing) existing.views = row.total_page_views || 0
+        }
+      }
 
       const today = new Date().toISOString().slice(0, 10)
       const all = Array.from(byId.values()).sort((a, b) => {
@@ -227,8 +236,8 @@ function EventCard({
   event: EventRow
   dimmed?: boolean
 }) {
-  // Card click → manage view (tickets/sales). Most operator visits are
-  // ops, not setup. Edit lives on the icon button below.
+  // Whole card → manage view (tickets/sales/marketing). Edit lives inside
+  // that page's own "Edit Event" button, so this listing stays lean.
   return (
     <Link
       href={`/dashboard/events/${event.id}/tickets`}
@@ -236,6 +245,18 @@ function EventCard({
         dimmed ? 'opacity-60' : ''
       }`}
     >
+      {/* Thumbnail */}
+      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-white/[0.05]">
+        {event.image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={event.image_url} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <Calendar className="h-5 w-5 text-gray-400 dark:text-gray-600" />
+          </div>
+        )}
+      </div>
+
       <div className="min-w-0 flex-1">
         <div className="truncate font-display text-sm font-semibold uppercase tracking-wide text-gray-900 dark:text-white">
           {event.title}
@@ -263,55 +284,17 @@ function EventCard({
         </div>
       </div>
 
-      {/* Action icons. Each stops propagation so they don't fire the
-          card-level link. */}
-      <div className="flex shrink-0 items-center gap-1">
-        <IconButton
-          href={`/dashboard/events/edit?id=${event.id}`}
-          label="Edit event"
-        >
-          <Pencil className="h-4 w-4" />
-        </IconButton>
-        {event.slug && (
-          <IconButton
-            href={`/events/${event.slug}`}
-            label="View public event page"
-            external
-          >
-            <ExternalLink className="h-4 w-4" />
-          </IconButton>
-        )}
+      {/* Page views */}
+      <div className="flex shrink-0 flex-col items-end gap-0.5 pl-2">
+        <div className="flex items-center gap-1 text-sm font-semibold text-gray-900 dark:text-white">
+          <Eye className="h-3.5 w-3.5 text-gray-400 dark:text-gray-600" />
+          {event.views.toLocaleString()}
+        </div>
+        <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-600">
+          views
+        </div>
       </div>
     </Link>
-  )
-}
-
-function IconButton({
-  href,
-  label,
-  external = false,
-  children,
-}: {
-  href: string
-  label: string
-  external?: boolean
-  children: React.ReactNode
-}) {
-  // Important: nested anchor + stopPropagation. Without stopPropagation
-  // the parent <Link> swallows the click and you'd never reach this href.
-  return (
-    <a
-      href={href}
-      {...(external
-        ? { target: '_blank', rel: 'noopener noreferrer' }
-        : {})}
-      onClick={(e) => e.stopPropagation()}
-      aria-label={label}
-      title={label}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
-    >
-      {children}
-    </a>
   )
 }
 
