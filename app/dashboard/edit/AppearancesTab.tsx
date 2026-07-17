@@ -193,7 +193,7 @@ export default function AppearancesTab({ artistId }: { artistId: string }) {
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {event.slug && (
-                    
+                   <a 
                       href={`/events/${event.slug}`}
                       target="_blank"
                       rel="noopener noreferrer"
