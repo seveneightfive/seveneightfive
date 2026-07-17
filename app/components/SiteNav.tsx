@@ -12,6 +12,7 @@ const IMMERSIVE_PREFIXES = [
   '/venues/',
   '/events/',
   '/stories/',
+  '/sellers/',
 ]
 
 function isImmersive(pathname: string) {
