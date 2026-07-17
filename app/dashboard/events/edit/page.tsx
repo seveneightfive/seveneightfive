@@ -401,38 +401,28 @@ function EventEditInner() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      {/* Sticky header */}
-      <div className="sticky top-[72px] z-30 -mx-4 flex items-center justify-between gap-4 border-b border-gray-200 bg-white/95 px-4 py-4 backdrop-blur md:-mx-6 md:px-6 dark:border-gray-800 dark:bg-gray-900/95">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
-            Creator
-          </p>
-          <h1 className="font-display text-2xl font-bold leading-none text-gray-900 dark:text-white">
-            {isNew ? 'Add Event' : 'Edit Event'}
-          </h1>
-        </div>
-        <div className="flex items-center gap-3">
-          {(!isNew || step === STEP_COUNT - 1) && (
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              {saving ? 'Saving…' : isNew ? 'Create Event' : 'Save'}
-            </button>
-          )}
-          {!isNew && (
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="inline-flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5 font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/15"
-            >
-              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-              Delete
-            </button>
-          )}
-        </div>
+      {/* Sticky action bar — title removed; breadcrumbs/page header above already show "Create Event" / "Edit Event" */}
+      <div className="sticky top-[72px] z-30 -mx-4 flex items-center justify-end gap-3 bg-white/95 px-4 py-4 backdrop-blur md:-mx-6 md:px-6 dark:bg-gray-900/95">
+        {(!isNew || step === STEP_COUNT - 1) && (
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            {saving ? 'Saving…' : isNew ? 'Publish Event' : 'Save'}
+          </button>
+        )}
+        {!isNew && (
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="inline-flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5 font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400 dark:hover:bg-brand-500/15"
+          >
+            {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            Delete
+          </button>
+        )}
       </div>
 
       {/* Page intro */}
@@ -600,7 +590,7 @@ function EventEditInner() {
       </StepCard>
 
       {/* Card: Featured Artists */}
-      <StepCard index={5} step={step} isNew={isNew} title="Featured Artists" summary={stepSummaries[5]} onEdit={goToStep} onContinue={() => handleContinue(5)} isLast>
+      <StepCard index={5} step={step} isNew={isNew} title="Featured Artists" summary={stepSummaries[5]} onEdit={goToStep} onContinue={handleSave} saving={saving} isLast>
         {linkedArtists.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-1.5">
             {linkedArtists.map(a => (
@@ -696,7 +686,7 @@ function Card({ children }: { children: React.ReactNode }) {
  *     - index === step → active, fully expanded, with a Continue button
  */
 function StepCard({
-  index, step, isNew, title, summary, children, onEdit, onContinue, isLast,
+  index, step, isNew, title, summary, children, onEdit, onContinue, isLast, saving,
 }: {
   index: number
   step: number
@@ -707,6 +697,7 @@ function StepCard({
   onEdit: (index: number) => void
   onContinue: () => void
   isLast?: boolean
+  saving?: boolean
 }) {
   if (!isNew) {
     return (
@@ -757,10 +748,20 @@ function StepCard({
         <button
           type="button"
           onClick={onContinue}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-5 py-2.5 font-semibold text-white transition hover:bg-brand-700"
+          disabled={isLast && saving}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-5 py-2.5 font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isLast ? 'Continue' : 'Continue'}
-          <ChevronRight className="h-4 w-4" />
+          {isLast ? (
+            <>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              {saving ? 'Saving…' : 'Publish Event'}
+            </>
+          ) : (
+            <>
+              Continue
+              <ChevronRight className="h-4 w-4" />
+            </>
+          )}
         </button>
       </div>
     </Card>
