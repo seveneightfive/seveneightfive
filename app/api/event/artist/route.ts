@@ -11,6 +11,10 @@ export async function POST(request: Request) {
 
   const { eventId, artistId } = await request.json()
 
+  if (!eventId || !artistId) {
+    return NextResponse.json({ error: 'eventId and artistId are required' }, { status: 400 })
+  }
+
   // Verify caller is the artist owner or the event creator
   const [{ data: artistMatch }, { data: eventMatch }] = await Promise.all([
     supabase.from('artists').select('id').eq('id', artistId).eq('auth_user_id', user.id).single(),
