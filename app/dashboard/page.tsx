@@ -144,14 +144,15 @@ export default async function DashboardPage() {
             .limit(2)
         : Promise.resolve({ data: [] as any[] }),
       // Used to decide whether to show the 785Tickets promo card.
-      // A user "has active ticketed events" if they own any event where
-      // ticketing is enabled. Adjust the table/column names if yours differ.
+      // A user "has active ticketed events" if they own any event that has
+      // at least one ticket tier set up (the events table itself has no
+      // created_by or tickets_enabled column — ticketing is signaled by
+      // the presence of rows in ticket_tiers).
       user
         ? supabase
             .from('events')
-            .select('id')
-            .eq('created_by', user.id)
-            .eq('tickets_enabled', true)
+            .select('id, ticket_tiers!inner(id)')
+            .eq('auth_user_id', user.id)
             .limit(1)
         : Promise.resolve({ data: [] as any[] }),
     ])
