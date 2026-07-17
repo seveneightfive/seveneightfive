@@ -401,7 +401,21 @@ function EditPageInner() {
             Edit Profile
           </h1>
         </div>
-        <SaveButton saving={saving} saved={saved} onClick={handleSave} />
+        <div className="flex shrink-0 items-center gap-2">
+          {artist?.slug && (
+            
+              href={`/artists/${artist.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 px-4 py-2 font-display text-xs font-semibold uppercase tracking-wider text-gray-700 transition hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-white/[0.08]"
+            >
+              View
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </a>
+          )}
+          <SaveButton saving={saving} saved={saved} onClick={handleSave} />
+        </div>
+      </div>
         <div className="flex shrink-0 items-center gap-2">
 +          {artist?.slug && (
 +            
@@ -805,7 +819,7 @@ function EditPageInner() {
               {activeRows.map(({ img, originalIdx }, activeIdx) => (
                 <div
                   key={img.id || originalIdx}
-                  className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-white/[0.03]"
+                  className="flex items-start gap-3 rounded-xl border border-gray-300 bg-white p-3 dark:border-gray-700 dark:bg-white/[0.03]"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
