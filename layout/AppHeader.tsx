@@ -58,6 +58,10 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
     title: 'Venue Page',
     subtitle: 'Manage your venue profile.',
   },
+  '/dashboard/pages': {
+    title: 'My Pages',
+    subtitle: 'Pages you manage on 785.',
+  },
   '/dashboard/appearances': {
     title: 'Appearances',
     subtitle: 'Upcoming shows linked to your artist page.',
