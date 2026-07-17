@@ -15,6 +15,8 @@ const EVENT_TYPES = [
   'Bingo', 'Workshop / Class', 'Film / Screening', 'Dance', 'Theater',
 ]
 
+const ARTIST_TYPES = ['Musician', 'Visual', 'Performance', 'Literary'] as const
+
 type TicketMode = 'free' | 'external' | '785'
 
 type EventForm = {
@@ -96,7 +98,13 @@ function EventEditInner() {
   const [artistSearch, setArtistSearch] = useState('')
   const [artistOptions, setArtistOptions] = useState<{ id: string; name: string }[]>([])
   const [artistDropOpen, setArtistDropOpen] = useState(false)
+  const [artistSearchedOnce, setArtistSearchedOnce] = useState(false)
   const artistDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Quick-add-a-new-artist (used when the search above turns up nothing)
+  const [newArtistType, setNewArtistType] = useState<(typeof ARTIST_TYPES)[number]>('Musician')
+  const [creatingArtist, setCreatingArtist] = useState(false)
+  const [createArtistError, setCreateArtistError] = useState('')
 
   const set = <K extends keyof EventForm>(field: K, value: EventForm[K]) =>
     setForm(f => ({ ...f, [field]: value }))
@@ -222,9 +230,11 @@ function EventEditInner() {
   }, [venueSearch, selectedVenueName])
 
   useEffect(() => {
+    setCreateArtistError('')
     if (!artistSearch.trim()) {
       setArtistOptions([])
       setArtistDropOpen(false)
+      setArtistSearchedOnce(false)
       return
     }
     if (artistDebounce.current) clearTimeout(artistDebounce.current)
@@ -239,12 +249,14 @@ function EventEditInner() {
       const filtered = (data || []).filter(a => !linkedArtists.find(l => l.artist_id === a.id))
       setArtistOptions(filtered)
       setArtistDropOpen(true)
+      setArtistSearchedOnce(true)
     }, 250)
   }, [artistSearch, linkedArtists])
 
   const addArtist = async (artistId: string, artistName: string) => {
     setArtistDropOpen(false)
     setArtistSearch('')
+    setArtistSearchedOnce(false)
 
     if (!form.id && isNew) {
       setLinkedArtists(prev => [...prev, { artist_id: artistId, name: artistName, slug: null }])
@@ -257,6 +269,34 @@ function EventEditInner() {
       body: JSON.stringify({ eventId: form.id || eventId, artistId }),
     })
     setLinkedArtists(prev => [...prev, { artist_id: artistId, name: artistName, slug: null }])
+  }
+
+  // Quick-add a brand-new artist right from this form — just a name and a
+  // type. Creates a minimal, unclaimed artist record (no auth_user_id yet)
+  // so it can be found and formally claimed later, and links it to this
+  // event the same way picking an existing artist from search would.
+  const quickAddArtist = async () => {
+    const name = artistSearch.trim()
+    if (!name) return
+    setCreatingArtist(true)
+    setCreateArtistError('')
+    try {
+      const res = await fetch('/api/artist/quick-create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, artist_type: newArtistType }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setCreateArtistError(json.error || 'Could not create artist')
+        return
+      }
+      await addArtist(json.id, json.name || name)
+    } catch {
+      setCreateArtistError('Could not create artist')
+    } finally {
+      setCreatingArtist(false)
+    }
   }
 
   const removeArtist = async (artistId: string) => {
@@ -403,14 +443,14 @@ function EventEditInner() {
     <div className="mx-auto max-w-3xl space-y-6">
       {/* Sticky action bar — title removed; breadcrumbs/page header above already show "Create Event" / "Edit Event" */}
       <div className="sticky top-[72px] z-30 -mx-4 flex items-center justify-end gap-3 bg-white/95 px-4 py-4 backdrop-blur md:-mx-6 md:px-6 dark:bg-gray-900/95">
-        {(!isNew || step === STEP_COUNT - 1) && (
+        {!isNew && (
           <button
             onClick={handleSave}
             disabled={saving}
             className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-            {saving ? 'Saving…' : isNew ? 'Publish Event' : 'Save'}
+            {saving ? 'Saving…' : 'Save'}
           </button>
         )}
         {!isNew && (
@@ -615,6 +655,36 @@ function EventEditInner() {
             </div>
           )}
         </div>
+
+        {/* Quick-add — shown once a search has run and turned up nothing */}
+        {artistSearchedOnce && artistOptions.length === 0 && artistSearch.trim() && (
+          <div className="mt-3 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-3 dark:border-gray-700 dark:bg-white/[0.02]">
+            <p className="mb-2 text-xs text-gray-600 dark:text-gray-400">
+              Can't find <span className="font-semibold text-gray-900 dark:text-white">"{artistSearch.trim()}"</span>? Add them as a new artist:
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={newArtistType}
+                onChange={e => setNewArtistType(e.target.value as (typeof ARTIST_TYPES)[number])}
+                className="rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs text-gray-800 outline-none dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90"
+              >
+                {ARTIST_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <button
+                type="button"
+                onClick={quickAddArtist}
+                disabled={creatingArtist}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {creatingArtist ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                {creatingArtist ? 'Adding…' : `Add "${artistSearch.trim()}"`}
+              </button>
+            </div>
+            {createArtistError && (
+              <p className="mt-2 text-xs text-brand-600 dark:text-brand-400">{createArtistError}</p>
+            )}
+          </div>
+        )}
       </StepCard>
 
       {/* 785 Ticketing — only when the event is saved AND user picked 785 mode */}
@@ -650,10 +720,10 @@ function EventEditInner() {
         </div>
       )}
 
-      {/* Bottom save button (edit mode, or new events once the last card is reached) */}
-      {(!isNew || step === STEP_COUNT - 1) && (
+      {/* Bottom save button (edit mode only — new events publish from the Featured Artists card above) */}
+      {!isNew && (
         <button onClick={handleSave} disabled={saving} className="w-full rounded-lg bg-brand-600 px-4 py-3.5 font-display text-sm font-semibold uppercase tracking-wider text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50">
-          {saving ? 'Saving…' : isNew ? 'Create Event' : 'Save Changes'}
+          {saving ? 'Saving…' : 'Save Changes'}
         </button>
       )}
     </div>
