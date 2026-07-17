@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback, Suspense } from 'react'
 import { createClient } from '@/lib/supabaseBrowser'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ImageUpload from './ImageUpload'
-import { Check, ArrowUp, ArrowDown, X, Image as ImageIcon } from 'lucide-react'
+import AppearancesTab from './AppearancesTab'
+import { Check, ArrowUp, ArrowDown, X, Image as ImageIcon, ArrowUpRight } from 'lucide-react'
 
 const MUSICAL_GENRES = [
   'Rock','Pop','Jazz','Classical','Electronic','Hip-Hop','Country','Reggae',
@@ -376,6 +377,7 @@ function EditPageInner() {
     { id: 'media', label: 'Music / Media' },
     ...(artist?.artist_type === 'Visual' ? [{ id: 'visual', label: 'Visual' }] : []),
     { id: 'portfolio', label: 'Portfolio' },
+    { id: 'appearances', label: 'Appearances' },
   ]
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -390,7 +392,7 @@ function EditPageInner() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       {/* Page header + sticky save bar */}
-      <div className="sticky top-[72px] z-30 -mx-4 flex items-center justify-between gap-4 border-b border-gray-200 bg-surface-light/95 px-4 py-4 backdrop-blur md:-mx-6 md:px-6 dark:border-gray-800 dark:bg-surface-dark/95">
+      <div className="sticky top-[72px] z-30 -mx-4 flex items-center justify-between gap-4 border-b border-gray-300 bg-surface-light/95 px-4 py-4 backdrop-blur md:-mx-6 md:px-6 dark:border-gray-700 dark:bg-surface-dark/95">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-400">
             Creator
@@ -400,6 +402,20 @@ function EditPageInner() {
           </h1>
         </div>
         <SaveButton saving={saving} saved={saved} onClick={handleSave} />
+        <div className="flex shrink-0 items-center gap-2">
++          {artist?.slug && (
++            
++              href={`/artists/${artist.slug}`}
++              target="_blank"
++              rel="noopener noreferrer"
++              className="inline-flex items-center gap-1.5 rounded-full border border-gray-300 px-4 py-2 font-display text-xs font-semibold uppercase tracking-wider text-gray-700 transition hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-white/[0.08]"
++            >
++              View
++              <ArrowUpRight className="h-3.5 w-3.5" />
++            </a>
++          )}
++          <SaveButton saving={saving} saved={saved} onClick={handleSave} />
++        </div>
       </div>
 
       {/* Tab bar */}
@@ -416,10 +432,10 @@ function EditPageInner() {
               role="tab"
               aria-selected={activeSection === s.id}
               onClick={() => setActiveSection(s.id)}
-              className={`relative whitespace-nowrap border-b-2 px-3 py-3 text-xs font-semibold uppercase tracking-[0.1em] transition ${
+              className={`relative whitespace-nowrap rounded-t-lg border-b-2 px-3 py-3 text-xs font-semibold uppercase tracking-[0.1em] transition ${
                 activeSection === s.id
-                  ? 'border-brand-600 text-gray-900 dark:border-brand-400 dark:text-white'
-                  : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
+                  ? 'border-brand-600 bg-brand-50 text-brand-700 dark:border-brand-400 dark:bg-brand-500/10 dark:text-brand-400'
+                : 'border-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.05] dark:hover:text-gray-200'
               }`}
             >
               {s.label}
@@ -909,7 +925,7 @@ const inputCls =
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div className="space-y-5 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+    <div className="space-y-5 rounded-2xl border border-gray-300 bg-white p-5 shadow-theme-xs dark:border-gray-700 dark:bg-white/[0.03]">
       {children}
     </div>
   )
@@ -926,12 +942,12 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
-        {label}
+      <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.16em] text-gray-700 dark:text-gray-200">
+         {label}
       </label>
       {children}
       {hint && (
-        <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">{hint}</p>
+        <p className="mt-1.5 text-xs text-gray-600 dark:text-gray-400">{hint}</p>
       )}
     </div>
   )
