@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabaseBrowser'
 import Link from 'next/link'
-import { User, Building2, ArrowUpRight, Plus } from 'lucide-react'
+import { User, Building2, ArrowUpRight } from 'lucide-react'
 
 type PageRow = {
   id: string
@@ -130,7 +130,6 @@ function PageCard({ page }: { page: PageRow }) {
 
   return (
     <div className="group flex items-center gap-3 rounded-2xl border border-gray-300 bg-white p-4 transition hover:border-brand-400 hover:shadow-theme-sm dark:border-gray-700 dark:bg-white/[0.03] dark:hover:border-brand-500/50">
-      {/* Thumbnail */}
       <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-white/[0.05]">
         {page.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -152,7 +151,6 @@ function PageCard({ page }: { page: PageRow }) {
         </div>
       </Link>
 
-      {/* Actions */}
       <div className="flex shrink-0 items-center gap-2">
         {page.publicHref && (
           
