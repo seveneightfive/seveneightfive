@@ -26,10 +26,6 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
     title: 'Dashboard',
     subtitle: "Here's what's happening across your events and pages.",
   },
-  '/dashboard/events/edit': {
-    title: 'Create Event',
-    subtitle: 'Add a new event to the 785 calendar.',
-  },
   '/dashboard/events': {
     title: 'Events',
     subtitle: "Events you're hosting or selling tickets for.",
@@ -66,7 +62,7 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
     title: 'Appearances',
     subtitle: 'Upcoming shows linked to your artist page.',
   },
-  '/save-the-date': {
+  '/dashboard/save-the-date': {
     title: 'Save the Date',
     subtitle: 'Post a placeholder event before all the details are locked in.',
   },
