@@ -155,7 +155,7 @@ function PageCard({ page }: { page: PageRow }) {
       {/* Actions */}
       <div className="flex shrink-0 items-center gap-2">
         {page.publicHref && (
-          
+          <a
             href={page.publicHref}
             target="_blank"
             rel="noopener noreferrer"
