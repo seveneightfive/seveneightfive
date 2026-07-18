@@ -181,7 +181,8 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
   const serviceFeeDisplay = fmt(serviceFeeTotalCents)
   const totalDisplay = fmt(totalCents)
 
-  const headerLabel = isFreeEvent ? 'Free Event' : '🎟 785 Tickets'
+  // No icon, no "785 Tickets" branding line — just a plain, quiet label.
+  const headerLabel = isFreeEvent ? 'Free Event' : 'Tickets'
   const headerPrice = isFree ? 'Free' : `$${tier.price.toFixed(2)}`
   const ctaLabel = isFree ? 'RSVP' : 'Get Tickets'
 
