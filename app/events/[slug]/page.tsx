@@ -458,22 +458,23 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         .page-wrap { max-width: 1240px; margin: 0 auto; padding: 0 32px 0; }
 
         /* FADED HERO BAND — viewport-relative, not a fixed px height */
-        .hero-band { position: relative; height: clamp(160px, 30vh, 320px); overflow: hidden; margin: 0 -32px 28px; }
+        .hero-band { position: relative; height: clamp(160px, 30vh, 320px); overflow: hidden; width: 100vw; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); margin-bottom: 28px; }
         .hero-band img { width: 100%; height: 100%; object-fit: cover; opacity: 0.32; display: block; }
         .hero-fade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, var(--white) 94%); }
+        .hero-band__inner { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; height: 100%; }
         .back-link { position: absolute; left: 32px; top: 20px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 600; color: var(--ink); background: var(--white); border: 1px solid var(--border); padding: 7px 14px; border-radius: 100px; text-decoration: none; }
         .back-link:hover { border-color: var(--ink); }
 
-        .hero-bottom { position: absolute; left: 32px; bottom: 22px; display: flex; align-items: flex-end; gap: 16px; }
-        .date-badge { background: var(--ink); color: white; border-radius: 8px; padding: 8px 13px; text-align: center; min-width: 58px; flex-shrink: 0; }
-        .date-badge .dow { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.6; }
-        .date-badge .day { font-family: var(--serif); font-size: 1.35rem; font-weight: 700; line-height: 1.05; }
-        .date-badge .mon { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.6; }
+        .hero-bottom { position: absolute; left: 32px; bottom: 22px; right: 32px; display: flex; align-items: flex-end; gap: 20px; }
+        .date-badge { background: var(--ink); color: white; border-radius: 10px; padding: 14px 20px; text-align: center; min-width: 100px; flex-shrink: 0; }
+        .date-badge .dow { font-size: 0.85rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.65; }
+        .date-badge .day { font-family: var(--serif); font-size: 3.4rem; font-weight: 700; line-height: 1; margin: 2px 0; }
+        .date-badge .mon { font-size: 0.85rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.65; }
         .top-eyebrow { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
         .page-title { font-family: var(--serif); font-size: clamp(1.5rem, 3vw, 2.3rem); font-weight: 700; text-transform: uppercase; line-height: 1.05; letter-spacing: -0.01em; }
         @media (max-width: 640px) {
-          .hero-band { margin: 0 -20px 24px; }
           .back-link, .hero-bottom { left: 20px; }
+          .hero-bottom { right: 20px; }
         }
 
         /* TWO-COLUMN: image standing alone LEFT, details block RIGHT */
@@ -482,10 +483,10 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           .event-grid { grid-template-columns: 1fr; gap: 28px; }
         }
 
-        .event-image-wrap { position: relative; border-radius: 14px; overflow: hidden; background: var(--off); aspect-ratio: 4/5; }
+        .event-image-wrap { position: relative; border-radius: 14px; overflow: hidden; background: var(--off); }
         .event-image-noimg { position: relative; aspect-ratio: 4/5; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #2a2620, #1a1814); font-family: var(--serif); font-size: 6rem; font-weight: 700; color: rgba(255,255,255,0.08); }
         @media (max-width: 900px) {
-          .event-image-wrap, .event-image-noimg { aspect-ratio: 16/10; }
+          .event-image-noimg { aspect-ratio: 16/10; }
         }
 
         .event-types-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; }
@@ -494,6 +495,9 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
 
         /* DETAILS SIDEBAR (right column) */
         .details-col { display: flex; flex-direction: column; gap: 20px; }
+
+        .time-box { background: var(--off); border-radius: 14px; padding: 18px 22px; font-family: var(--serif); font-size: clamp(1.4rem, 2.4vw, 1.9rem); font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
+        .time-box__sep { margin: 0 10px; color: var(--ink-faint); font-weight: 400; }
 
         .info-card { background: var(--off); border-radius: 14px; overflow: hidden; }
         .info-grid { display: grid; grid-template-columns: 1fr 1fr; }
@@ -515,21 +519,31 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         .artist-type { font-size: 0.78rem; color: var(--ink-faint); margin-top: 1px; }
         .artist-arrow { color: var(--ink-faint); flex-shrink: 0; }
 
-        /* ACTION ROW — primary CTA + Follow (heart) + Calendar + Share, one row */
-        .action-row { display: flex; align-items: center; gap: 8px; }
-        .btn-block { display: flex; align-items: center; justify-content: center; flex: 1.6; padding: 15px 18px; border-radius: 8px; font-family: var(--serif); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; text-decoration: none; text-align: center; transition: all 0.15s; cursor: pointer; border: none; background: var(--accent); color: white; }
+        /* TICKET ROW — its own full-width line, room for TicketPurchaseButton's dropdown */
+        .ticket-row { width: 100%; }
+        .btn-block { display: flex; align-items: center; justify-content: center; width: 100%; padding: 15px 18px; border-radius: 8px; font-family: var(--serif); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; text-decoration: none; text-align: center; transition: all 0.15s; cursor: pointer; border: none; background: var(--accent); color: white; }
         .btn-block:hover { background: #a30440; }
         .btn-block.outline { background: transparent; color: var(--ink); border: 2px solid var(--ink); }
         .btn-block.outline:hover { background: var(--ink); color: white; }
+
+        /* ACTION ROW — Follow (heart) + Calendar + Share, below the ticket row */
+        .action-row { display: flex; align-items: center; gap: 8px; }
         .action-icon-btn { flex: 0 0 auto; }
         @media (max-width: 480px) {
           .action-row { flex-wrap: wrap; }
-          .btn-block { flex: 1 1 100%; }
         }
 
-        /* CALLOUT BOXES — Venue, replacing "Did You Know" */
-        .callout-box { display: flex; gap: 16px; align-items: flex-start; background: var(--warm); border-radius: 14px; padding: 20px; text-decoration: none; color: var(--ink); transition: background 0.15s; }
-        .callout-box:hover { background: #ece4d8; }
+        /* VENUE CARD — full-height image like the artist card, black bg */
+        .venue-card { display: flex; overflow: hidden; border-radius: 14px; background: #14110f; text-decoration: none; color: white; transition: background 0.15s; }
+        .venue-card:hover { background: #201b17; }
+        .venue-card-img { width: 110px; flex-shrink: 0; object-fit: cover; align-self: stretch; background: rgba(255,255,255,0.08); }
+        .venue-card-img-placeholder { width: 110px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 1.8rem; color: var(--gold); background: rgba(255,255,255,0.08); }
+        .venue-card-body { padding: 16px 20px; display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 0; }
+        .venue-card-eyebrow { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.5); }
+        .venue-card-name { font-family: var(--serif); font-size: 1.25rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; line-height: 1.15; color: white; }
+        .venue-card-address { font-size: 0.85rem; color: white; opacity: 0.85; }
+        .venue-card-neighborhood { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gold); margin-top: 2px; }
+        .venue-card-link { margin-top: 6px; font-size: 0.8rem; font-weight: 600; color: var(--gold); display: flex; align-items: center; }
 
         /* ARTIST FEATURE CARD — rectangular image left, content right */
         .artist-card { display: flex; overflow: hidden; border-radius: 14px; background: var(--accent-light); text-decoration: none; color: var(--ink); transition: background 0.15s; }
@@ -540,13 +554,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         .artist-card-eyebrow { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-soft); }
         .artist-card-name { font-family: var(--serif); font-size: 1.25rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; line-height: 1.15; }
         .artist-card-type { font-size: 0.88rem; color: var(--ink-soft); }
-        .artist-card-link { margin-top: 6px; font-size: 0.8rem; font-weight: 600; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
-        .callout-badge { width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0; object-fit: cover; background: white; border: 2px solid rgba(0,0,0,0.06); }
-        .callout-badge-placeholder { width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0; background: white; border: 2px solid rgba(0,0,0,0.06); display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 1.3rem; color: var(--ink-faint); }
-        .callout-eyebrow { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
-        .callout-title { font-family: var(--serif); font-size: 1.05rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; line-height: 1.2; margin-bottom: 4px; }
-        .callout-sub { font-size: 0.85rem; color: var(--ink-soft); line-height: 1.4; }
-        .callout-arrow { color: var(--ink-faint); flex-shrink: 0; margin-left: auto; align-self: center; }
+        .artist-card-link { margin-top: 6px; font-size: 0.8rem; font-weight: 600; color: var(--accent); display: flex; align-items: center; }
 
         /* DESCRIPTION */
         .section { padding: 48px 0; border-top: 1px solid var(--border); }
@@ -599,24 +607,26 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         <div className="hero-band">
           {event.image_url && <img src={event.image_url} alt="" />}
           <div className="hero-fade" />
-          <a href="/events" className="back-link">← All Events</a>
-          <div className="hero-bottom">
-            <div className="date-badge">
-              <div className="dow">{dayOfWeek.slice(0, 3)}</div>
-              <div className="day">{d.getDate()}</div>
-              <div className="mon">{d.toLocaleDateString('en-US', { month: 'short' })}</div>
-            </div>
-            <div>
-              <div className="top-eyebrow">
-                {[event.venue?.name, categoryLabel].filter(Boolean).join(' / ')}
+          <div className="hero-band__inner">
+            <a href="/events" className="back-link">← All Events</a>
+            <div className="hero-bottom">
+              <div className="date-badge">
+                <div className="dow">{dayOfWeek.slice(0, 3)}</div>
+                <div className="day">{d.getDate()}</div>
+                <div className="mon">{d.toLocaleDateString('en-US', { month: 'short' })}</div>
               </div>
-              <h1 className="page-title">{event.title}</h1>
-              {(isToday || event.star) && (
-                <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-                  {isToday && <span className="top-today">Today</span>}
-                  {event.star && <span className="top-star">Featured</span>}
+              <div>
+                <div className="top-eyebrow">
+                  {[event.venue?.name, categoryLabel].filter(Boolean).join(' / ')}
                 </div>
-              )}
+                <h1 className="page-title">{event.title}</h1>
+                {(isToday || event.star) && (
+                  <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                    {isToday && <span className="top-today">Today</span>}
+                    {event.star && <span className="top-star">Featured</span>}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -644,30 +654,26 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           {/* DETAILS COLUMN */}
           <div className="details-col">
 
+            {/* Time — big and bold on its own, not squeezed into the grid */}
+            <div className="time-box">
+              {event.event_start_time ? (
+                <>
+                  {formatTime(event.event_start_time)}
+                  {event.event_end_time && <span className="time-box__sep">–</span>}
+                  {event.event_end_time && formatTime(event.event_end_time)}
+                </>
+              ) : 'Time TBA'}
+            </div>
+
             {/* Info card */}
             <div className="info-card">
               <div className="info-grid">
-
-                <div className="info-cell">
-                  <div className="info-label">Time</div>
-                  <div className="info-value">
-                    {event.event_start_time ? (
-                      <>
-                        <strong>{formatTime(event.event_start_time)}</strong>
-                        {event.event_end_time && ` → ${formatTime(event.event_end_time)}`}
-                      </>
-                    ) : 'Time TBA'}
-                  </div>
-                </div>
 
                 {event.venue && (
                   <div className="info-cell">
                     <div className="info-label">Venue</div>
                     <div className="info-value">
                       <strong>{event.venue.name}</strong>
-                      {event.venue.neighborhood && (
-                        <><br /><span style={{ color: 'var(--ink-faint)', fontSize: '0.88rem' }}>{event.venue.neighborhood}</span></>
-                      )}
                     </div>
                   </div>
                 )}
@@ -682,18 +688,21 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
               </div>
             </div>
 
-            {/* Actions — one row: primary CTA + Follow (heart) + Calendar + Share */}
-            <div className="action-row">
+            {/* Ticket box — its own line, full width, since TicketPurchaseButton's
+                dropdown (tier selection, quantity, checkout) needs real room and
+                was getting cramped squeezed next to the Follow/Calendar/Share icons */}
+            <div className="ticket-row">
               {event.ticketing_enabled && event.id && event.slug ? (
                 <TicketPurchaseButton eventId={event.id} eventSlug={event.slug} />
               ) : ctaUrl ? (
                 <a href={ctaUrl} target="_blank" rel="noopener noreferrer" className="btn-block">
                   {event.ticket_url ? 'Get Tickets' : 'Learn More'}
                 </a>
-              ) : (
-                <span />
-              )}
+              ) : null}
+            </div>
 
+            {/* Utility row — Follow (heart) + Calendar + Share, below the ticket box */}
+            <div className="action-row">
               <div className="action-icon-btn">
                 <FollowFavoriteButtons
                   entityType="event"
@@ -730,34 +739,38 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
                   description={event.description}
                 />
               </div>
-              {/* NOTE: couldn't fetch AddToCalendar.tsx / ShareButtons.tsx to
-                  check their internal button markup — GitHub's API was
-                  returning 503s while building this. They're dropped in
-                  here as-is; if their default size/shape doesn't sit well
-                  next to the heart button and CTA, send a screenshot and
-                  I'll true up the sizing. */}
+              {/* NOTE: couldn't fetch AddToCalendar.tsx to check its internal
+                  button markup — GitHub's API was returning 503s while
+                  building this. It's dropped in here as-is; if its default
+                  size/shape doesn't sit well next to the heart button and
+                  Share, send a screenshot and I'll true up the sizing. */}
             </div>
 
-            {/* Venue callout — replaces the pink "Did You Know" box */}
+            {/* Venue callout — black bg, full-height image like the artist card */}
             {event.venue && (
               <a
                 href={event.venue.slug ? `/venues/${event.venue.slug}` : event.venue.website || '#'}
                 target={event.venue.slug ? '_self' : '_blank'}
                 rel={event.venue.slug ? undefined : 'noopener noreferrer'}
-                className="callout-box"
+                className="venue-card"
               >
                 {event.venue.logo || event.venue.image_url
-                  ? <img src={event.venue.logo ?? event.venue.image_url ?? ''} alt={event.venue.name} className="callout-badge" />
-                  : <div className="callout-badge-placeholder">{event.venue.name[0]}</div>
+                  ? <img src={event.venue.logo ?? event.venue.image_url ?? ''} alt={event.venue.name} className="venue-card-img" />
+                  : <div className="venue-card-img-placeholder">{event.venue.name[0]}</div>
                 }
-                <div>
-                  <div className="callout-eyebrow">Venue</div>
-                  <div className="callout-title">{event.venue.name}</div>
-                  <div className="callout-sub">
-                    {[event.venue.address, event.venue.neighborhood || event.venue.city].filter(Boolean).join(' · ')}
+                <div className="venue-card-body">
+                  <div className="venue-card-eyebrow">Venue</div>
+                  <div className="venue-card-name">{event.venue.name}</div>
+                  {event.venue.address && (
+                    <div className="venue-card-address">{event.venue.address}</div>
+                  )}
+                  {event.venue.neighborhood && (
+                    <div className="venue-card-neighborhood">{event.venue.neighborhood}</div>
+                  )}
+                  <div className="venue-card-link">
+                    View Venue Page <ArrowIcon />
                   </div>
                 </div>
-                <span className="callout-arrow">→</span>
               </a>
             )}
 
@@ -778,7 +791,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
                   {artist.artist_type && (
                     <div className="artist-card-type">{artist.artist_type}</div>
                   )}
-                  <div className="artist-card-link">View Artist Page →</div>
+                  <div className="artist-card-link">View Artist Page <ArrowIcon /></div>
                 </div>
               </a>
             ))}
@@ -847,6 +860,25 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
 }
 
 // ─── Related event card ───────────────────────────────────────────────────────
+
+function ArrowIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ display: 'inline-block', verticalAlign: '-2px', marginLeft: '2px' }}
+    >
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="13 6 19 12 13 18" />
+    </svg>
+  )
+}
 
 function RelatedCard({ event: rel }: { event: Event }) {
   const relDate = new Date(rel.event_date + 'T12:00:00')
