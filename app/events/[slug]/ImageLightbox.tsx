@@ -15,6 +15,12 @@ import { createPortal } from 'react-dom'
  *     ordinary CSS instead of needing to be a positioned ancestor.
  *   - No more opacity/gradient darkening — the photo shows at full
  *     brightness since there's no text it needs to stay legible under.
+ *   - No more object-fit: cover / forced height — the image now renders
+ *     at width: 100%, height: auto, so it displays at its own natural
+ *     aspect ratio instead of being cropped to fit a fixed box. A wide,
+ *     landscape-style image (e.g. a Facebook-cover-shaped photo) now
+ *     shows in full rather than getting cropped top/bottom to force it
+ *     into a portrait frame.
  */
 export default function ImageLightbox({ src, alt }: { src: string; alt: string }) {
   const [open, setOpen] = useState(false)
@@ -22,7 +28,7 @@ export default function ImageLightbox({ src, alt }: { src: string; alt: string }
   useEffect(() => { setMounted(true) }, [])
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <div style={{ position: 'relative', width: '100%' }}>
       <img
         src={src}
         alt={alt}
@@ -31,8 +37,7 @@ export default function ImageLightbox({ src, alt }: { src: string; alt: string }
           cursor: 'zoom-in',
           display: 'block',
           width: '100%',
-          height: '100%',
-          objectFit: 'cover',
+          height: 'auto',
         }}
       />
 
