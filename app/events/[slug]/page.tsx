@@ -455,21 +455,25 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         html, body { background: var(--white); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
 
         /* PAGE WRAP */
-        .page-wrap { max-width: 1240px; margin: 0 auto; padding: 0 32px 0; }
+        .page-wrap { max-width: 1240px; margin: 0 auto; padding: 0 24px 0; }
 
-        /* FADED HERO BAND — viewport-relative, not a fixed px height */
+        /* FADED HERO BAND — viewport-relative, not a fixed px height.
+           back-link/hero-bottom align with the centered 1240px content
+           column via calc()/max() directly, rather than an inner wrapper
+           div — a wrapper relying on height:100% turned out fragile and
+           caused the whole title/date/back-link block to disappear. */
         .hero-band { position: relative; height: clamp(160px, 30vh, 320px); overflow: hidden; width: 100vw; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); margin-bottom: 28px; }
         .hero-band img { width: 100%; height: 100%; object-fit: cover; opacity: 0.32; display: block; }
         .hero-fade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, var(--white) 94%); }
-        .hero-band__inner { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; height: 100%; }
-        .back-link { position: absolute; left: 32px; top: 20px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 600; color: var(--ink); background: var(--white); border: 1px solid var(--border); padding: 7px 14px; border-radius: 100px; text-decoration: none; }
+        .back-link { position: absolute; z-index: 2; left: max(24px, calc((100vw - 1240px) / 2 + 24px)); top: 20px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 600; color: var(--ink); background: var(--white); border: 1px solid var(--border); padding: 7px 14px; border-radius: 100px; text-decoration: none; }
         .back-link:hover { border-color: var(--ink); }
 
-        .hero-bottom { position: absolute; left: 32px; bottom: 22px; right: 32px; display: flex; align-items: flex-end; gap: 20px; }
-        .date-badge { background: var(--ink); color: white; border-radius: 10px; padding: 14px 20px; text-align: center; min-width: 100px; flex-shrink: 0; }
-        .date-badge .dow { font-size: 0.85rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.65; }
-        .date-badge .day { font-family: var(--serif); font-size: 3.4rem; font-weight: 700; line-height: 1; margin: 2px 0; }
-        .date-badge .mon { font-size: 0.85rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.65; }
+        .hero-bottom { position: absolute; z-index: 2; left: max(24px, calc((100vw - 1240px) / 2 + 24px)); right: max(24px, calc((100vw - 1240px) / 2 + 24px)); bottom: 22px; display: flex; align-items: flex-end; gap: 18px; }
+        .hero-bottom__text { min-width: 0; }
+        .date-badge { background: var(--ink); color: white; border-radius: 8px; padding: 9px 14px; text-align: center; min-width: 66px; flex-shrink: 0; }
+        .date-badge .dow { font-size: 0.64rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.65; }
+        .date-badge .day { font-family: var(--serif); font-size: 1.6rem; font-weight: 700; line-height: 1.05; }
+        .date-badge .mon { font-size: 0.64rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.65; }
         .top-eyebrow { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
         .page-title { font-family: var(--serif); font-size: clamp(1.5rem, 3vw, 2.3rem); font-weight: 700; text-transform: uppercase; line-height: 1.05; letter-spacing: -0.01em; }
         @media (max-width: 640px) {
@@ -489,7 +493,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           .event-image-noimg { aspect-ratio: 16/10; }
         }
 
-        .event-types-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; }
+        .event-types-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
         .hero-type-tag { font-size: 0.66rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); background: var(--accent-light); border: 1px solid rgba(200,6,80,0.2); padding: 4px 11px; border-radius: 100px; text-decoration: none; transition: background 0.15s; }
         .hero-type-tag:hover { background: rgba(200,6,80,0.18); }
 
@@ -526,35 +530,37 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         .btn-block.outline { background: transparent; color: var(--ink); border: 2px solid var(--ink); }
         .btn-block.outline:hover { background: var(--ink); color: white; }
 
-        /* ACTION ROW — Follow (heart) + Calendar + Share, below the ticket row */
-        .action-row { display: flex; align-items: center; gap: 8px; }
-        .action-icon-btn { flex: 0 0 auto; }
-        @media (max-width: 480px) {
-          .action-row { flex-wrap: wrap; }
-        }
+        /* FOLLOW ROW — small, on its own, not part of the 50/50 grid below */
+        .follow-row { display: flex; }
+
+        /* ACTION ROW — Calendar + Share, even 50/50 split */
+        .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
         /* VENUE CARD — full-height image like the artist card, black bg */
-        .venue-card { display: flex; overflow: hidden; border-radius: 14px; background: #14110f; text-decoration: none; color: white; transition: background 0.15s; }
+        .venue-card { display: flex; align-items: stretch; overflow: hidden; border-radius: 14px; background: #14110f; text-decoration: none; color: white; transition: background 0.15s; }
         .venue-card:hover { background: #201b17; }
-        .venue-card-img { width: 110px; flex-shrink: 0; object-fit: cover; align-self: stretch; background: rgba(255,255,255,0.08); }
+        .venue-card-img { width: 110px; flex-shrink: 0; object-fit: contain; align-self: stretch; background: rgba(255,255,255,0.06); padding: 8px; box-sizing: border-box; }
         .venue-card-img-placeholder { width: 110px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 1.8rem; color: var(--gold); background: rgba(255,255,255,0.08); }
         .venue-card-body { padding: 16px 20px; display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 0; }
         .venue-card-eyebrow { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.5); }
         .venue-card-name { font-family: var(--serif); font-size: 1.25rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; line-height: 1.15; color: white; }
         .venue-card-address { font-size: 0.85rem; color: white; opacity: 0.85; }
         .venue-card-neighborhood { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gold); margin-top: 2px; }
-        .venue-card-link { margin-top: 6px; font-size: 0.8rem; font-weight: 600; color: var(--gold); display: flex; align-items: center; }
 
-        /* ARTIST FEATURE CARD — rectangular image left, content right */
-        .artist-card { display: flex; overflow: hidden; border-radius: 14px; background: var(--accent-light); text-decoration: none; color: var(--ink); transition: background 0.15s; }
-        .artist-card:hover { background: #fbe2d8; }
+        /* ARTIST FEATURE CARD — same pattern, light gray bg instead of off-white/pink */
+        .artist-card { display: flex; align-items: stretch; overflow: hidden; border-radius: 14px; background: var(--off); text-decoration: none; color: var(--ink); transition: background 0.15s; }
+        .artist-card:hover { background: #ece8e2; }
         .artist-card-img { width: 110px; flex-shrink: 0; object-fit: cover; align-self: stretch; background: var(--border); }
         .artist-card-img-placeholder { width: 110px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 1.8rem; color: var(--accent); background: var(--border); }
         .artist-card-body { padding: 16px 20px; display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 0; }
         .artist-card-eyebrow { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-soft); }
         .artist-card-name { font-family: var(--serif); font-size: 1.25rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; line-height: 1.15; }
         .artist-card-type { font-size: 0.88rem; color: var(--ink-soft); }
-        .artist-card-link { margin-top: 6px; font-size: 0.8rem; font-weight: 600; color: var(--accent); display: flex; align-items: center; }
+
+        /* Circular arrow-only button, far right of both card types — no
+           label text, matches the plain chevron-in-a-circle reference */
+        .card-arrow { flex-shrink: 0; align-self: center; margin: 0 18px 0 8px; width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid currentColor; display: flex; align-items: center; justify-content: center; opacity: 0.75; transition: opacity 0.15s, transform 0.15s; }
+        .venue-card:hover .card-arrow, .artist-card:hover .card-arrow { opacity: 1; transform: translateX(3px); }
 
         /* DESCRIPTION */
         .section { padding: 48px 0; border-top: 1px solid var(--border); }
@@ -607,26 +613,31 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         <div className="hero-band">
           {event.image_url && <img src={event.image_url} alt="" />}
           <div className="hero-fade" />
-          <div className="hero-band__inner">
-            <a href="/events" className="back-link">← All Events</a>
-            <div className="hero-bottom">
-              <div className="date-badge">
-                <div className="dow">{dayOfWeek.slice(0, 3)}</div>
-                <div className="day">{d.getDate()}</div>
-                <div className="mon">{d.toLocaleDateString('en-US', { month: 'short' })}</div>
+          <a href="/events" className="back-link">← All Events</a>
+          <div className="hero-bottom">
+            <div className="date-badge">
+              <div className="dow">{dayOfWeek.slice(0, 3)}</div>
+              <div className="day">{d.getDate()}</div>
+              <div className="mon">{d.toLocaleDateString('en-US', { month: 'short' })}</div>
+            </div>
+            <div className="hero-bottom__text">
+              <div className="top-eyebrow">
+                {[event.venue?.name, categoryLabel].filter(Boolean).join(' / ')}
               </div>
-              <div>
-                <div className="top-eyebrow">
-                  {[event.venue?.name, categoryLabel].filter(Boolean).join(' / ')}
+              <h1 className="page-title">{event.title}</h1>
+              {(isToday || event.star) && (
+                <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                  {isToday && <span className="top-today">Today</span>}
+                  {event.star && <span className="top-star">Featured</span>}
                 </div>
-                <h1 className="page-title">{event.title}</h1>
-                {(isToday || event.star) && (
-                  <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-                    {isToday && <span className="top-today">Today</span>}
-                    {event.star && <span className="top-star">Featured</span>}
-                  </div>
-                )}
-              </div>
+              )}
+              {event.event_types && event.event_types.length > 0 && (
+                <div className="event-types-row">
+                  {event.event_types.map(t => (
+                    <a key={t} href={`/events?type=${encodeURIComponent(t)}`} className="hero-type-tag">{t}</a>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -642,13 +653,6 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
                 : <div className="event-image-noimg">{event.title[0]}</div>
               }
             </div>
-            {event.event_types && event.event_types.length > 0 && (
-              <div className="event-types-row">
-                {event.event_types.map(t => (
-                  <a key={t} href={`/events?type=${encodeURIComponent(t)}`} className="hero-type-tag">{t}</a>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* DETAILS COLUMN */}
@@ -701,49 +705,46 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
               ) : null}
             </div>
 
-            {/* Utility row — Follow (heart) + Calendar + Share, below the ticket box */}
-            <div className="action-row">
-              <div className="action-icon-btn">
-                <FollowFavoriteButtons
-                  entityType="event"
-                  entityId={event.id}
-                  heartOnly
-                  className="ffb-light"
-                />
-              </div>
-              {/* NOTE: heartOnly's default styling (ffb-heart-btn) assumes a
-                  dark background — it uses white-ish borders/icon strokes
-                  meant to sit over a photo. Here it's sitting on the light
-                  --off sidebar background instead, so this may need its own
-                  light-mode variant added inside FollowFavoriteButtons.tsx
-                  (similar to how ffb-light already overrides the pill-style
-                  Follow button) rather than relying on the className alone —
-                  check how it actually looks once rendered. */}
+            {/* Follow — its own small row, not part of the 50/50 grid below */}
+            <div className="follow-row">
+              <FollowFavoriteButtons
+                entityType="event"
+                entityId={event.id}
+                heartOnly
+                className="ffb-light"
+              />
+            </div>
+            {/* NOTE: heartOnly's default styling (ffb-heart-btn) assumes a
+                dark background — it uses white-ish borders/icon strokes
+                meant to sit over a photo. Here it's sitting on the light
+                --off sidebar background instead, so this may need its own
+                light-mode variant added inside FollowFavoriteButtons.tsx
+                (similar to how ffb-light already overrides the pill-style
+                Follow button) rather than relying on the className alone —
+                check how it actually looks once rendered. */}
 
-              <div className="action-icon-btn">
-                <AddToCalendar
-                  title={event.title}
-                  date={event.event_date}
-                  startTime={event.event_start_time}
-                  endTime={event.event_end_time}
-                  endDate={event.end_date}
-                  venueName={event.venue?.name ?? null}
-                  venueAddress={event.venue?.address ?? null}
-                  description={event.description}
-                  slug={event.slug ?? event.id}
-                />
-              </div>
-              <div className="action-icon-btn">
-                <ShareButtons
-                  title={event.title}
-                  description={event.description}
-                />
-              </div>
+            {/* Calendar + Share — even 50/50 split, same width as the boxes above */}
+            <div className="action-row">
+              <AddToCalendar
+                title={event.title}
+                date={event.event_date}
+                startTime={event.event_start_time}
+                endTime={event.event_end_time}
+                endDate={event.end_date}
+                venueName={event.venue?.name ?? null}
+                venueAddress={event.venue?.address ?? null}
+                description={event.description}
+                slug={event.slug ?? event.id}
+              />
+              <ShareButtons
+                title={event.title}
+                description={event.description}
+              />
               {/* NOTE: couldn't fetch AddToCalendar.tsx to check its internal
                   button markup — GitHub's API was returning 503s while
                   building this. It's dropped in here as-is; if its default
-                  size/shape doesn't sit well next to the heart button and
-                  Share, send a screenshot and I'll true up the sizing. */}
+                  size/shape doesn't sit well next to Share, send a
+                  screenshot and I'll true up the sizing. */}
             </div>
 
             {/* Venue callout — black bg, full-height image like the artist card */}
@@ -767,10 +768,8 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
                   {event.venue.neighborhood && (
                     <div className="venue-card-neighborhood">{event.venue.neighborhood}</div>
                   )}
-                  <div className="venue-card-link">
-                    View Venue Page <ArrowIcon />
-                  </div>
                 </div>
+                <div className="card-arrow"><ArrowIcon /></div>
               </a>
             )}
 
@@ -791,8 +790,8 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
                   {artist.artist_type && (
                     <div className="artist-card-type">{artist.artist_type}</div>
                   )}
-                  <div className="artist-card-link">View Artist Page <ArrowIcon /></div>
                 </div>
+                <div className="card-arrow"><ArrowIcon /></div>
               </a>
             ))}
 
