@@ -89,7 +89,9 @@ export default function ShareButtons({ title, description }: Props) {
         aria-label="Share this event"
         style={{
           display: 'inline-flex',
+          width: '100%',
           alignItems: 'center',
+          justifyContent: 'center',
           gap: '7px',
           padding: '13px 20px',
           borderRadius: '8px',
