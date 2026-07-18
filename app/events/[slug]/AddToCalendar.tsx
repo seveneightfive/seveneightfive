@@ -96,12 +96,19 @@ export default function AddToCalendar({
     setOpen(false)
   }
 
+  // Matches ShareButtons.tsx's item styling exactly — bold uppercase serif
+  // labels, accent-tinted hover — so the two dropdowns feel like the same
+  // component family instead of two different UI patterns.
   const itemBase: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    gap: '10px',
-    padding: '11px 16px',
-    fontSize: '0.84rem',
+    gap: '11px',
+    padding: '13px 18px',
+    fontSize: '0.78rem',
+    fontWeight: 700,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+    fontFamily: 'var(--serif)',
     color: 'var(--ink)',
     textDecoration: 'none',
     background: 'transparent',
@@ -109,20 +116,21 @@ export default function AddToCalendar({
     borderBottom: '1px solid var(--border)',
     width: '100%',
     cursor: 'pointer',
-    fontFamily: 'var(--sans)',
     textAlign: 'left',
-    transition: 'background 0.1s',
+    transition: 'background 0.12s',
   }
 
   return (
-    <div style={{ position: 'relative' }} ref={ref}>
+    <div style={{ position: 'relative', width: '100%' }} ref={ref}>
       <button
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
         aria-haspopup="listbox"
         style={{
           display: 'inline-flex',
+          width: '100%',
           alignItems: 'center',
+          justifyContent: 'center',
           gap: '7px',
           padding: '13px 20px',
           borderRadius: '8px',
@@ -150,46 +158,73 @@ export default function AddToCalendar({
           role="listbox"
           style={{
             position: 'absolute',
-            top: 'calc(100% + 6px)',
+            top: 'calc(100% + 8px)',
             left: 0,
             background: 'var(--white)',
             border: '1px solid var(--border)',
-            borderRadius: '10px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
-            minWidth: '200px',
+            borderRadius: '12px',
+            boxShadow: '0 12px 32px rgba(20,17,15,0.14)',
+            minWidth: '210px',
             overflow: 'hidden',
             zIndex: 100,
           }}
         >
+          <div
+            style={{
+              padding: '11px 18px',
+              fontSize: '0.66rem',
+              fontWeight: 700,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-faint)',
+              borderBottom: '1px solid var(--border)',
+              background: 'var(--off)',
+            }}
+          >
+            Add To Calendar
+          </div>
           <a
             href={googleUrl}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => setOpen(false)}
-            style={{ ...itemBase, background: hovered === 'google' ? 'var(--off)' : 'transparent' }}
+            style={{
+              ...itemBase,
+              background: hovered === 'google' ? 'var(--accent-light)' : 'transparent',
+              color: hovered === 'google' ? 'var(--accent)' : 'var(--ink)',
+            }}
             onMouseEnter={() => setHovered('google')}
             onMouseLeave={() => setHovered(null)}
           >
-            <GoogleCalIcon /> Google Calendar
+            <GoogleIcon /> Google Calendar
           </a>
           <button
             onClick={downloadIcs}
-            style={{ ...itemBase, background: hovered === 'apple' ? 'var(--off)' : 'transparent' }}
+            style={{
+              ...itemBase,
+              background: hovered === 'apple' ? 'var(--accent-light)' : 'transparent',
+              color: hovered === 'apple' ? 'var(--accent)' : 'var(--ink)',
+            }}
             onMouseEnter={() => setHovered('apple')}
             onMouseLeave={() => setHovered(null)}
           >
-            <AppleCalIcon /> Apple Calendar
+            <AppleIcon /> Apple Calendar
           </button>
           <a
             href={outlookUrl}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => setOpen(false)}
-            style={{ ...itemBase, borderBottom: 'none', background: hovered === 'outlook' ? 'var(--off)' : 'transparent' }}
+            style={{
+              ...itemBase,
+              borderBottom: 'none',
+              background: hovered === 'outlook' ? 'var(--accent-light)' : 'transparent',
+              color: hovered === 'outlook' ? 'var(--accent)' : 'var(--ink)',
+            }}
             onMouseEnter={() => setHovered('outlook')}
             onMouseLeave={() => setHovered(null)}
           >
-            <OutlookCalIcon /> Outlook
+            <OutlookIcon /> Outlook
           </a>
         </div>
       )}
@@ -220,39 +255,31 @@ function ChevronIcon({ open }: { open: boolean }) {
   )
 }
 
-function GoogleCalIcon() {
+// Simple flat "G" — matches the plain, non-fussy icon language used for
+// X/Facebook in ShareButtons rather than a busy multi-color logo mark.
+function GoogleIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-      <rect width="24" height="24" rx="4" fill="#fff" />
-      <path d="M17 3H7C4.79 3 3 4.79 3 7v10c0 2.21 1.79 4 4 4h10c2.21 0 4-1.79 4-4V7c0-2.21-1.79-4-4-4z" fill="#4285F4" />
-      <path d="M17 3H7C4.79 3 3 4.79 3 7v10c0 2.21 1.79 4 4 4h10c2.21 0 4-1.79 4-4V7c0-2.21-1.79-4-4-4z" fill="none" stroke="#4285F4" strokeWidth="0" />
-      <rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="#4285F4" strokeWidth="0" />
-      <path d="M8 11h8M8 14h5" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-      <circle cx="12" cy="8" r="1.5" fill="white" />
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+      <text x="12" y="17" textAnchor="middle" fontFamily="system-ui, sans-serif" fontSize="16" fontWeight="700" fill="#4285F4">G</text>
     </svg>
   )
 }
 
-function AppleCalIcon() {
+// Simple Apple silhouette
+function AppleIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-      <rect x="2" y="4" width="20" height="18" rx="3" fill="#FF3B30" />
-      <rect x="2" y="4" width="20" height="5" rx="0" fill="#FF3B30" />
-      <rect x="2" y="7" width="20" height="2" fill="#C0392B" />
-      <text x="12" y="18" textAnchor="middle" fill="white" fontSize="8" fontWeight="bold" fontFamily="system-ui">{new Date().getDate()}</text>
-      <line x1="8" y1="2" x2="8" y2="6" stroke="#555" strokeWidth="1.5" strokeLinecap="round" />
-      <line x1="16" y1="2" x2="16" y2="6" stroke="#555" strokeWidth="1.5" strokeLinecap="round" />
+    <svg width="14" height="14" viewBox="0 0 384 512" fill="currentColor">
+      <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" />
     </svg>
   )
 }
 
-function OutlookCalIcon() {
+// Simple Outlook mark
+function OutlookIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <svg width="15" height="15" viewBox="0 0 24 24">
       <rect x="2" y="3" width="20" height="18" rx="3" fill="#0078D4" />
-      <rect x="8" y="3" width="14" height="18" rx="3" fill="#50A0E0" />
-      <rect x="2" y="3" width="10" height="18" rx="3" fill="#0078D4" />
-      <text x="7" y="15" textAnchor="middle" fill="white" fontSize="7" fontWeight="bold" fontFamily="system-ui">CAL</text>
+      <text x="12" y="16" textAnchor="middle" fontFamily="system-ui, sans-serif" fontSize="12" fontWeight="700" fill="#fff">O</text>
     </svg>
   )
 }
