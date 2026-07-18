@@ -64,9 +64,13 @@ export default function ShareButtons({ title, description }: Props) {
   const itemBase: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    gap: '10px',
-    padding: '11px 16px',
-    fontSize: '0.84rem',
+    gap: '11px',
+    padding: '13px 18px',
+    fontSize: '0.78rem',
+    fontWeight: 700,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+    fontFamily: 'var(--serif)',
     color: 'var(--ink)',
     textDecoration: 'none',
     background: 'transparent',
@@ -74,9 +78,8 @@ export default function ShareButtons({ title, description }: Props) {
     borderBottom: '1px solid var(--border)',
     width: '100%',
     cursor: 'pointer',
-    fontFamily: 'var(--sans)',
     textAlign: 'left',
-    transition: 'background 0.1s',
+    transition: 'background 0.12s',
   }
 
   return (
@@ -112,20 +115,38 @@ export default function ShareButtons({ title, description }: Props) {
         <div
           style={{
             position: 'absolute',
-            top: 'calc(100% + 6px)',
+            top: 'calc(100% + 8px)',
             left: 0,
             background: 'var(--white)',
             border: '1px solid var(--border)',
-            borderRadius: '10px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
-            minWidth: '180px',
+            borderRadius: '12px',
+            boxShadow: '0 12px 32px rgba(20,17,15,0.14)',
+            minWidth: '210px',
             overflow: 'hidden',
             zIndex: 100,
           }}
         >
+          <div
+            style={{
+              padding: '11px 18px',
+              fontSize: '0.66rem',
+              fontWeight: 700,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-faint)',
+              borderBottom: '1px solid var(--border)',
+              background: 'var(--off)',
+            }}
+          >
+            Share Event
+          </div>
           <button
             onClick={copyLink}
-            style={{ ...itemBase, background: hovered === 'copy' ? 'var(--off)' : 'transparent' }}
+            style={{
+              ...itemBase,
+              background: hovered === 'copy' ? 'var(--accent-light)' : 'transparent',
+              color: hovered === 'copy' ? 'var(--accent)' : 'var(--ink)',
+            }}
             onMouseEnter={() => setHovered('copy')}
             onMouseLeave={() => setHovered(null)}
           >
@@ -134,7 +155,11 @@ export default function ShareButtons({ title, description }: Props) {
           </button>
           <button
             onClick={shareToX}
-            style={{ ...itemBase, background: hovered === 'x' ? 'var(--off)' : 'transparent' }}
+            style={{
+              ...itemBase,
+              background: hovered === 'x' ? 'var(--accent-light)' : 'transparent',
+              color: hovered === 'x' ? 'var(--accent)' : 'var(--ink)',
+            }}
             onMouseEnter={() => setHovered('x')}
             onMouseLeave={() => setHovered(null)}
           >
@@ -143,7 +168,12 @@ export default function ShareButtons({ title, description }: Props) {
           </button>
           <button
             onClick={shareToFacebook}
-            style={{ ...itemBase, borderBottom: 'none', background: hovered === 'fb' ? 'var(--off)' : 'transparent' }}
+            style={{
+              ...itemBase,
+              borderBottom: 'none',
+              background: hovered === 'fb' ? 'var(--accent-light)' : 'transparent',
+              color: hovered === 'fb' ? 'var(--accent)' : 'var(--ink)',
+            }}
             onMouseEnter={() => setHovered('fb')}
             onMouseLeave={() => setHovered(null)}
           >
@@ -187,7 +217,7 @@ function CheckIcon() {
 
 function XIcon() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.259 5.633L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z" />
     </svg>
   )
