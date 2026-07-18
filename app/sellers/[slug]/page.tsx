@@ -19,6 +19,7 @@ import {
   getSellerDisplayName,
 } from '@/lib/sellers';
 import type { SellerEvent } from '@/types/seller';
+import ManageTicketsButton from './ManageTicketsButton';
 
 export const revalidate = 300;
 
@@ -63,6 +64,53 @@ function formatDateBlock(dateStr: string) {
   };
 }
 
+function formatTimeOfDay(time: string | null): string | null {
+  if (!time) return null;
+  const [hStr, mStr] = time.split(':');
+  const h = parseInt(hStr, 10);
+  if (Number.isNaN(h)) return null;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour = h % 12 || 12;
+  return `${hour}:${mStr} ${ampm}`;
+}
+
+// Builds a line like "Sat Nov 21, 2026 8:45 PM - 10:15 PM" — matches the
+// reference layout's single date/time line under the title.
+function formatDateTimeLine(event: SellerEvent): string {
+  const dateStr = event.start_date ?? event.event_date;
+  const d = new Date(dateStr + (dateStr.includes('T') ? '' : 'T00:00:00'));
+  const datePart = d.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const start = formatTimeOfDay(event.event_start_time);
+  const end = formatTimeOfDay(event.event_end_time);
+  if (start && end) return `${datePart} ${start} - ${end}`;
+  if (start) return `${datePart} ${start}`;
+  return datePart;
+}
+
+function PinIcon() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ flexShrink: 0 }}
+    >
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
 // ---------- Page ----------
 export default async function SellerPage({
   params,
@@ -92,6 +140,7 @@ export default async function SellerPage({
 
   return (
     <main className="seller-page">
+      <div className="seller-page__inner">
       {/* UTILITY BAR — logo/name, optional Event Website link, Manage Tickets */}
       <div className="utilityBar">
         <Link href={`/sellers/${slug}`} className="utilityBar__brand">
@@ -107,9 +156,7 @@ export default async function SellerPage({
               Event Website
             </a>
           )}
-          <Link href={`/tickets/lookup?seller=${slug}`} className="utilityBar__manage">
-            Manage Tickets
-          </Link>
+          <ManageTicketsButton />
         </div>
       </div>
 
@@ -155,33 +202,46 @@ export default async function SellerPage({
         ) : (
           <div className="events">
             {upcoming.map((event) => {
-              const d = formatDateBlock(event.start_date ?? event.event_date);
               const eventPath = `/events/${event.slug ?? event.id}`;
+              const dateTimeLine = formatDateTimeLine(event);
+              const ticketHref = event.ticket_url || eventPath;
               return (
-                <Link key={event.id} href={eventPath} className="eventCard">
-                  <div className="eventDate">
-                    <span className="day">{d.day}</span>
-                    <span className="mon">{d.mon}</span>
+                <div key={event.id} className="eventCard">
+                  <div className="eventCard__media">
+                    {event.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={event.image_url} alt="" className="eventCard__img" />
+                    ) : (
+                      <div className="eventCard__imgFallback" />
+                    )}
                   </div>
-                  <div className="eventInfo">
+                  <div className="eventCard__body">
                     {event.event_format && (
                       <div className="eventTag">{event.event_format}</div>
                     )}
-                    <div className="eventName">{event.title}</div>
-                    <div className="eventMeta">
-                      {event.venue?.name}
-                      {event.event_start_time && ` · ${event.event_start_time}`}
+                    <div className="eventCard__title">{event.title}</div>
+                    {dateTimeLine && <div className="eventCard__datetime">{dateTimeLine}</div>}
+                    {event.venue?.name && (
+                      <div className="eventCard__venue">
+                        <PinIcon />
+                        {event.venue.name}
+                      </div>
+                    )}
+                    <div className="eventCard__actions">
+                      <Link href={eventPath} className="eventCard__btn eventCard__btn--outline">
+                        Event Details
+                      </Link>
+                      <a
+                        href={ticketHref}
+                        target={event.ticket_url ? '_blank' : undefined}
+                        rel={event.ticket_url ? 'noopener noreferrer' : undefined}
+                        className="eventCard__btn eventCard__btn--solid"
+                      >
+                        {event.cta_label || 'Get Tickets'}
+                      </a>
                     </div>
                   </div>
-                  <div className="eventThumb">
-                    {event.image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={event.image_url} alt="" className="eventThumbImg" />
-                    ) : (
-                      <div className="eventThumbFallback" />
-                    )}
-                  </div>
-                </Link>
+                </div>
               );
             })}
           </div>
@@ -197,31 +257,31 @@ export default async function SellerPage({
               const d = formatDateBlock(event.start_date ?? event.event_date);
               const eventPath = `/events/${event.slug ?? event.id}`;
               return (
-                <Link
-                  key={event.id}
-                  href={eventPath}
-                  className="eventCard eventCard--past"
-                >
-                  <div className="eventDate">
-                    <span className="day">{d.day}</span>
-                    <span className="mon">{d.mon}</span>
-                  </div>
-                  <div className="eventInfo">
-                    <div className="eventName">{event.title}</div>
-                    <div className="eventMeta">
-                      {event.venue?.name}
-                      {` · ${d.year}`}
-                    </div>
-                  </div>
-                  <div className="eventThumb">
+                <div key={event.id} className="eventCard eventCard--past">
+                  <div className="eventCard__media">
                     {event.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={event.image_url} alt="" className="eventThumbImg" />
+                      <img src={event.image_url} alt="" className="eventCard__img" />
                     ) : (
-                      <div className="eventThumbFallback" />
+                      <div className="eventCard__imgFallback" />
                     )}
                   </div>
-                </Link>
+                  <div className="eventCard__body">
+                    <div className="eventCard__title">{event.title}</div>
+                    <div className="eventCard__datetime">{d.mon} {d.day}, {d.year}</div>
+                    {event.venue?.name && (
+                      <div className="eventCard__venue">
+                        <PinIcon />
+                        {event.venue.name}
+                      </div>
+                    )}
+                    <div className="eventCard__actions">
+                      <Link href={eventPath} className="eventCard__btn eventCard__btn--outline">
+                        Event Details
+                      </Link>
+                    </div>
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -283,6 +343,7 @@ export default async function SellerPage({
       </div>
       <p className="stripe-line">Payments processed securely by Stripe</p>
 
+      </div>
       <style>{styles}</style>
     </main>
   );
@@ -291,18 +352,24 @@ export default async function SellerPage({
 // ---------- Styles ----------
 const styles = `
   .seller-page {
-    --ink: #14110f;
-    --muted: #6a635a;
-    --accent: #c80650;
-    --rule: rgba(20, 17, 15, 0.12);
-    --card-bg: rgba(0, 0, 0, 0.02);
+    --ink: #f5f3f0;
+    --muted: rgba(245, 243, 240, 0.62);
+    --accent: #f30963;
+    --rule: rgba(245, 243, 240, 0.16);
+    --card-bg: rgba(255, 255, 255, 0.04);
+    --bg: #0f0d0b;
 
+    width: 100%;
+    background: var(--bg);
     color: var(--ink);
     font-family: var(--font-dm-sans), system-ui, sans-serif;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .seller-page__inner {
     max-width: 1100px;
     margin: 0 auto;
     padding: 0 clamp(1rem, 4vw, 2.5rem) 3rem;
-    line-height: 1.5;
   }
 
   .seller-page h1,
@@ -370,16 +437,20 @@ const styles = `
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--ink);
+    background: transparent;
     border: 1px solid var(--ink);
     border-radius: 999px;
     padding: 0.5rem 1.1rem;
     text-decoration: none;
     white-space: nowrap;
+    cursor: pointer;
+    font: inherit;
+    letter-spacing: 0.08em;
     transition: background 0.15s, color 0.15s;
   }
   .utilityBar__manage:hover {
     background: var(--ink);
-    color: #fff;
+    color: var(--bg);
   }
 
   /* HERO */
@@ -430,7 +501,7 @@ const styles = `
     border-radius: 999px;
     font-weight: 500;
   }
-  .chip--verified { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .chip--verified { background: var(--ink); color: var(--bg); border-color: var(--ink); }
   .chip--ghost { border-color: var(--rule); color: var(--muted); }
 
   /* SECTIONS */
@@ -449,88 +520,96 @@ const styles = `
   .prose--muted { color: var(--muted); }
 
   /* EVENT CARDS */
-  .events { display: flex; flex-direction: column; gap: 0.75rem; }
+  .events { display: flex; flex-direction: column; gap: 0.85rem; }
   .eventCard {
-    display: grid;
-    grid-template-columns: 64px 1fr 80px;
+    display: flex;
     gap: 1rem;
-    align-items: center;
-    padding: 0.85rem 1rem;
     background: var(--card-bg);
     border: 1px solid var(--rule);
-    border-radius: 8px;
-    text-decoration: none;
-    color: inherit;
-    transition: background 0.15s, transform 0.15s, border-color 0.15s;
+    border-radius: 10px;
+    overflow: hidden;
   }
-  .eventCard:hover {
-    background: rgba(0, 0, 0, 0.04);
-    border-color: rgba(20, 17, 15, 0.24);
-    transform: translateY(-1px);
-  }
-  .eventCard--past { opacity: 0.78; }
+  .eventCard--past { opacity: 0.8; }
 
-  .eventDate {
+  .eventCard__media {
+    width: 110px;
+    flex-shrink: 0;
+    align-self: stretch;
+  }
+  .eventCard__img { width: 100%; height: 100%; min-height: 130px; object-fit: cover; display: block; }
+  .eventCard__imgFallback {
+    width: 100%;
+    height: 100%;
+    min-height: 130px;
+    background: linear-gradient(135deg, rgba(243, 9, 99, 0.22), rgba(255, 255, 255, 0.06));
+  }
+
+  .eventCard__body {
+    flex: 1;
+    min-width: 0;
+    padding: 0.9rem 1rem 0.9rem 0;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    line-height: 1;
-    font-family: var(--font-oswald), system-ui, sans-serif;
+    gap: 0.2rem;
   }
-  .eventDate .day {
-    font-size: 1.85rem;
-    font-weight: 700;
-    color: var(--accent);
-  }
-  .eventDate .mon {
-    font-size: 0.72rem;
-    letter-spacing: 0.14em;
-    color: var(--muted);
-    text-transform: uppercase;
-    margin-top: 0.15rem;
-  }
-
-  .eventInfo { min-width: 0; }
   .eventTag {
     font-family: var(--font-oswald), system-ui, sans-serif;
-    font-size: 0.68rem;
+    font-size: 0.66rem;
     letter-spacing: 0.16em;
     color: var(--muted);
     text-transform: uppercase;
-    margin-bottom: 0.2rem;
+    margin-bottom: 0.1rem;
   }
-  .eventName {
+  .eventCard__title {
     font-family: var(--font-oswald), system-ui, sans-serif;
     font-size: 1.05rem;
-    font-weight: 600;
-    line-height: 1.2;
-    margin-bottom: 0.15rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-weight: 700;
+    line-height: 1.25;
+    text-transform: uppercase;
   }
-  .eventMeta {
+  .eventCard__datetime {
     font-size: 0.85rem;
     color: var(--muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
+    margin-top: 0.15rem;
+  }
+  .eventCard__venue {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-top: 0.1rem;
+  }
+  .eventCard__actions {
+    display: flex;
+    gap: 0.6rem;
+    margin-top: 0.7rem;
+    flex-wrap: wrap;
+  }
+  .eventCard__btn {
+    font-family: var(--font-oswald), system-ui, sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    text-decoration: none;
     white-space: nowrap;
+    transition: background 0.15s, color 0.15s, opacity 0.15s;
   }
-
-  .eventThumb {
-    width: 80px;
-    height: 80px;
-    border-radius: 6px;
-    overflow: hidden;
-    background: rgba(0, 0, 0, 0.06);
-    flex-shrink: 0;
+  .eventCard__btn--outline {
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    background: transparent;
   }
-  .eventThumbImg { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .eventThumbFallback {
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(135deg, rgba(200, 6, 80, 0.12), rgba(20, 17, 15, 0.08));
+  .eventCard__btn--outline:hover { background: var(--ink); color: var(--bg); }
+  .eventCard__btn--solid {
+    background: var(--ink);
+    color: var(--bg);
+    border: 1px solid var(--ink);
   }
+  .eventCard__btn--solid:hover { opacity: 0.85; }
 
   /* POLICIES */
   .policy { margin-bottom: 1.25rem; }
@@ -609,9 +688,9 @@ const styles = `
   @media (max-width: 640px) {
     .utilityBar { flex-wrap: wrap; }
     .hero__row { flex-direction: column; align-items: flex-start; gap: 1rem; }
-    .eventCard { grid-template-columns: 56px 1fr 64px; gap: 0.75rem; padding: 0.7rem; }
-    .eventDate .day { font-size: 1.5rem; }
-    .eventThumb { width: 64px; height: 64px; }
+    .eventCard__media { width: 84px; }
+    .eventCard__img, .eventCard__imgFallback { min-height: 100%; }
+    .eventCard__title { font-size: 0.95rem; }
     .contactLine { flex-direction: column; align-items: flex-start; gap: 0.25rem; }
     .contactLine__sep { display: none; }
   }
