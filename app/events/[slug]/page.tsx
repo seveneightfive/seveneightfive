@@ -39,6 +39,7 @@ type Event = {
   event_date: string
   event_start_time: string | null
   event_end_time: string | null
+  start_date: string | null
   end_date: string | null
   image_url: string | null
   ticket_price: number | null
@@ -60,7 +61,7 @@ async function getEvent(slug: string): Promise<Event | null> {
     .from('events')
     .select(`
       id, title, description, event_date, event_start_time, event_end_time,
-      end_date, image_url, ticket_price, ticket_url, learnmore_link,
+      start_date, end_date, image_url, ticket_price, ticket_url, learnmore_link,
       event_types, star, slug, capacity, ticketing_enabled, venue_id,
       venues (id, name, address, neighborhood, city, state, slug, website, image_url, logo),
       event_artists (
@@ -185,8 +186,15 @@ export async function generateMetadata(
   const event = await getEvent(slug)
   if (!event) return { title: 'Event Not Found' }
 
-  const d = new Date(event.event_date + 'T12:00:00')
-  const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+  // Prefer the clean start_date timestamptz column (correctly stored as a
+  // real instant, DST-aware) over reconstructing from event_date. Falls back
+  // to the old date-only path only for any record that hasn't been synced
+  // through the fixed Airtable/Whalesync pipeline yet.
+  const d = event.start_date ? new Date(event.start_date) : new Date(event.event_date + 'T12:00:00')
+  const dateStr = d.toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+    timeZone: 'America/Chicago',
+  })
   const description = event.description || `${event.title} | ${dateStr}${event.venue ? ` at ${event.venue.name}` : ''} in Topeka, KS`
 
   return {
@@ -226,13 +234,18 @@ const SCHEMA_TYPE_MAP: Record<string, string> = {
 }
 
 function getJsonLd(event: Event) {
-  const startDate = event.event_start_time
-    ? `${event.event_date}T${event.event_start_time}`
-    : event.event_date
+  // start_date/end_date are real timestamptz columns (correctly populated
+  // via the fixed Airtable startDate/endDate → Whalesync → Supabase path),
+  // so they're already valid ISO instants — no string concatenation needed,
+  // which is what caused invalid startDate/endDate values before (mixing
+  // 24-hour and "h:mm A" time formats in event_start_time/event_end_time).
+  // The old reconstruction is kept only as a fallback for any record that
+  // predates the fix and hasn't been backfilled/re-synced yet.
+  const startDate = event.start_date
+    || (event.event_start_time ? `${event.event_date}T${event.event_start_time}` : event.event_date)
 
-  const endDate = event.event_end_time
-    ? `${event.event_date}T${event.event_end_time}`
-    : event.end_date || undefined
+  const endDate = event.end_date
+    || (event.event_end_time ? `${event.event_date}T${event.event_end_time}` : undefined)
 
   const schemaType = event.event_types
     ?.map(t => SCHEMA_TYPE_MAP[t])
@@ -286,7 +299,7 @@ function getJsonLd(event: Event) {
         priceCurrency: 'USD',
         availability: 'https://schema.org/InStock',
         ...(event.ticket_url && { url: event.ticket_url }),
-        validFrom: event.event_date,
+        validFrom: event.start_date || event.event_date,
       },
     }),
     ...(event.artists && event.artists.length > 0 && {
