@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
+import EventCard from '@/app/components/EventCard'
 import ImageLightbox from './ImageLightbox'
 import TicketPurchaseButton from '@/app/components/TicketPurchaseButton'
 import FollowFavoriteButtons from '@/app/components/FollowFavoriteButtons'
@@ -593,14 +594,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         @media (max-width: 780px) {
           .related-grid { grid-template-columns: 1fr; }
         }
-        .related-card { display: block; border-radius: 12px; overflow: hidden; background: var(--off); text-decoration: none; color: var(--ink); transition: transform 0.15s, box-shadow 0.15s; }
-        .related-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,0.08); }
-        .related-card-img { width: 100%; aspect-ratio: 16/10; object-fit: cover; background: var(--border); }
-        .related-card-img-placeholder { width: 100%; aspect-ratio: 16/10; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 2rem; color: var(--ink-faint); background: var(--border); }
-        .related-card-body { padding: 14px 16px 18px; }
-        .related-card-type { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 5px; }
-        .related-card-title { font-family: var(--serif); font-weight: 700; text-transform: uppercase; font-size: 1rem; line-height: 1.25; margin-bottom: 6px; }
-        .related-card-meta { font-size: 0.8rem; color: var(--ink-faint); }
+
 
         /* BROWSE CTA */
         .browse-cta { padding: 40px 0 8px; text-align: center; border-top: 1px solid var(--border); }
@@ -832,7 +826,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
             </div>
             <div className="related-grid">
               {categoryEvents.map((rel) => (
-                <RelatedCard key={rel.id} event={rel} />
+                <EventCard key={rel.id} event={rel} />
               ))}
             </div>
           </div>
@@ -847,7 +841,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
             </div>
             <div className="related-grid">
               {alsoLikeEvents.map((rel) => (
-                <RelatedCard key={rel.id} event={rel} />
+                <EventCard key={rel.id} event={rel} />
               ))}
             </div>
           </div>
@@ -892,27 +886,4 @@ function ArrowIcon() {
   )
 }
 
-function RelatedCard({ event: rel }: { event: Event }) {
-  const relDate = new Date(rel.event_date + 'T12:00:00')
-  const relDateStr = relDate.toLocaleDateString('en-US', {
-    weekday: 'short', month: 'short', day: 'numeric'
-  })
 
-  return (
-    <a href={`/events/${rel.slug}`} className="related-card">
-      {rel.image_url
-        ? <img src={rel.image_url} alt={rel.title} className="related-card-img" />
-        : <div className="related-card-img-placeholder">{rel.title[0]}</div>
-      }
-      <div className="related-card-body">
-        {rel.event_types && rel.event_types.length > 0 && (
-          <div className="related-card-type">{rel.event_types[0]}</div>
-        )}
-        <div className="related-card-title">{rel.title}</div>
-        <div className="related-card-meta">
-          {relDateStr}{rel.venue ? ` · ${rel.venue.name}` : ''}
-        </div>
-      </div>
-    </a>
-  )
-}
