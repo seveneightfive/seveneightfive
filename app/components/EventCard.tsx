@@ -46,7 +46,16 @@ function formatTime(t: string | null) {
   return m === 0 ? `${hour} ${ampm}` : `${hour}:${m.toString().padStart(2, '0')} ${ampm}`
 }
 
-export default function EventCard({ event }: { event: EventCardEvent }) {
+export default function EventCard({
+  event,
+  featured = false,
+}: {
+  event: EventCardEvent
+  // Small "★ Featured" flag, top-right — used by the homepage Featured rail
+  // and anywhere else a starred/editor's-pick event needs to stand out
+  // without needing an entirely different card design.
+  featured?: boolean
+}) {
   const venue = event.venue ?? (Array.isArray(event.venues) ? event.venues[0] : event.venues)
   const date = formatDate(event.event_date)
   const href = event.slug ? `/events/${event.slug}` : '/events'
@@ -73,6 +82,12 @@ export default function EventCard({ event }: { event: EventCardEvent }) {
           <div className="text-2xl font-bold leading-none">{date.day}</div>
           <div className="text-[10px] font-bold uppercase tracking-widest">{date.month}</div>
         </div>
+
+        {featured && (
+          <div className="absolute right-3 top-3 flex items-center gap-1 bg-black/80 px-2.5 py-1 font-['Oswald'] text-[10px] font-bold uppercase tracking-widest text-[#FFCE03]">
+            ★ Featured
+          </div>
+        )}
 
         {event.event_types?.[0] && (
           <div className="absolute bottom-3 left-3 bg-[#FFCE03] px-3 py-1 font-['Oswald'] text-xs font-bold uppercase tracking-wider text-black">
