@@ -289,8 +289,18 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
         .events-empty-title { font-family: var(--serif); font-size: 1rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); }
         .events-empty-sub { font-size: 0.85rem; color: var(--ink-faint); }
         .events-list { display: flex; flex-direction: column; gap: 10px; }
-        .link-row { display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--white); border: 1.5px solid var(--border); border-radius: 10px; text-decoration: none; color: var(--ink); transition: border-color 0.15s, box-shadow 0.15s; -webkit-tap-highlight-color: transparent; }
+
+        /* Compact date-block-on-the-left row — date bleeds flush to the
+           top, bottom and left of the row; only the right side (the text
+           content) gets padding. */
+        .link-row { display: flex; align-items: stretch; background: var(--white); border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden; text-decoration: none; color: var(--ink); transition: border-color 0.15s, box-shadow 0.15s; -webkit-tap-highlight-color: transparent; }
         .link-row:hover, .link-row:active { border-color: var(--ink); box-shadow: -3px 0 0 var(--accent); }
+        .link-date { width: 64px; flex-shrink: 0; background: var(--accent); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .link-date-day { font-family: var(--serif); font-size: 1.4rem; font-weight: 700; line-height: 1; }
+        .link-date-mon { font-family: var(--serif); font-size: 0.62rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 3px; }
+        .link-content { flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px; padding: 14px 16px; }
+        .link-title { font-family: var(--serif); font-size: 0.95rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+        .link-time { font-size: 0.78rem; color: var(--ink-soft); margin-top: 3px; }
         .link-chevron { color: var(--ink-faint); font-size: 1rem; flex-shrink: 0; transition: transform 0.15s; }
         .link-row:hover .link-chevron { transform: translateX(3px); }
 
@@ -415,40 +425,41 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
                 </div>
               ) : (
                 <div className="events-list">
-                  {events.map(event => (
-                    <a
-                      key={event.id}
-                      href={event.slug ? `/events/${event.slug}` : event.ticket_url || '#'}
-                      target={event.slug ? '_self' : '_blank'}
-                      rel="noopener noreferrer"
-                      className="link-row"
-                    >
-                      {event.image_url && (
-                        <img
-                          src={event.image_url}
-                          alt={event.title}
-                          style={{ width: 90, aspectRatio: '16/9', objectFit: 'cover', borderRadius: 6, flexShrink: 0 }}
-                        />
-                      )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontFamily: 'var(--serif)', fontSize: '0.95rem', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          {event.title}
-                        </div>
-                        {event.event_date && (
-                          <div style={{ fontSize: '0.78rem', color: 'var(--ink-soft)', marginTop: 3 }}>
-                            {new Date(event.event_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                            {event.event_start_time && ` · ${event.event_start_time.trim()}`}
+                  {events.map(event => {
+                    const dateObj = event.event_date
+                      ? new Date(event.event_date + 'T12:00:00')
+                      : null
+                    return (
+                      <a
+                        key={event.id}
+                        href={event.slug ? `/events/${event.slug}` : event.ticket_url || '#'}
+                        target={event.slug ? '_self' : '_blank'}
+                        rel="noopener noreferrer"
+                        className="link-row"
+                      >
+                        {dateObj && (
+                          <div className="link-date">
+                            <span className="link-date-day">{dateObj.getDate()}</span>
+                            <span className="link-date-mon">{dateObj.toLocaleDateString('en-US', { month: 'short' })}</span>
                           </div>
                         )}
-                      </div>
-                      {event.ticket_price !== null && (
-                        <span style={{ fontSize: '0.8rem', fontWeight: 500, color: event.ticket_price === 0 ? 'var(--accent)' : 'var(--ink-soft)', flexShrink: 0 }}>
-                          {event.ticket_price === 0 ? 'Free' : `$${event.ticket_price}`}
-                        </span>
-                      )}
-                      <span className="link-chevron">→</span>
-                    </a>
-                  ))}
+                        <div className="link-content">
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div className="link-title">{event.title}</div>
+                            {event.event_start_time && (
+                              <div className="link-time">{event.event_start_time.trim()}</div>
+                            )}
+                          </div>
+                          {event.ticket_price !== null && (
+                            <span style={{ fontSize: '0.8rem', fontWeight: 500, color: event.ticket_price === 0 ? 'var(--accent)' : 'var(--ink-soft)', flexShrink: 0 }}>
+                              {event.ticket_price === 0 ? 'Free' : `$${event.ticket_price}`}
+                            </span>
+                          )}
+                          <span className="link-chevron">→</span>
+                        </div>
+                      </a>
+                    )
+                  })}
                 </div>
               )}
             </div>
