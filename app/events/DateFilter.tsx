@@ -106,7 +106,6 @@ export default function DateFilter({ selectedDate, onSelect }: DateFilterProps) 
         }
         .date-btn:hover { border-color: var(--ink); color: var(--ink); }
         .date-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
-        .date-btn-icon { font-size: 0.85rem; }
         .date-btn-clear {
           display: inline-flex;
           align-items: center;
@@ -324,7 +323,6 @@ export default function DateFilter({ selectedDate, onSelect }: DateFilterProps) 
           className={`date-btn ${isActive ? 'active' : ''}`}
           onClick={() => setOpen(o => !o)}
         >
-          <span className="date-btn-icon">📅</span>
           {buttonLabel()}
           {isActive && (
             <span
