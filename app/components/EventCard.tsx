@@ -77,7 +77,8 @@ export default function EventCard({
           </div>
         )}
 
-        <div className="absolute left-3 top-3 bg-[#C80650] px-3 py-2 text-center font-['Oswald'] text-white shadow-lg">
+        {/* Date badge — flush against the left edge of the image, no inset margin */}
+        <div className="absolute left-0 top-0 bg-[#C80650] px-3 py-2 text-center font-['Oswald'] text-white shadow-lg rounded-br-md">
           <div className="text-[10px] font-bold uppercase tracking-widest">{date.weekday}</div>
           <div className="text-2xl font-bold leading-none">{date.day}</div>
           <div className="text-[10px] font-bold uppercase tracking-widest">{date.month}</div>
@@ -108,19 +109,7 @@ export default function EventCard({
             </div>
           )}
 
-          {(time || venue?.neighborhood) && (
-            <div>
-              {time}
-              {time && venue?.neighborhood ? ' · ' : ''}
-              {venue?.neighborhood}
-            </div>
-          )}
-        </div>
-
-        <div className="mt-4">
-          <span className="font-['Oswald'] text-xs font-bold uppercase tracking-widest text-[#C80650]">
-            View Event →
-          </span>
+          {time && <div>{time}</div>}
         </div>
       </div>
     </Link>
