@@ -719,11 +719,12 @@ export default function ArtistPageClient({
         .portfolio-caption { font-size: 0.75rem; color: var(--ink-faint); font-style: italic; line-height: 1.4; }
 
         /* ─── EVENTS ─────────────────────────────────── */
+        /* Row bleeds edge-to-edge; the date block fills the full height
+           and hugs the left edge with no white padding around it — only
+           the text content on the right gets padding. */
         .event-item {
           display: flex;
-          gap: 16px;
-          align-items: flex-start;
-          padding: 16px 0;
+          align-items: stretch;
           border-bottom: 1px solid var(--border);
           text-decoration: none;
           color: inherit;
@@ -731,16 +732,25 @@ export default function ArtistPageClient({
           -webkit-tap-highlight-color: transparent;
         }
         .event-item:last-child { border-bottom: none; }
-        .event-item:active { background: rgba(200,6,80,0.03); margin: 0 -22px; padding-left: 22px; padding-right: 22px; }
-        .ev-date { width: 40px; flex-shrink: 0; text-align: center; }
-        .ev-mo { font-size: 0.62rem; font-weight: 700; color: var(--accent); letter-spacing: 0.12em; text-transform: uppercase; }
-        .ev-day { font-family: var(--serif); font-size: 1.8rem; font-weight: 700; color: var(--ink); line-height: 1; }
-        .ev-info { flex: 1; }
+        .event-item:active { background: rgba(200,6,80,0.04); }
+        .ev-date {
+          width: 56px;
+          flex-shrink: 0;
+          background: var(--accent);
+          color: #fff;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+        }
+        .ev-mo { font-size: 0.6rem; font-weight: 700; color: rgba(255,255,255,0.85); letter-spacing: 0.12em; text-transform: uppercase; }
+        .ev-day { font-family: var(--serif); font-size: 1.6rem; font-weight: 700; color: #fff; line-height: 1; }
+        .ev-info { flex: 1; padding: 16px 0 16px 16px; }
         .ev-name { font-size: 0.95rem; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
         .ev-venue { font-size: 0.8rem; color: var(--ink-soft); }
-        .ev-price { font-size: 0.8rem; font-weight: 500; color: var(--ink-soft); flex-shrink: 0; align-self: center; }
+        .ev-price { font-size: 0.8rem; font-weight: 500; color: var(--ink-soft); flex-shrink: 0; align-self: center; padding-right: 16px; }
         .ev-price.free { color: var(--accent); }
-        .ev-arrow { color: var(--ink-faint); font-size: 1.1rem; align-self: center; flex-shrink: 0; }
+        .ev-arrow { color: var(--ink-faint); font-size: 1.1rem; align-self: center; flex-shrink: 0; padding-right: 16px; }
         .events-empty {
           display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 0; text-align: center;
         }
