@@ -117,7 +117,7 @@ export default function AdvertisementBanner() {
       )}
 
       {/* Text side */}
-      <div className="flex flex-col justify-center gap-3 px-6 py-7 sm:px-8 sm:py-8 lg:px-10">
+      <div className="flex flex-col justify-center gap-3 py-7 pl-8 pr-6 sm:py-8 sm:pl-10 sm:pr-8 lg:pl-14 lg:pr-10">
         <span className="inline-flex w-fit items-center rounded-full bg-accent-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#1a1814]">
           Sponsored
         </span>
@@ -140,7 +140,7 @@ export default function AdvertisementBanner() {
 
         {ad.button_text && (
           <div className="mt-1">
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-5 py-2.5 font-display text-[13px] font-semibold uppercase tracking-wide text-white">
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-7 py-3.5 font-display text-[13px] font-semibold uppercase tracking-wide text-white">
               {ad.button_text}
               <svg
                 width="12"
