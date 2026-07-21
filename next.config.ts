@@ -32,25 +32,57 @@ const nextConfig: NextConfig = {
     ],
   },
   async redirects() {
-    return [
-      // --- 785events.com -> seveneightfive.com migration redirects ---
+    // NOTE: these rules only fire when the request's Host header is one of
+    // the OLD domains. They're scoped with `has: [{ type: "host", ... }]`
+    // and use ABSOLUTE destinations so the redirect actually crosses over
+    // to the new domain instead of just changing path on the same host.
+    // Vercel's domain-level "Redirect to Another Domain" feature must be
+    // OFF for 785events.com / www.785events.com (set to "Connect to an
+    // environment: Production" instead) or these never get a chance to run.
+    const OLD_HOSTS = ["785events.com", "www.785events.com"]
+    const NEW_ORIGIN = "https://www.seveneightfive.com"
+
+    const pageMap: Array<[string, string]> = [
       // Confirmed 1:1 matches (pages already exist on new site)
-      { source: "/live-music", destination: "/live-music", permanent: true },
-      { source: "/venues", destination: "/venues", permanent: true },
-      { source: "/all-events", destination: "/topeka-events/all-events", permanent: true },
-      { source: "/first-friday-artwalk", destination: "/topeka-events/first-friday-artwalk", permanent: true },
-      { source: "/weekly-entertainment", destination: "/topeka-events/weekly-entertainment", permanent: true },
-
+      ["/live-music", "/live-music"],
+      ["/venues", "/venues"],
+      ["/all-events", "/topeka-events/all-events"],
+      ["/first-friday-artwalk", "/topeka-events/first-friday-artwalk"],
+      ["/weekly-entertainment", "/topeka-events/weekly-entertainment"],
       // Low-traffic: redirected to closest topical match (no dedicated art/NOTO page)
-      { source: "/noto-events", destination: "/topeka-events/all-events", permanent: true },
-      { source: "/all-events-art", destination: "/topeka-events/all-events", permanent: true },
-
-      // Functional page, redirects off-site to the new event-submission form
-      { source: "/add-event", destination: "https://seveneightfive.fillout.com/add-event", permanent: true },
-
+      ["/noto-events", "/topeka-events/all-events"],
+      ["/all-events-art", "/topeka-events/all-events"],
       // Stale dynamic event-detail pages (385 Airtable-record URLs, ~55 clicks/3mo total)
-      { source: "/events-details", destination: "/topeka-events/all-events", permanent: true },
+      ["/events-details", "/topeka-events/all-events"],
     ]
+
+    const scopedRedirects = OLD_HOSTS.flatMap((host) =>
+      pageMap.map(([source, destPath]) => ({
+        source,
+        has: [{ type: "host" as const, value: host }],
+        destination: `${NEW_ORIGIN}${destPath}`,
+        permanent: true,
+      }))
+    )
+
+    // Functional page: off-site to the new event-submission form (all hosts)
+    const addEventRedirects = OLD_HOSTS.map((host) => ({
+      source: "/add-event",
+      has: [{ type: "host" as const, value: host }],
+      destination: "https://seveneightfive.fillout.com/add-event",
+      permanent: true,
+    }))
+
+    // Safety net: anything else hit on the old domains falls back to the
+    // new homepage instead of serving old-domain duplicate content.
+    const catchAllRedirects = OLD_HOSTS.map((host) => ({
+      source: "/:path*",
+      has: [{ type: "host" as const, value: host }],
+      destination: NEW_ORIGIN,
+      permanent: true,
+    }))
+
+    return [...scopedRedirects, ...addEventRedirects, ...catchAllRedirects]
   },
 }
 
