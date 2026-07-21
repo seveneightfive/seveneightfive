@@ -108,8 +108,8 @@ function EventCard({ event }: { event: any }) {
           : <div className="te-card-img-placeholder">🎵</div>
         }
         <div className="te-date-badge">
-          <span className="te-date-badge-month">{month}</span>
           <span className="te-date-badge-day">{day}</span>
+          <span className="te-date-badge-month">{month}</span>
         </div>
       </div>
       <div className="te-card-body">
@@ -244,9 +244,10 @@ export default async function TopekaEventsPage() {
         /* ── Cards ── */
         .te-card {
           text-decoration: none; color: inherit;
-          border-radius: 8px; overflow: hidden;
+          border-radius: 8px;
           border: 1px solid #e8e8e8;
           display: flex; flex-direction: column;
+          position: relative;
           transition: box-shadow 0.2s, transform 0.2s;
         }
         .te-card:hover {
@@ -254,31 +255,43 @@ export default async function TopekaEventsPage() {
           transform: translateY(-2px);
         }
         .te-card-img-wrap {
-          position: relative; aspect-ratio: 16/10;
-          background: #f0f0f0; overflow: hidden;
+          position: relative; aspect-ratio: 1.91/1;
+          background: #f0f0f0;
         }
-        .te-card-img-wrap img { width: 100%; height: 100%; object-fit: cover; }
+        .te-card-img-wrap img {
+          width: 100%; height: 100%; object-fit: cover;
+          border-radius: 8px 8px 0 0; display: block;
+        }
         .te-card-img-placeholder {
           width: 100%; height: 100%;
           display: flex; align-items: center; justify-content: center;
           background: #efefef; color: #ccc; font-size: 2rem;
+          border-radius: 8px 8px 0 0;
         }
+        /* Sits on the seam between the image and the body — a sibling of
+           the image wrap (not a child of it) so it isn't clipped by the
+           image's own corner rounding. */
         .te-date-badge {
-          position: absolute; top: 10px; left: 10px;
-          background: #fff; border-radius: 5px;
-          padding: 0.25rem 0.5rem; text-align: center; min-width: 42px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        }
-        .te-date-badge-month {
-          font-size: 0.58rem; font-weight: 700; color: #cc0000;
-          letter-spacing: 0.06em; display: block; text-transform: uppercase;
+          position: absolute; bottom: -18px; right: 14px;
+          background: #C80650; border-radius: 6px;
+          padding: 0.35rem 0.65rem; text-align: center; min-width: 46px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+          z-index: 2;
         }
         .te-date-badge-day {
-          font-size: 1.1rem; font-weight: 800; color: #111; line-height: 1; display: block;
+          font-family: 'Oswald', sans-serif;
+          font-size: 1.15rem; font-weight: 700; color: #fff; line-height: 1; display: block;
+        }
+        .te-date-badge-month {
+          font-family: 'Oswald', sans-serif;
+          font-size: 0.6rem; font-weight: 600; color: rgba(255,255,255,0.85);
+          letter-spacing: 0.08em; display: block; text-transform: uppercase;
         }
         .te-card-body {
-          padding: 0.9rem 1rem 1rem; flex: 1;
+          padding: 1.15rem 1rem 1rem; flex: 1;
           display: flex; flex-direction: column; gap: 4px;
+          background: #fff;
+          border-radius: 0 0 8px 8px;
         }
         .te-card-time {
           font-size: 0.72rem; color: #999;
@@ -318,7 +331,7 @@ export default async function TopekaEventsPage() {
             grid-template-columns: repeat(2, 1fr);
             gap: 0.75rem;
           }
-          .te-card-body { padding: 0.65rem 0.75rem 0.75rem; }
+          .te-card-body { padding: 1rem 0.75rem 0.75rem; }
           .te-card-title { font-size: 0.9rem; }
         }
         @media (max-width: 420px) {
