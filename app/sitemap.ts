@@ -8,10 +8,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { data: events },
     { data: venues },
     { data: artists },
+    { data: seoPages },
   ] = await Promise.all([
     supabase.from('events').select('slug, updated_at'),
     supabase.from('venues').select('slug, updated_at'),
     supabase.from('artists').select('slug, updated_at'),
+    supabase.from('seo_pages').select('slug, updated_at').eq('published', true),
   ])
 
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -52,5 +54,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.5,
     }))
 
-  return [...staticRoutes, ...eventRoutes, ...venueRoutes, ...artistRoutes]
+  // Programmatic SEO landing pages (all-events, free-events, karaoke, etc.)
+  // — one route per published row in the seo_pages table.
+  const seoPageRoutes: MetadataRoute.Sitemap = (seoPages ?? [])
+    .filter((p) => p.slug)
+    .map((p) => ({
+      url: `${BASE_URL}/topeka-events/${p.slug}`,
+      lastModified: p.updated_at ? new Date(p.updated_at) : new Date(),
+      changeFrequency: 'daily' as const,
+      priority: 0.7,
+    }))
+
+  return [...staticRoutes, ...eventRoutes, ...venueRoutes, ...artistRoutes, ...seoPageRoutes]
 }
