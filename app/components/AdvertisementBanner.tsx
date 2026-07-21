@@ -117,7 +117,7 @@ export default function AdvertisementBanner() {
       )}
 
       {/* Text side */}
-      <div className="flex flex-col justify-center gap-3 py-7 pl-8 pr-6 sm:py-8 sm:pl-10 sm:pr-8 lg:pl-14 lg:pr-10">
+      <dive className="flex flex-col justify-center gap-3 px-6 py-7 sm:px-8 sm:py-8 lg:px-14">
         <span className="inline-flex w-fit items-center rounded-full bg-accent-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#1a1814]">
           Sponsored
         </span>
