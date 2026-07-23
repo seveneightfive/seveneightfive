@@ -1,14 +1,39 @@
 'use server';
 
-import { Resend } from 'resend';
+// Sender.net API — https://api.sender.net/
+// Auth: Settings → API access tokens → create a token, set SENDER_API_TOKEN
+// in your environment (.env.local + Vercel).
+const SENDER_API_BASE = 'https://api.sender.net/v2';
+const SENDER_API_TOKEN = process.env.SENDER_API_TOKEN as string;
 
-// Initialize Resend with your API Key
-const resend = new Resend(process.env.RESEND_API_KEY);
+// The group your Weekender broadcast will target.
+// Create this once in Sender (Subscribers → Groups → Create a group), then
+// set SENDER_GROUP_ID in your environment. You can also fetch group IDs via
+// GET https://api.sender.net/v2/groups if you forget it.
+const GROUP_ID = process.env.SENDER_GROUP_ID as string;
 
-// The Audience your Weekender broadcast will target.
-// Create this once in the Resend dashboard (Audiences → Create), then
-// set RESEND_AUDIENCE_ID in your environment (.env.local + Vercel).
-const AUDIENCE_ID = process.env.RESEND_AUDIENCE_ID as string;
+async function senderFetch(path: string, options: RequestInit = {}) {
+  const res = await fetch(`${SENDER_API_BASE}${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${SENDER_API_TOKEN}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(options.headers ?? {}),
+    },
+  });
+
+  const data = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    const message =
+      (data && (data.message?.[0] ?? data.message ?? data.error)) ||
+      `Sender API error (${res.status})`;
+    throw new Error(typeof message === 'string' ? message : JSON.stringify(message));
+  }
+
+  return data;
+}
 
 export async function handleSignup(formData: FormData) {
   const email = formData.get('email') as string;
@@ -24,45 +49,47 @@ export async function handleSignup(formData: FormData) {
     return { success: false, error: 'Phone number is required for SMS updates.' };
   }
 
-  if (subscribeEmail && !AUDIENCE_ID) {
-    // Fail loudly in dev rather than silently losing signups because the
-    // env var was never set.
-    console.error('RESEND_AUDIENCE_ID is not set — cannot add contact to an audience.');
+  if (subscribeEmail && (!SENDER_API_TOKEN || !GROUP_ID)) {
+    console.error('SENDER_API_TOKEN or SENDER_GROUP_ID is not set — cannot add subscriber.');
     return { success: false, error: 'Signup is temporarily unavailable. Please try again shortly.' };
   }
 
   try {
-    // 1. Add the contact to the Weekender Audience in Resend
+    // 1. Add the contact to the Weekender group in Sender
+    //    (Sender upserts on email — if the contact already exists, this
+    //    updates them rather than erroring, so no special-casing needed.)
     if (subscribeEmail && email) {
-      const { error: contactError } = await resend.contacts.create({
-        email,
-        audienceId: AUDIENCE_ID,
-        unsubscribed: false,
+      await senderFetch('/subscribers', {
+        method: 'POST',
+        body: JSON.stringify({
+          email,
+          groups: [GROUP_ID],
+        }),
       });
 
-      // Resend returns an error if the contact already exists — treat that
-      // as a success rather than surfacing it to the person signing up.
-      if (contactError && !/already exists/i.test(contactError.message ?? '')) {
-        return { success: false, error: contactError.message || 'Could not save your subscription.' };
-      }
-
       // 2. Send a one-time welcome email confirming the signup.
-      // Swap the "from" address for your verified sending domain in Resend
-      // (Domains → Add Domain → verify DNS records) before going live —
-      // onboarding@resend.dev only works for testing.
-      await resend.emails.send({
-        from: 'The Weekender <weekender@seveneightfive.com>',
-        to: [email],
-        subject: "You're in! Welcome to The Weekender",
-        html: `<p>Thanks for signing up! You'll get The Weekender — Topeka's weekly guide to arts, music, and events — in your inbox every Thursday at <strong>${email}</strong>.</p>`,
+      // Swap the "from" address for your verified sending domain in Sender
+      // (Settings → Domains → Add Domain → verify DNS records) before going
+      // live.
+      await senderFetch('/message/send', {
+        method: 'POST',
+        body: JSON.stringify({
+          from: { email: 'weekender@seveneightfive.com', name: 'The Weekender' },
+          to: { email },
+          subject: "You're in! Welcome to The Weekender",
+          html: `<p>Thanks for signing up! You'll get The Weekender — Topeka's weekly guide to arts, music, and events — in your inbox every Thursday at <strong>${email}</strong>.</p>`,
+        }),
       });
     }
 
     // 3. Handle SMS subscription
     if (subscribeSMS && phone) {
-      // NOTE: Resend does not support native SMS.
-      // Integrate your chosen SMS gateway SDK here (e.g., Twilio, Plivo):
-      // await smsClient.messages.create({ body: 'Welcome!', to: phone, from: '...' });
+      // NOTE: Sender's SMS channel is a paid add-on and uses a different
+      // flow (subscribers can have a `phone` field, but sending SMS
+      // campaigns requires SMS credits on your account). If you want SMS
+      // handled here too, add `phone` to the subscriber payload above and
+      // wire up Sender's SMS campaign endpoints, or keep a separate
+      // provider like Twilio.
       console.log(`Simulating SMS opt-in sent to: ${phone}`);
     }
 
