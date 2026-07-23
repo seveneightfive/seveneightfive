@@ -1,6 +1,15 @@
 import { supabase } from '@/lib/supabase'
 import HomeClient from './HomeClient'
 import type { HeroSlide } from './HeroSlider'
+import SignupForm from './components/SignupForm';
+
+export default function Home() {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gray-50">
+      <SignupForm />
+    </main>
+  );
+}
 
 export const revalidate = 3600
 
