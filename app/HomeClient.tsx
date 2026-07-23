@@ -7,6 +7,8 @@ import HeroSlider, { type HeroSlide } from './HeroSlider'
 import AdvertisementBanner from './components/AdvertisementBanner'
 import EventCard from './components/EventCard'
 import HomeHero from './components/HomeHero'
+import SignupForm from './components/SignupForm'
+
 
 type Event = {
   id: string
@@ -304,7 +306,14 @@ export default function HomeClient({
           </a>
           <div className={styles.adDeco}>♪</div>
         </div>
-      
+        
+
+<section className={styles.contentWrap}>
+  <SignupForm />
+</section>
+
+<div className={styles.footerRule} />
+<p className={styles.footerText}>© seveneightfive magazine — Events & times subject to change</p>
 
         <div className={styles.footerRule} />
         <p className={styles.footerText}>© seveneightfive magazine — Events & times subject to change</p>
