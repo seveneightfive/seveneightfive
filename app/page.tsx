@@ -3,14 +3,6 @@ import HomeClient from './HomeClient'
 import type { HeroSlide } from './HeroSlider'
 import SignupForm from './components/SignupForm';
 
-export default function Home() {
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gray-50">
-      <SignupForm />
-    </main>
-  );
-}
-
 export const revalidate = 3600
 
 /**
@@ -38,6 +30,14 @@ type EventRow = {
   image_url: string | null
   ticket_url: string | null
   venue: { name: string; neighborhood: string | null } | { name: string; neighborhood: string | null }[] | null
+}
+
+export default function HomePage() {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gray-50">
+      <SignupForm />
+    </main>
+  );
 }
 
 export default async function HomePage() {
