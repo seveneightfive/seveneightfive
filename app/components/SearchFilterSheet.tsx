@@ -4,6 +4,17 @@ import { useEffect } from 'react'
 
 type QuickDateOption = { key: string; label: string }
 
+type ExtraSection = {
+  key: string
+  label: string
+  options: string[]
+  selected: string[]
+  onToggle: (v: string) => void
+  // true (default) = independent toggles, like Category.
+  // false = radio-like: picking one clears the others in this section.
+  multiSelect?: boolean
+}
+
 type SearchFilterSheetProps = {
   open: boolean
   onClose: () => void
@@ -11,14 +22,22 @@ type SearchFilterSheetProps = {
   onSearchChange: (v: string) => void
   searchPlaceholder?: string
   categories: string[]
+  categoriesLabel?: string
   selectedCategories: string[]
   onToggleCategory: (cat: string) => void
-  quickDate: string | null
-  onQuickDate: (key: string | null) => void
-  startDate: string | null
-  endDate: string | null
-  onStartDate: (v: string | null) => void
-  onEndDate: (v: string | null) => void
+  // Additional pill sections beyond Category — e.g. Artists' Type, then a
+  // dependent Genre/Medium/Specialty section that only shows once a type
+  // is picked.
+  extraSections?: ExtraSection[]
+  // Set false to hide the When/Pick-a-day/date-range block entirely —
+  // Venues and Artists don't have their own event_date to filter by.
+  showDateFilters?: boolean
+  quickDate?: string | null
+  onQuickDate?: (key: string | null) => void
+  startDate?: string | null
+  endDate?: string | null
+  onStartDate?: (v: string | null) => void
+  onEndDate?: (v: string | null) => void
   // Pick-a-specific-day strip (ported from the old DateFilter.tsx week strip) —
   // distinct from quickDate/start/end above: this jumps to one exact calendar day.
   selectedDate?: string | null
@@ -59,12 +78,15 @@ export default function SearchFilterSheet({
   onSearchChange,
   searchPlaceholder = 'Search events, artists, venues...',
   categories,
+  categoriesLabel = 'Category',
   selectedCategories,
   onToggleCategory,
-  quickDate,
+  extraSections = [],
+  showDateFilters = true,
+  quickDate = null,
   onQuickDate,
-  startDate,
-  endDate,
+  startDate = null,
+  endDate = null,
   onStartDate,
   onEndDate,
   selectedDate = null,
@@ -208,6 +230,7 @@ export default function SearchFilterSheet({
             </svg>
           </div>
 
+          {showDateFilters && (
           <div className="sfs-section">
             <div className="sfs-section-label">When</div>
             <div className="sfs-pill-row">
@@ -216,7 +239,7 @@ export default function SearchFilterSheet({
                   key={opt.key}
                   type="button"
                   className={`sfs-pill ${quickDate === opt.key ? 'checked' : ''}`}
-                  onClick={() => onQuickDate(quickDate === opt.key ? null : opt.key)}
+                  onClick={() => onQuickDate?.(quickDate === opt.key ? null : opt.key)}
                 >
                   {opt.label}
                 </button>
@@ -230,7 +253,7 @@ export default function SearchFilterSheet({
                   type="date"
                   className="sfs-date-input"
                   value={startDate || ''}
-                  onChange={e => onStartDate(e.target.value || null)}
+                  onChange={e => onStartDate?.(e.target.value || null)}
                 />
               </div>
               <div className="sfs-date-field">
@@ -240,13 +263,14 @@ export default function SearchFilterSheet({
                   type="date"
                   className="sfs-date-input"
                   value={endDate || ''}
-                  onChange={e => onEndDate(e.target.value || null)}
+                  onChange={e => onEndDate?.(e.target.value || null)}
                 />
               </div>
             </div>
           </div>
+          )}
 
-          {onSelectDate && (
+          {showDateFilters && onSelectDate && (
             <div className="sfs-section">
               <div className="sfs-section-label">Pick a day</div>
               <div className="sfs-day-strip">
@@ -271,8 +295,9 @@ export default function SearchFilterSheet({
             </div>
           )}
 
+          {categories.length > 0 && (
           <div className="sfs-section">
-            <div className="sfs-section-label">Category</div>
+            <div className="sfs-section-label">{categoriesLabel}</div>
             <div className="sfs-pill-row">
               {categories.map(cat => (
                 <button
@@ -286,6 +311,25 @@ export default function SearchFilterSheet({
               ))}
             </div>
           </div>
+          )}
+
+          {extraSections.map(section => (
+            <div className="sfs-section" key={section.key}>
+              <div className="sfs-section-label">{section.label}</div>
+              <div className="sfs-pill-row">
+                {section.options.map(opt => (
+                  <button
+                    key={opt}
+                    type="button"
+                    className={`sfs-pill ${section.selected.includes(opt) ? 'checked' : ''}`}
+                    onClick={() => section.onToggle(opt)}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
 
         <div className="sfs-footer">
