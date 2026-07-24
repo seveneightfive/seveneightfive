@@ -378,7 +378,6 @@ export default function EventsList() {
         }
       `}</style>
 
-      <div className="events-root">
       <BrowseHeader
         title="Events"
         activeFilterCount={activeFilterCount}
@@ -407,6 +406,7 @@ export default function EventsList() {
         onClearAll={clearAllFilters}
       />
 
+      <div className="events-root">
       <div className="page">
         {loading ? (
           <div className="loading">
