@@ -29,6 +29,7 @@ type Event = {
   ticket_url: string | null
   learnmore_link: string | null
   event_types: string[] | null
+  tags: string[] | null
   star: boolean | null
   slug: string | null
   venue: Venue | null
@@ -48,6 +49,20 @@ const EVENT_TYPES = [
   'Art', 'Entertainment', 'Lifestyle', 'Local Flavor', 'Live Music',
   'Party For A Cause', 'Community / Cultural', 'Shop Local', 'Family',
 ]
+
+// Descriptive sub-category tags from events.tags — additive to event_types,
+// not a replacement (per the column's own schema comment). Kept as a
+// separate hardcoded list (rather than an enum) since the DB column is
+// plain text[], not constrained — update this list if new tags get used.
+const EVENT_TAGS = [
+  'Theater', 'Sports', 'Karaoke', 'Class', 'Dance', 'Trivia Night',
+  'Bingo', 'Literary', 'Comedy Night', 'Exhibition', 'Open Mic',
+  'Film Screening', 'Auditions', 'All Ages', 'Free', 'A Short Drive',
+]
+
+// One flat pill list in the Category section — the person filtering
+// doesn't need to know or care which DB column a given value lives in.
+const CATEGORY_OPTIONS = [...EVENT_TYPES, ...EVENT_TAGS]
 
 function formatTime(t: string | null): string {
   if (!t || t.trim() === ':') return ''
@@ -161,7 +176,7 @@ export default function EventsList() {
         .select(`
           id, title, description, event_date, start_date, end_date,
           event_start_time, event_end_time, image_url, ticket_price,
-          ticket_url, learnmore_link, event_types, star, slug,
+          ticket_url, learnmore_link, event_types, tags, star, slug,
           venues (id, name, address, neighborhood, city, slug)
         `)
         .gte('event_date', showPast ? '2020-01-01' : today)
@@ -200,7 +215,10 @@ export default function EventsList() {
     let result = [...source]
 
     if (selectedCategories.length > 0) {
-      result = result.filter(e => e.event_types?.some(t => selectedCategories.includes(t)))
+      result = result.filter(e => {
+        const eventCategories = [...(e.event_types || []), ...(e.tags || [])]
+        return selectedCategories.some(cat => eventCategories.includes(cat))
+      })
     }
 
     if (selectedDate) {
@@ -373,7 +391,7 @@ export default function EventsList() {
         search={search}
         onSearchChange={setSearch}
         searchPlaceholder="Search events, artists, venues..."
-        categories={EVENT_TYPES}
+        categories={CATEGORY_OPTIONS}
         selectedCategories={selectedCategories}
         onToggleCategory={toggleCategory}
         quickDate={quickDate}
