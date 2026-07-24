@@ -154,7 +154,6 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
         @media (max-width: 380px) { .venues-grid { grid-template-columns: 1fr; } }
       `}</style>
 
-      <div className="venues-root">
       <BrowseHeader
         title="Venues"
         activeFilterCount={activeFilterCount}
@@ -177,6 +176,7 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
         onClearAll={clearAllFilters}
       />
 
+      <div className="venues-root">
       <div className="page">
         {loading ? (
           <div className="loading"><div className="loading-dots"><span/><span/><span/></div></div>
