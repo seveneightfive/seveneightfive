@@ -1,0 +1,182 @@
+.browseHeader {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #ffffff;
+  border-bottom: 2px solid #0A0A0A;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 100px;
+  border: 1.5px solid #ece8e2;
+  background: transparent;
+  color: #0A0A0A;
+  cursor: pointer;
+}
+
+.backBtn:hover {
+  border-color: #0A0A0A;
+}
+
+.title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #0A0A0A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.searchFilterBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border-radius: 100px;
+  border: none;
+  background: #0A0A0A;
+  color: #ffffff;
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.searchFilterBtn:hover {
+  opacity: 0.85;
+}
+
+.searchFilterBtnLight {
+  background: transparent;
+  border: 1.5px solid #ffffff;
+  color: #ffffff;
+}
+
+.searchFilterBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 100px;
+  background: #FFCE03;
+  color: #0A0A0A;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.hamburgerWrap {
+  position: relative;
+  display: none;
+}
+
+.hamburgerBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 100px;
+  border: 1.5px solid #ece8e2;
+  background: transparent;
+  color: #0A0A0A;
+  cursor: pointer;
+}
+
+.hamburgerBtn:hover {
+  border-color: #0A0A0A;
+}
+
+.menuScrim {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: transparent;
+}
+
+.menuDropdown {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  z-index: 200;
+  min-width: 200px;
+  padding: 6px;
+  background: #ffffff;
+  border: 1px solid #ece8e2;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(10, 10, 10, 0.1);
+}
+
+.menuLink {
+  display: block;
+  padding: 10px 14px;
+  border-radius: 4px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #0A0A0A;
+  text-decoration: none;
+}
+
+.menuLink:hover {
+  background: #FFCE03;
+}
+
+.menuLinkActive {
+  background: #0A0A0A;
+  color: #ffffff;
+}
+
+@media (min-width: 640px) {
+  .row {
+    padding: 0 40px;
+    height: 64px;
+  }
+
+  .title {
+    font-size: 22px;
+  }
+
+  .hamburgerWrap {
+    display: block;
+  }
+}
