@@ -2,11 +2,9 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
-import DateFilter from './DateFilter'
-import FiltersPanel from './FiltersPanel'
-import { useNavState } from '../components/NavContext'
+import BrowseHeader from '../components/BrowseHeader'
+import SearchFilterSheet, { getActiveFilterCount } from '../components/SearchFilterSheet'
 import AdvertisementBanner from '../components/AdvertisementBanner'
-import Link from 'next/link'
 
 type Venue = {
   id: string
@@ -122,11 +120,10 @@ export default function EventsList() {
   const [filtered, setFiltered] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [searchOpen, setSearchOpen] = useState(false)
   const [showPast, setShowPast] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
-  // Full Filters panel state
+  // Search & Filter sheet state
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [quickDate, setQuickDate] = useState<string | null>(null)
@@ -135,16 +132,6 @@ export default function EventsList() {
   const [sortBy, setSortBy] = useState<'featured' | 'date'>('featured')
 
   const scrollRestored = useRef(false)
-  const searchInputRef = useRef<HTMLInputElement>(null)
-  const { setRightText } = useNavState()
-
-  useEffect(() => {
-    return () => { setRightText('') }
-  }, [setRightText])
-
-  useEffect(() => {
-    if (!loading) setRightText(`${filtered.length} ${filtered.length === 1 ? 'Event' : 'Events'}`)
-  }, [loading, filtered.length, setRightText])
 
   useEffect(() => {
     if (!loading && !scrollRestored.current) {
@@ -160,10 +147,6 @@ export default function EventsList() {
       }
     }
   }, [loading])
-
-  useEffect(() => {
-    if (searchOpen) searchInputRef.current?.focus()
-  }, [searchOpen])
 
   const handleEventClick = useCallback((isExternal: boolean) => {
     if (!isExternal) {
@@ -198,7 +181,7 @@ export default function EventsList() {
     fetchEvents()
   }, [showPast])
 
-  // Resolve the quick-date radio (from the Filters panel) into a concrete date/range
+  // Resolve the quick-date radio (from the Search & Filter sheet) into a concrete date/range
   const quickDateRange = useMemo(() => {
     if (!quickDate) return null
     const todayKey = getDateKey(new Date())
@@ -273,12 +256,7 @@ export default function EventsList() {
     )
   }
 
-  const activeFilterCount =
-    selectedCategories.length +
-    (selectedDate ? 1 : 0) +
-    (quickDate ? 1 : 0) +
-    (startDate ? 1 : 0) +
-    (endDate ? 1 : 0)
+  const activeFilterCount = getActiveFilterCount({ selectedCategories, quickDate, startDate, endDate, selectedDate })
 
   const dayGroups = getDayGroups(filtered)
 
@@ -296,48 +274,6 @@ export default function EventsList() {
         html, body { overflow-x: hidden; max-width: 100vw; }
         html, body { background: var(--white); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
         .page { max-width: 1100px; margin: 0 auto; padding: 0 24px; overflow: hidden; }
-
-        /* STICKY CONTROL BAR: search icon + filters + date, all sticky together */
-        .control-bar { position: sticky; top: 0; z-index: 100; background: var(--white); border-bottom: 1px solid var(--border); }
-        .control-bar-logo { display: flex; align-items: center; margin-right: 4px; text-decoration: none; flex-shrink: 0; }
-.control-bar-logo img { height: 30px; width: auto; display: block; }
-@media (min-width: 640px) {
-  .control-bar { top: 64px; }       /* stack below the 64px desktop topnav instead of overlapping it */
-  .control-bar-logo { display: none; } /* desktop topnav already shows the logo */
-}
-        .control-bar-row { max-width: 1100px; margin: 0 auto; padding: 10px 24px; display: flex; align-items: center; gap: 10px; }
-
-        .icon-btn {
-          display: flex; align-items: center; justify-content: center;
-          width: 36px; height: 36px; flex-shrink: 0;
-          border-radius: 100px; border: 1.5px solid var(--border);
-          background: transparent; color: var(--ink-soft); cursor: pointer;
-          transition: all 0.15s;
-        }
-        .icon-btn:hover { border-color: var(--ink); color: var(--ink); }
-        .icon-btn.active { background: var(--ink); border-color: var(--ink); color: white; }
-
-        .filter-btn {
-          display: flex; align-items: center; gap: 6px;
-          padding: 6px 14px; border-radius: 100px;
-          border: 1.5px solid var(--border); background: transparent;
-          font-family: var(--sans); font-size: 0.78rem; font-weight: 500;
-          color: var(--ink-soft); cursor: pointer; transition: all 0.15s; white-space: nowrap;
-        }
-        .filter-btn:hover { border-color: var(--ink); color: var(--ink); }
-        .filter-btn-badge {
-          display: inline-flex; align-items: center; justify-content: center;
-          min-width: 16px; height: 16px; padding: 0 4px;
-          border-radius: 100px; background: var(--accent); color: white;
-          font-size: 0.62rem; font-weight: 700;
-        }
-
-        .search-expand { max-width: 1100px; margin: 0 auto; padding: 0 24px 10px; }
-        .search-wrap { position: relative; width: 100%; }
-        .search-input { width: 100%; padding: 7px 12px 7px 38px; background: #f5f5f5; border: 0.5px solid #e0e0e0; border-radius: 20px; font-family: var(--sans); font-size: 0.88rem; color: var(--ink); outline: none; transition: border-color 0.15s, background 0.15s; }
-        .search-input:focus { border-color: var(--ink); background: var(--white); }
-        .search-input::placeholder { color: var(--ink-faint); }
-        .search-icon-inline { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--ink-faint); pointer-events: none; }
 
         .calendar { padding: 24px 0 80px; }
         .day-group { margin-bottom: 48px; }
@@ -380,8 +316,6 @@ export default function EventsList() {
         .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
         @keyframes pulse { 0%,80%,100%{opacity:0.3;transform:scale(0.85)}40%{opacity:1;transform:scale(1)} }
         @media (max-width: 640px) {
-          .control-bar-row { padding: 10px 16px; }
-          .search-expand { padding: 0 16px 10px; }
           .event-card { grid-template-columns: 68px 1fr auto; }
           .event-time-col { padding: 14px 10px 14px 14px; }
           .event-img-thumb { width: 48px; height: 48px; }
@@ -397,60 +331,18 @@ export default function EventsList() {
         }
       `}</style>
 
-      {/* STICKY: search icon + filters + date, all in one sticky header */}
-      <div className="control-bar">
-        <div className="control-bar-row">
-          <Link href="/" className="control-bar-logo" aria-label="785 Magazine home">
-  <img src="https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785logo_512.png" alt="785 Magazine" />
-</Link>
-          <button
-            className={`icon-btn ${searchOpen ? 'active' : ''}`}
-            onClick={() => setSearchOpen(o => !o)}
-            aria-label="Toggle search"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-            </svg>
-          </button>
+      <BrowseHeader
+        title="Events"
+        activeFilterCount={activeFilterCount}
+        onOpenFilters={() => setFiltersOpen(true)}
+      />
 
-          <button
-            className="filter-btn"
-            onClick={() => setFiltersOpen(true)}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 6h16M7 12h10M10 18h4"/>
-            </svg>
-            Filters
-            {activeFilterCount > 0 && <span className="filter-btn-badge">{activeFilterCount}</span>}
-          </button>
-
-          <DateFilter selectedDate={selectedDate} onSelect={setSelectedDate} />
-        </div>
-
-        {searchOpen && (
-          <div className="search-expand">
-            <div className="search-wrap">
-              <svg className="search-icon-inline" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-              </svg>
-              <input
-                ref={searchInputRef}
-                className="search-input"
-                type="text"
-                placeholder="Search events, venues..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      <FiltersPanel
+      <SearchFilterSheet
         open={filtersOpen}
         onClose={() => setFiltersOpen(false)}
         search={search}
         onSearchChange={setSearch}
+        searchPlaceholder="Search events, artists, venues..."
         categories={EVENT_TYPES}
         selectedCategories={selectedCategories}
         onToggleCategory={toggleCategory}
@@ -460,9 +352,12 @@ export default function EventsList() {
         endDate={endDate}
         onStartDate={setStartDate}
         onEndDate={setEndDate}
+        selectedDate={selectedDate}
+        onSelectDate={setSelectedDate}
         sortBy={sortBy}
         onSortBy={setSortBy}
         resultCount={filtered.length}
+        resultLabel="Events"
         onClearAll={clearAllFilters}
       />
 
