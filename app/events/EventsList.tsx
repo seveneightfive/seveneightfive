@@ -41,12 +41,12 @@ type DayGroup = {
   events: Event[]
 }
 
+// Must match the check constraint on events.event_types exactly — anything
+// listed here that isn't one of these 9 values will always return zero
+// results, since the column can't contain it.
 const EVENT_TYPES = [
-  'Live Music', 'Art', 'Entertainment', 'Lifestyle',
-  'Local Flavor', 'Community / Cultural', 'Party For A Cause',
-  'Shop Local', 'Holiday', 'Exhibition',
-  'Comedy Night', 'Open Mic', 'Poetry Reading', 'Trivia Night',
-  'Bingo', 'Workshop / Class', 'Film / Screening', 'Dance', 'Theater',
+  'Art', 'Entertainment', 'Lifestyle', 'Local Flavor', 'Live Music',
+  'Party For A Cause', 'Community / Cultural', 'Shop Local', 'Family',
 ]
 
 function formatTime(t: string | null): string {
@@ -129,7 +129,6 @@ export default function EventsList() {
   const [quickDate, setQuickDate] = useState<string | null>(null)
   const [startDate, setStartDate] = useState<string | null>(null)
   const [endDate, setEndDate] = useState<string | null>(null)
-  const [sortBy, setSortBy] = useState<'featured' | 'date'>('featured')
 
   const scrollRestored = useRef(false)
 
@@ -224,17 +223,14 @@ export default function EventsList() {
       )
     }
 
-    if (sortBy === 'featured') {
-      result.sort((a, b) => {
-        if (a.star === b.star) return a.event_date.localeCompare(b.event_date)
-        return a.star ? -1 : 1
-      })
-    } else {
-      result.sort((a, b) => a.event_date.localeCompare(b.event_date))
-    }
+    // Featured (starred) events first, then chronological — no longer user-selectable.
+    result.sort((a, b) => {
+      if (a.star === b.star) return a.event_date.localeCompare(b.event_date)
+      return a.star ? -1 : 1
+    })
 
     return result
-  }, [selectedCategories, selectedDate, startDate, endDate, quickDateRange, search, sortBy])
+  }, [selectedCategories, selectedDate, startDate, endDate, quickDateRange, search])
 
   useEffect(() => {
     setFiltered(applyFilters(events))
@@ -246,7 +242,6 @@ export default function EventsList() {
     setQuickDate(null)
     setStartDate(null)
     setEndDate(null)
-    setSortBy('featured')
     setSearch('')
   }
 
@@ -257,6 +252,40 @@ export default function EventsList() {
   }
 
   const activeFilterCount = getActiveFilterCount({ selectedCategories, quickDate, startDate, endDate, selectedDate })
+
+  // The three date mechanisms (When pills, pick-a-day strip, start/end range)
+  // are mutually exclusive — choosing one clears the other two so there's
+  // never an ambiguous combination of date filters active at once.
+  const handleQuickDate = (key: string | null) => {
+    setQuickDate(key)
+    if (key) {
+      setSelectedDate(null)
+      setStartDate(null)
+      setEndDate(null)
+    }
+  }
+  const handleSelectDate = (date: string | null) => {
+    setSelectedDate(date)
+    if (date) {
+      setQuickDate(null)
+      setStartDate(null)
+      setEndDate(null)
+    }
+  }
+  const handleStartDate = (v: string | null) => {
+    setStartDate(v)
+    if (v) {
+      setQuickDate(null)
+      setSelectedDate(null)
+    }
+  }
+  const handleEndDate = (v: string | null) => {
+    setEndDate(v)
+    if (v) {
+      setQuickDate(null)
+      setSelectedDate(null)
+    }
+  }
 
   const dayGroups = getDayGroups(filtered)
 
@@ -271,8 +300,8 @@ export default function EventsList() {
           --yellow: #FFCE03;
           --serif: 'Oswald', sans-serif; --sans: 'DM Sans', system-ui, sans-serif;
         }
-        html, body { overflow-x: hidden; max-width: 100vw; }
         html, body { background: var(--white); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+        .events-root { overflow-x: hidden; max-width: 100vw; }
         .page { max-width: 1100px; margin: 0 auto; padding: 0 24px; overflow: hidden; }
 
         .calendar { padding: 24px 0 80px; }
@@ -331,6 +360,7 @@ export default function EventsList() {
         }
       `}</style>
 
+      <div className="events-root">
       <BrowseHeader
         title="Events"
         activeFilterCount={activeFilterCount}
@@ -347,15 +377,13 @@ export default function EventsList() {
         selectedCategories={selectedCategories}
         onToggleCategory={toggleCategory}
         quickDate={quickDate}
-        onQuickDate={setQuickDate}
+        onQuickDate={handleQuickDate}
         startDate={startDate}
         endDate={endDate}
-        onStartDate={setStartDate}
-        onEndDate={setEndDate}
+        onStartDate={handleStartDate}
+        onEndDate={handleEndDate}
         selectedDate={selectedDate}
-        onSelectDate={setSelectedDate}
-        sortBy={sortBy}
-        onSortBy={setSortBy}
+        onSelectDate={handleSelectDate}
         resultCount={filtered.length}
         resultLabel="Events"
         onClearAll={clearAllFilters}
@@ -460,6 +488,7 @@ export default function EventsList() {
             )}
           </section>
         )}
+      </div>
       </div>
     </>
   )
