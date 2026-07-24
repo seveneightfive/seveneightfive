@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { useNavState } from '../components/NavContext'
+import BrowseHeader from '../components/BrowseHeader'
+import SearchFilterSheet from '../components/SearchFilterSheet'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -329,16 +330,7 @@ export default function ArtistDirectory({ initialData }: { initialData: InitialD
   const [activeType, setActiveType] = useState(validType)
   const [activeGenre, setActiveGenre] = useState('')
   const [showMine, setShowMine] = useState(false)
-  const { setLogoSuffix, setRightText } = useNavState()
-
-  useEffect(() => {
-    setLogoSuffix('ARTISTS')
-    return () => { setLogoSuffix('MAGAZINE'); setRightText('') }
-  }, [setLogoSuffix, setRightText])
-
-  useEffect(() => {
-    setRightText(`${artists.length} Artists`)
-  }, [artists.length, setRightText])
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   // ── Fetch user-specific data only (public data is server-rendered) ──────────
   useEffect(() => {
@@ -404,6 +396,59 @@ export default function ArtistDirectory({ initialData }: { initialData: InitialD
 
   const hasSidebar = (exhibitions.length > 0 || productions.length > 0)
   const isFiltered = !!(search.trim() || activeType !== 'All' || activeGenre || showMine)
+
+  // Type is single-select (radio-like): picking a type clears genre + mine,
+  // same as the original inline chips. Clicking the already-active type
+  // clears back to "All".
+  const handleToggleType = (type: string) => {
+    setActiveType(activeType === type ? 'All' : type)
+    setActiveGenre('')
+    setShowMine(false)
+  }
+  const handleToggleGenre = (g: string) => {
+    setActiveGenre(activeGenre === g ? '' : g)
+  }
+  const myArtistsLabel = `My Artists (${myArtistIds.length})`
+  const handleToggleMine = () => {
+    setShowMine(v => !v)
+    setActiveType('All')
+    setActiveGenre('')
+  }
+
+  const extraSections = [
+    {
+      key: 'type',
+      label: 'Type',
+      options: ARTIST_TYPES.filter(t => t !== 'All').map(t => TYPE_FILTER_LABELS[t]),
+      // options are display labels; map back to the raw type key for selection matching
+      selected: activeType !== 'All' && !showMine ? [TYPE_FILTER_LABELS[activeType]] : [],
+      onToggle: (label: string) => {
+        const type = (Object.keys(TYPE_FILTER_LABELS) as string[]).find(k => TYPE_FILTER_LABELS[k] === label)
+        if (type) handleToggleType(type)
+      },
+      multiSelect: false,
+    },
+    // Dependent genre/medium/specialty section — only present once a type is chosen
+    ...(activeType !== 'All' && !showMine ? [{
+      key: 'genre',
+      label: getGenreLabel(),
+      options: getGenreList(),
+      selected: activeGenre ? [activeGenre] : [],
+      onToggle: handleToggleGenre,
+      multiSelect: false,
+    }] : []),
+    // My Artists — only present if the signed-in user actually manages any
+    ...(myArtistIds.length > 0 ? [{
+      key: 'mine',
+      label: 'My Artists',
+      options: [myArtistsLabel],
+      selected: showMine ? [myArtistsLabel] : [],
+      onToggle: handleToggleMine,
+      multiSelect: false,
+    }] : []),
+  ]
+
+  const activeFilterCount = (activeType !== 'All' ? 1 : 0) + (activeGenre ? 1 : 0) + (showMine ? 1 : 0)
 
   return (
     <>
@@ -917,6 +962,28 @@ export default function ArtistDirectory({ initialData }: { initialData: InitialD
         }
       `}</style>
 
+      <BrowseHeader
+        title="Artists"
+        activeFilterCount={activeFilterCount}
+        onOpenFilters={() => setFiltersOpen(true)}
+      />
+
+      <SearchFilterSheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search artists..."
+        categories={[]}
+        selectedCategories={[]}
+        onToggleCategory={() => {}}
+        extraSections={extraSections}
+        showDateFilters={false}
+        resultCount={filtered.length}
+        resultLabel="Artists"
+        onClearAll={() => { setActiveType('All'); setActiveGenre(''); setShowMine(false); setSearch('') }}
+      />
+
       {/* ── Partnership tagline ── */}
       <div className="adir-tagline">
         Topeka Artist Directory · presented in partnership between{' '}
@@ -925,71 +992,6 @@ export default function ArtistDirectory({ initialData }: { initialData: InitialD
 
       <div className="adir-wrap">
         <h1 className="adir-heading">785 <em>Artists</em></h1>
-
-        {/* ── Controls: search inline with type filters ── */}
-        <div className="adir-controls">
-          <div className="adir-search-wrap">
-            <svg className="adir-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-            </svg>
-            <input
-              className="adir-search"
-              type="text"
-              placeholder="Search artists…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-            {search && (
-              <button className="adir-search-clear" onClick={() => setSearch('')} aria-label="Clear">×</button>
-            )}
-          </div>
-
-          <div className="adir-divider" />
-
-          <div className="adir-filters">
-            {ARTIST_TYPES.map(type => (
-              <button
-                key={type}
-                className={`adir-chip${activeType === type && !showMine ? ' active' : ''}`}
-                onClick={() => { setActiveType(type); setActiveGenre(''); setShowMine(false) }}
-              >
-                {TYPE_FILTER_LABELS[type]}
-              </button>
-            ))}
-            {myArtistIds.length > 0 && (
-              <button
-                className={`adir-chip mine${showMine ? ' active' : ''}`}
-                onClick={() => { setShowMine(v => !v); setActiveType('All'); setActiveGenre('') }}
-              >
-                My Artists ({myArtistIds.length})
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Sub-genre filter */}
-        {activeType !== 'All' && !showMine && (
-          <div className="adir-subfilters">
-            <div className="adir-subfilter-label">{getGenreLabel()}</div>
-            <div className="adir-genre-scroll">
-              <button
-                className={`adir-chip genre-chip${activeGenre === '' ? ' active' : ''}`}
-                onClick={() => setActiveGenre('')}
-              >
-                All
-              </button>
-              {getGenreList().map(g => (
-                <button
-                  key={g}
-                  className={`adir-chip genre-chip${activeGenre === g ? ' active' : ''}`}
-                  onClick={() => setActiveGenre(activeGenre === g ? '' : g)}
-                >
-                  {g}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         <div className={`adir-layout${hasSidebar && !isFiltered ? ' has-sidebar' : ''}`}>
 
