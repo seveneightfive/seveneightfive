@@ -6,6 +6,7 @@ import DateFilter from './DateFilter'
 import FiltersPanel from './FiltersPanel'
 import { useNavState } from '../components/NavContext'
 import AdvertisementBanner from '../components/AdvertisementBanner'
+import Link from 'next/link'
 
 type Venue = {
   id: string
@@ -298,6 +299,12 @@ export default function EventsList() {
 
         /* STICKY CONTROL BAR: search icon + filters + date, all sticky together */
         .control-bar { position: sticky; top: 0; z-index: 100; background: var(--white); border-bottom: 1px solid var(--border); }
+        .control-bar-logo { display: flex; align-items: center; margin-right: 4px; text-decoration: none; flex-shrink: 0; }
+.control-bar-logo img { height: 30px; width: auto; display: block; }
+@media (min-width: 640px) {
+  .control-bar { top: 64px; }       /* stack below the 64px desktop topnav instead of overlapping it */
+  .control-bar-logo { display: none; } /* desktop topnav already shows the logo */
+}
         .control-bar-row { max-width: 1100px; margin: 0 auto; padding: 10px 24px; display: flex; align-items: center; gap: 10px; }
 
         .icon-btn {
@@ -393,6 +400,9 @@ export default function EventsList() {
       {/* STICKY: search icon + filters + date, all in one sticky header */}
       <div className="control-bar">
         <div className="control-bar-row">
+          <Link href="/" className="control-bar-logo" aria-label="785 Magazine home">
+  <img src="https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785logo_512.png" alt="785 Magazine" />
+</Link>
           <button
             className={`icon-btn ${searchOpen ? 'active' : ''}`}
             onClick={() => setSearchOpen(o => !o)}
