@@ -23,8 +23,6 @@ type SearchFilterSheetProps = {
   // distinct from quickDate/start/end above: this jumps to one exact calendar day.
   selectedDate?: string | null
   onSelectDate?: (date: string | null) => void
-  sortBy: 'featured' | 'date'
-  onSortBy: (v: 'featured' | 'date') => void
   resultCount: number
   resultLabel?: string
   onClearAll: () => void
@@ -71,8 +69,6 @@ export default function SearchFilterSheet({
   onEndDate,
   selectedDate = null,
   onSelectDate,
-  sortBy,
-  onSortBy,
   resultCount,
   resultLabel = 'Events',
   onClearAll,
@@ -274,25 +270,6 @@ export default function SearchFilterSheet({
               </div>
             </div>
           )}
-
-          <div className="sfs-section">
-            <div className="sfs-section-label">Sort by</div>
-            <div className="sfs-pill-row">
-              {([
-                { key: 'featured' as const, label: 'Featured' },
-                { key: 'date' as const, label: 'Date (upcoming)' },
-              ]).map(opt => (
-                <button
-                  key={opt.key}
-                  type="button"
-                  className={`sfs-pill ${sortBy === opt.key ? 'checked' : ''}`}
-                  onClick={() => onSortBy(opt.key)}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
 
           <div className="sfs-section">
             <div className="sfs-section-label">Category</div>
