@@ -28,6 +28,7 @@ export default function SiteNav() {
 
   const date = new Date().toLocaleString('en-US', { month: 'short', year: 'numeric' })
   const isActive = (prefix: string) => pathname.startsWith(prefix)
+  const hideMobileHeader = pathname === '/events'
 
   return (
     <>
@@ -46,14 +47,18 @@ export default function SiteNav() {
       </header>
 
       {/* ── Mobile Header ── */}
-      <header className={styles.mobileHeader}>
-        <Link href="/" className={styles.logo}>
-          785<span>{logoSuffix}</span>
-        </Link>
-        <span className={styles.date}>
-          {rightText || date}
-        </span>
-      </header>
+{/* Suppressed on /events — that page renders its own compact logo
+    inside its sticky control bar instead. */}
+{!hideMobileHeader && (
+  <header className={styles.mobileHeader}>
+    <Link href="/" className={styles.logo}>
+      785<span>{logoSuffix}</span>
+    </Link>
+    <span className={styles.date}>
+      {rightText || date}
+    </span>
+  </header>
+)}
 
       {/* ── Mobile Bottom Nav ── */}
       {/* Intentionally left at 4 items (Events, Artists, Venues, MY 785) —
