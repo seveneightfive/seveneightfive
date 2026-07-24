@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useNavState } from '../components/NavContext'
+import BrowseHeader from '../components/BrowseHeader'
+import SearchFilterSheet from '../components/SearchFilterSheet'
 
 type Venue = {
   id: string
@@ -18,24 +19,25 @@ type Venue = {
   venue_type: string[] | null
 }
 
+// Matches the neighborhood_enum values on venues.neighborhood exactly.
+const NEIGHBORHOODS = [
+  'Downtown', 'NOTO', 'North Topeka', 'Oakland', 'Westboro Mart',
+  'College Hill', 'Lake Shawnee', 'Golden Mile', 'A Short Drive',
+  'South Topeka', 'Midtown', 'West Topeka', 'East Topeka',
+]
+
 export default function VenuesList({ initialNeighborhood, initialVenues = [] }: { initialNeighborhood?: string; initialVenues?: Venue[] }) {
   const [venues, setVenues] = useState<Venue[]>(initialVenues)
   const [filtered, setFiltered] = useState<Venue[]>(initialVenues)
   const [loading, setLoading] = useState(initialVenues.length === 0)
   const [search, setSearch] = useState('')
-  const [activeNeighborhood, setActiveNeighborhood] = useState(initialNeighborhood || 'All')
-  const [activeType, setActiveType] = useState('All')
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  // Multi-select now (was single "All"/one-value before) — seeded from the
+  // ?neighborhood= deep link if present, same as before.
+  const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>(
+    initialNeighborhood ? [initialNeighborhood] : []
+  )
   const scrollRestored = useRef(false)
-  const { setLogoSuffix, setRightText } = useNavState()
-
-  useEffect(() => {
-    setLogoSuffix('PLACES')
-    return () => { setLogoSuffix('MAGAZINE'); setRightText('') }
-  }, [setLogoSuffix, setRightText])
-
-  useEffect(() => {
-    if (!loading) setRightText(`${filtered.length} ${filtered.length === 1 ? 'Venue' : 'Venues'}`)
-  }, [loading, filtered.length, setRightText])
 
   useEffect(() => {
     if (!loading && !scrollRestored.current) {
@@ -72,13 +74,11 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
     fetchVenues()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const neighborhoods = ['All', ...Array.from(new Set(venues.map(v => v.neighborhood).filter(Boolean) as string[])).sort()]
-  const venueTypes = ['All', ...Array.from(new Set(venues.flatMap(v => v.venue_type || []))).sort()]
-
   const applyFilters = useCallback(() => {
     let result = [...venues]
-    if (activeNeighborhood !== 'All') result = result.filter(v => v.neighborhood === activeNeighborhood)
-    if (activeType !== 'All') result = result.filter(v => v.venue_type?.includes(activeType))
+    if (selectedNeighborhoods.length > 0) {
+      result = result.filter(v => v.neighborhood && selectedNeighborhoods.includes(v.neighborhood))
+    }
     if (search.trim()) {
       const q = search.toLowerCase()
       result = result.filter(v =>
@@ -88,9 +88,18 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
       )
     }
     setFiltered(result)
-  }, [venues, activeNeighborhood, activeType, search])
+  }, [venues, selectedNeighborhoods, search])
 
   useEffect(() => { applyFilters() }, [applyFilters])
+
+  const toggleNeighborhood = (n: string) => {
+    setSelectedNeighborhoods(prev => prev.includes(n) ? prev.filter(x => x !== n) : [...prev, n])
+  }
+  const clearAllFilters = () => {
+    setSelectedNeighborhoods([])
+    setSearch('')
+  }
+  const activeFilterCount = selectedNeighborhoods.length
 
   return (
     <>
@@ -102,36 +111,12 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
           --accent: #C80650; --accent-light: #fdf1ec; --border: #ece8e2;
           --serif: 'Oswald', sans-serif; --sans: 'DM Sans', system-ui, sans-serif;
         }
-        html, body { overflow-x: hidden; max-width: 100vw; background: var(--white); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
-
+        html, body { background: var(--white); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+        .venues-root { overflow-x: hidden; max-width: 100vw; }
         .page { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
 
-        /* ── HEADER ── */
-        .header { padding: 48px 0 36px; border-bottom: 1px solid var(--border); }
-        .header-inner { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
-        .header-eyebrow { font-size: 0.68rem; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
-        .header-title { font-family: var(--serif); font-size: clamp(2.4rem, 6vw, 4rem); font-weight: 700; text-transform: uppercase; line-height: 0.95; letter-spacing: -0.01em; }
-        .header-title em { font-style: normal; color: var(--accent); }
-        .header-count { font-size: 0.75rem; color: var(--ink-faint); margin-top: 10px; }
-        .search-wrap { position: relative; width: 100%; max-width: 340px; }
-        .search-input { width: 100%; padding: 11px 16px 11px 42px; background: var(--off); border: 1.5px solid var(--border); border-radius: 100px; font-family: var(--sans); font-size: 0.88rem; color: var(--ink); outline: none; transition: border-color 0.15s, background 0.15s; }
-        .search-input:focus { border-color: var(--ink); background: var(--white); }
-        .search-input::placeholder { color: var(--ink-faint); }
-        .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--ink-faint); pointer-events: none; }
-
-        /* ── FILTERS ── */
-        .filters-bar { position: sticky; top: 0; z-index: 100; background: var(--white); border-bottom: 1px solid var(--border); }
-        .filters-row { max-width: 1100px; margin: 0 auto; padding: 10px 24px; display: flex; align-items: center; gap: 8px; overflow: hidden; }
-        .filters-label { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; flex-shrink: 0; }
-        .filter-scroll { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: 1; }
-        .filter-scroll::-webkit-scrollbar { display: none; }
-        .filter-chip { padding: 5px 13px; border-radius: 100px; border: 1.5px solid var(--border); background: transparent; font-family: var(--sans); font-size: 0.76rem; font-weight: 500; color: var(--ink-soft); cursor: pointer; transition: all 0.15s; white-space: nowrap; flex-shrink: 0; }
-        .filter-chip:hover { border-color: var(--ink); color: var(--ink); }
-        .filter-chip.active { background: var(--ink); border-color: var(--ink); color: white; }
-        .filter-divider { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
-
         /* ── GRID ── */
-        .grid-section { padding: 40px 0 80px; }
+        .grid-section { padding: 24px 0 80px; }
         .venues-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
 
         /* ── VENUE CARD ── */
@@ -161,51 +146,36 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
         /* ── RESPONSIVE ── */
         @media (max-width: 900px) { .venues-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 640px) {
-          .header { padding: 32px 0 24px; }
-          .header-inner { flex-direction: column; align-items: flex-start; gap: 16px; }
-          .search-wrap { max-width: 100%; }
           .venues-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
           .page { padding: 0 16px; }
-          .filters-row { padding: 8px 16px; }
           .venue-card-name { font-size: 0.95rem; }
           .venue-card-body { padding: 12px; }
         }
         @media (max-width: 380px) { .venues-grid { grid-template-columns: 1fr; } }
       `}</style>
 
-      <div className="page">
-        <header className="header">
-          <div className="search-wrap" style={{ maxWidth: '100%' }}>
-            <svg className="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-            </svg>
-            <input
-              className="search-input"
-              type="text"
-              placeholder="Search venues..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
-        </header>
-      </div>
+      <div className="venues-root">
+      <BrowseHeader
+        title="Venues"
+        activeFilterCount={activeFilterCount}
+        onOpenFilters={() => setFiltersOpen(true)}
+      />
 
-      <div className="filters-bar">
-        {neighborhoods.length > 1 && (
-          <div className="filters-row">
-            <span className="filters-label">Area</span>
-            <div className="filter-scroll">
-              {neighborhoods.map(n => (
-                <button key={n} className={`filter-chip ${activeNeighborhood === n ? 'active' : ''}`} onClick={() => setActiveNeighborhood(n)}>{n}</button>
-              ))}
-              {venueTypes.length > 1 && <div className="filter-divider" />}
-              {venueTypes.length > 1 && venueTypes.map(t => (
-                <button key={t} className={`filter-chip ${activeType === t ? 'active' : ''}`} onClick={() => setActiveType(t)}>{t}</button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      <SearchFilterSheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search venues..."
+        categories={NEIGHBORHOODS}
+        categoriesLabel="Neighborhood"
+        selectedCategories={selectedNeighborhoods}
+        onToggleCategory={toggleNeighborhood}
+        showDateFilters={false}
+        resultCount={filtered.length}
+        resultLabel="Venues"
+        onClearAll={clearAllFilters}
+      />
 
       <div className="page">
         {loading ? (
@@ -254,6 +224,7 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
             </div>
           </section>
         )}
+      </div>
       </div>
     </>
   )
