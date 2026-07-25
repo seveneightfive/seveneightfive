@@ -80,7 +80,7 @@ function formatTime(t: string | null): string {
   const m = parseInt(match[2], 10)
   const ampm = h >= 12 ? 'P' : 'A'
   const hour = h % 12 || 12
-  return m === 0 ? `${hour} ${ampm}` : `${hour}:${m.toString().padStart(2, '0')} ${ampm}`
+  return m === 0 ? `${hour} ${ampm}` : `${hour}:${m.toString().padStart(2, '0')}`
 }
 
 function formatTimeShort(t: string | null): string {
@@ -130,10 +130,19 @@ function getWeekendRange(): { start: string; end: string } {
   return { start: getDateKey(fri), end: getDateKey(sun) }
 }
 
-export default function EventsList() {
-  const [events, setEvents] = useState<Event[]>([])
-  const [filtered, setFiltered] = useState<Event[]>([])
-  const [loading, setLoading] = useState(true)
+type EventsListProps = {
+  // Server-rendered seed data (from app/events/page.tsx) so the page has
+  // real, crawlable content in the initial HTML instead of an empty shell
+  // while this client component's own Supabase fetch is still in flight.
+  // The client fetch below still runs after mount to pick up anything that
+  // changed since the server render, then replaces this seed.
+  initialEvents?: Event[]
+}
+
+export default function EventsList({ initialEvents }: EventsListProps = {}) {
+  const [events, setEvents] = useState<Event[]>(initialEvents ?? [])
+  const [filtered, setFiltered] = useState<Event[]>(initialEvents ?? [])
+  const [loading, setLoading] = useState(!initialEvents || initialEvents.length === 0)
   const [search, setSearch] = useState('')
   const [showPast, setShowPast] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
