@@ -38,19 +38,41 @@ function chicagoToday(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago' }).format(new Date())
 }
 
+function chicagoDate(offsetDays = 0): Date {
+  const todayStr = chicagoToday()
+  const d = new Date(`${todayStr}T12:00:00`)
+  d.setDate(d.getDate() + offsetDays)
+  return d
+}
+
+const toISODate = (d: Date) => d.toISOString().split('T')[0]
+
 // The upcoming Friday-through-Sunday window (or the current one, if today
 // already falls on a Fri/Sat/Sun), in America/Chicago.
 function chicagoWeekendRange(): { start: string; end: string } {
-  const todayStr = chicagoToday()
-  const today = new Date(`${todayStr}T12:00:00`)
+  const today = chicagoDate(0)
   const dow = today.getDay() // 0 = Sun .. 6 = Sat
   const daysUntilFriday = (5 - dow + 7) % 7
   const friday = new Date(today)
   friday.setDate(friday.getDate() + daysUntilFriday)
   const sunday = new Date(friday)
   sunday.setDate(friday.getDate() + 2)
-  const toISODate = (d: Date) => d.toISOString().split('T')[0]
   return { start: toISODate(friday), end: toISODate(sunday) }
+}
+
+// Rolling 7-day window starting today (not "Mon-Sun of this calendar week") —
+// matches how someone searching "events this week" actually thinks about it.
+function chicagoThisWeekRange(): { start: string; end: string } {
+  const today = chicagoDate(0)
+  const end = chicagoDate(6)
+  return { start: toISODate(today), end: toISODate(end) }
+}
+
+// Today through the last day of the current calendar month.
+function chicagoThisMonthRange(): { start: string; end: string } {
+  const today = chicagoDate(0)
+  const end = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+  return { start: toISODate(today), end: toISODate(end) }
 }
 
 const EVENT_SELECT = `
@@ -106,8 +128,16 @@ export async function getFilteredEvents(page: SeoPageRow, limit = 60): Promise<S
       break
     }
     case 'date-range': {
-      if (page.filter_value === 'this-weekend') {
+      if (page.filter_value === 'today') {
+        query = query.eq('event_date', today)
+      } else if (page.filter_value === 'this-week') {
+        const { start, end } = chicagoThisWeekRange()
+        query = query.gte('event_date', start).lte('event_date', end)
+      } else if (page.filter_value === 'this-weekend') {
         const { start, end } = chicagoWeekendRange()
+        query = query.gte('event_date', start).lte('event_date', end)
+      } else if (page.filter_value === 'this-month') {
+        const { start, end } = chicagoThisMonthRange()
         query = query.gte('event_date', start).lte('event_date', end)
       }
       // 'upcoming' needs nothing further — the base gte(today) already covers it
