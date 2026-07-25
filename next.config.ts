@@ -51,16 +51,16 @@ const nextConfig: NextConfig = {
 
     const pageMap: Array<[string, string]> = [
       // Confirmed 1:1 matches (pages already exist on new site)
-      ["/live-music", "/live-music"],
+      ["/live-music", "/events/live-music"],
       ["/venues", "/venues"],
-      ["/all-events", "/topeka-events/all-events"],
-      ["/first-friday-artwalk", "/topeka-events/first-friday-artwalk"],
+      ["/all-events", "/events/all-events"],
+      ["/first-friday-artwalk", "/events/first-friday-artwalk"],
       ["/weekly-entertainment", "/topeka-events/weekly-entertainment"],
       // Low-traffic: redirected to closest topical match (no dedicated art/NOTO page)
-      ["/noto-events", "/topeka-events/all-events"],
-      ["/all-events-art", "/topeka-events/all-events"],
+      ["/noto-events", "/events/all-events"],
+      ["/all-events-art", "/events/all-events"],
       // Stale dynamic event-detail pages (385 Airtable-record URLs, ~55 clicks/3mo total)
-      ["/events-details", "/topeka-events/all-events"],
+      ["/events-details", "/events/all-events"],
     ]
 
     const scopedRedirects = OLD_HOSTS.flatMap((host) =>
@@ -99,10 +99,37 @@ const nextConfig: NextConfig = {
       statusCode: 301,
     }))
 
+    // --- Same-host consolidation: /topeka-events/* -> /events/* ---
+    // /events is now the primary SEO hub (real event listings + crawlable
+    // filter sub-pages) instead of /topeka-events, which used to host this
+    // same seo_pages-driven template. These run on seveneightfive.com
+    // itself (no `has: host` filter), so they fire regardless of which
+    // domain the request came in on, AFTER the old-domain rules above have
+    // already routed things to the right seveneightfive.com path.
+    const topekaEventsToEventsMap: Array<[string, string]> = [
+      ["/topeka-events/all-events", "/events/all-events"],
+      ["/topeka-events/comedy", "/events/comedy"],
+      ["/topeka-events/family-events", "/events/family"],
+      ["/topeka-events/first-friday-artwalk", "/events/first-friday-artwalk"],
+      ["/topeka-events/free-events", "/events/free"],
+      ["/topeka-events/karaoke", "/events/karaoke"],
+      ["/topeka-events/this-weekend", "/events/this-weekend"],
+      // This was always a duplicate of all-events (same "upcoming" filter) -
+      // retire it into the surviving page instead of giving it its own URL.
+      ["/topeka-events/upcoming-events", "/events/all-events"],
+    ]
+
+    const topekaEventsRedirects = topekaEventsToEventsMap.map(([source, destination]) => ({
+      source,
+      destination,
+      statusCode: 301,
+    }))
+
     return [
       ...homepageRedirects,
       ...scopedRedirects,
       ...addEventRedirects,
+      ...topekaEventsRedirects,
       ...catchAllRedirects,
     ]
   },
