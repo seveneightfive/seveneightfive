@@ -21,6 +21,30 @@
   min-width: 0;
 }
 
+/* Home mark — same wordmark treatment as SiteNav's desktop topnav logo,
+   just smaller to fit this compact bar. Desktop-only (see media query
+   below): on mobile this header sits above the bottom tab bar, which
+   already has its own Home tab, so a second home link here would be
+   redundant clutter on a small screen. */
+.logo {
+  display: none;
+  font-family: 'Oswald', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #0A0A0A;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.logoDivider {
+  display: none;
+  width: 1px;
+  height: 20px;
+  background: #ece8e2;
+  flex-shrink: 0;
+}
+
 .backBtn {
   display: flex;
   align-items: center;
@@ -174,6 +198,14 @@
 
   .title {
     font-size: 22px;
+  }
+
+  .logo {
+    display: block;
+  }
+
+  .logoDivider {
+    display: block;
   }
 
   .hamburgerWrap {

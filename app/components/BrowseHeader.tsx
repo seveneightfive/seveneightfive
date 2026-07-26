@@ -7,6 +7,7 @@ import styles from './browse-header.module.css'
 import SearchFilterButton from './SearchFilterButton'
 
 const NAV_LINKS = [
+  { href: '/', label: 'Home' },
   { href: '/events', label: 'Events' },
   { href: '/artists', label: 'Artist Directory' },
   { href: '/venues', label: 'Venues' },
@@ -44,12 +45,25 @@ export default function BrowseHeader({ title, activeFilterCount, onOpenFilters }
   const router = useRouter()
   const showBack = useShowBackButton()
   const [menuOpen, setMenuOpen] = useState(false)
-  const isActive = (href: string) => pathname.startsWith(href)
+  const isActive = (href: string) => href === '/' ? pathname === '/' : pathname.startsWith(href)
 
   return (
     <div className={styles.browseHeader}>
       <div className={styles.row}>
         <div className={styles.left}>
+          {/* Desktop-only home mark (hidden below 640px via CSS) — this
+              bar deliberately replaces the full SiteNav topnav on
+              /events, /artists, /venues (see SiteNav's
+              HIDE_DESKTOP_TOPNAV_PATHS), which means its logo needs to
+              come along too, or there's no way back to "/" on desktop
+              except browser back. Mobile skips this: the compact header
+              itself is hidden on mobile for these routes (SiteNav's
+              HIDE_MOBILE_HEADER_PATHS), and the bottom tab bar doesn't
+              have a Home tab either (Events/Artists/Venues/MY 785 only,
+              intentionally capped at 4) — same gap exists on mobile,
+              just not what was asked about here. */}
+          <Link href="/" className={styles.logo} aria-label="seveneightfive home">785</Link>
+          <span className={styles.logoDivider} aria-hidden="true" />
           {showBack && (
             <button className={styles.backBtn} onClick={() => router.back()} aria-label="Go back">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
