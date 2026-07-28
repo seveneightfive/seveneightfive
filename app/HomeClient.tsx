@@ -306,14 +306,9 @@ export default function HomeClient({
           </a>
           <div className={styles.adDeco}>♪</div>
         </div>
-        
 
-<section className={styles.contentWrap}>
-  <SignupForm />
-</section>
-
-<div className={styles.footerRule} />
-<p className={styles.footerText}>© seveneightfive magazine — Events & times subject to change</p>
+        {/* ── Newsletter Signup (full-width) ── */}
+        <SignupForm />
 
         <div className={styles.footerRule} />
         <p className={styles.footerText}>© seveneightfive magazine — Events & times subject to change</p>
