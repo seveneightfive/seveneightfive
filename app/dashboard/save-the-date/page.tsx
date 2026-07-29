@@ -887,24 +887,27 @@ export default function SaveTheDatePage() {
         .cal-grid-loading { padding: 40px 24px; text-align: center; color: var(--ink-faint); font-size: 14px; font-weight: 500; }
         .cal-grid-dow { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 6px; }
         .cal-grid-dow-cell { padding: 6px 8px; text-align: center; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; color: var(--ink-faint); }
-        .cal-grid-body { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        .cal-grid-body { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 108px; gap: 4px; }
         .cal-grid-cell {
-          min-height: 108px;
+          height: 108px;
           padding: 8px;
           border-radius: 8px;
           background: var(--off);
           display: flex;
           flex-direction: column;
           gap: 4px;
+          overflow: hidden;
           transition: background 0.12s;
         }
         .cal-grid-cell-out { background: transparent; }
         .cal-grid-cell-out .cal-grid-daynum { color: var(--ink-faint); }
         .cal-grid-cell-today { border: 1.5px solid var(--magenta); background: #fdf0f4; }
-        .cal-grid-daynum { font-size: 0.85rem; font-weight: 700; color: var(--ink); }
-        .cal-grid-events { display: flex; flex-direction: column; gap: 3px; }
+        .cal-grid-daynum { flex-shrink: 0; font-size: 0.85rem; font-weight: 700; color: var(--ink); }
+        .cal-grid-events { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
         .cal-grid-chip {
-          display: block;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
           width: 100%;
           text-align: left;
           background: var(--yellow);
@@ -912,20 +915,23 @@ export default function SaveTheDatePage() {
           border: none;
           border-radius: 5px;
           padding: 3px 7px;
-          font-size: 0.7rem;
+          font-size: 0.68rem;
+          line-height: 1.25;
           font-weight: 600;
           font-family: var(--sans);
           cursor: pointer;
-          white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
+          word-break: break-word;
           transition: background 0.12s;
+          flex-shrink: 0;
         }
         .cal-grid-chip:hover { background: #e6b910; }
-        .cal-grid-more { font-size: 0.66rem; font-weight: 600; color: var(--ink-faint); padding: 0 2px; }
+        .cal-grid-more { flex-shrink: 0; font-size: 0.64rem; font-weight: 600; color: var(--ink-faint); padding: 0 2px; }
         @media (max-width: 900px) {
-          .cal-grid-cell { min-height: 80px; padding: 6px; }
-          .cal-grid-chip { font-size: 0.62rem; }
+          .cal-grid-body { grid-auto-rows: 80px; }
+          .cal-grid-cell { height: 80px; padding: 6px; }
+          .cal-grid-chip { font-size: 0.6rem; -webkit-line-clamp: 1; }
         }
 
         /* Upcoming list — new section under calendar view */
