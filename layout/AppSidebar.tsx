@@ -1,46 +1,43 @@
 'use client'
-import React, { useEffect, useRef, useState, useCallback } from 'react'
+import React, { useState, useCallback } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSidebar } from '@/context/SidebarContext'
 import { useTheme } from '@/context/ThemeContext'
 import { createClient } from '@/lib/supabaseBrowser'
-import {
-  CalenderIcon,
-  ChevronDownIcon,
-  GridIcon,
-  ListIcon,
-  PageIcon,
-  PieChartIcon,
-  TableIcon,
-  UserCircleIcon,
-} from '@/icons/index'
-import { DollarSign, X, Phone, LogOut, Moon, Sun, ArrowLeft } from 'lucide-react'
+import { X, Phone, LogOut, Moon, Sun } from 'lucide-react'
 import ContactModal from '@/components/common/ContactModal'
 import type { HeaderUser } from '@/app/dashboard/DashboardShell'
 
 /**
- * Sidebar — always-dark, always-static shell.
+ * Sidebar — rebuilt to match the mockup's visual language while keeping
+ * this codebase's actual logo, routes, and Supabase-driven auth/user data.
  *
- * Logo links to the public site ("/") — unchanged from before.
- *
- * CHANGE (this pass): the bottom identity row no longer shows the
- * phone/email line under the user's name — just avatar, name, and the
- * sign-out icon button. Simpler, and avoids showing a phone number in
- * a nav element that's visible on every dashboard page.
+ * What changed vs. the previous version:
+ *  - Flat single-level nav (no "Creator Hub" / "Account" section headers,
+ *    no collapsible submenus) — matches the mockup's 5-item list.
+ *  - Active item is a solid yellow pill with black text, plus a thin
+ *    magenta accent bar on the left edge (mockup detail) — replaces the
+ *    old translucent-brand-ring active state.
+ *  - Dark Mode row now uses a moon/sun icon + a real pill toggle switch
+ *    instead of a plain button, matching the mockup's switch control.
+ *  - "My Tickets" / "Following" / "Contact 785" (previously a separate
+ *    "Account" group) are folded into the same flat list, since the
+ *    mockup doesn't have a second grouped section. Payouts and Settings
+ *    stay as-is.
+ *  - Logo is untouched — still your existing image, still links to "/".
+ *    No yellow badge added (kept as your actual logo per your last note).
+ *  - User row: avatar + name + sign-out icon only, no phone/email line
+ *    (unchanged from the previous pass).
  */
 
 const LOGO_WHITE =
   'https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785-Splash-512-White.png'
 
-type SubItem = { name: string; path: string; pro?: boolean; new?: boolean }
-
 type NavItem = {
   name: string
-  icon: React.ReactNode
   path?: string
-  subItems?: SubItem[]
   onClick?: () => void
 }
 
@@ -52,31 +49,18 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
   const [contactOpen, setContactOpen] = useState(false)
   const isGuest = !headerUser
 
-  const createManageItems: NavItem[] = [
-    { icon: <GridIcon />, name: 'Dashboard', path: '/dashboard' },
-    { icon: <PageIcon />, name: 'My Pages', path: '/dashboard/pages' },
-    { icon: <CalenderIcon />, name: 'Events', path: '/dashboard/events' },
-    { icon: <CalenderIcon />, name: 'Save the Date', path: '/dashboard/save-the-date' },
-    { icon: <PieChartIcon />, name: 'Advertise', path: '/dashboard/advertise' },
+  // Flat nav — matches the mockup's single list, no grouping headers.
+  const navItems: NavItem[] = [
+    { name: 'My Pages', path: '/dashboard/pages' },
+    { name: 'Save the Date', path: '/dashboard/save-the-date' },
+    { name: 'Event Manager', path: '/dashboard/events' },
+    { name: 'Advertising', path: '/dashboard/advertise' },
+    { name: 'My Tickets', path: '/dashboard/tickets' },
+    { name: 'Following', path: '/dashboard/following' },
+    { name: 'Payouts', path: '/dashboard/payouts' },
+    { name: 'Settings', path: '/dashboard/settings' },
+    { name: 'Contact 785', onClick: () => setContactOpen(true) },
   ]
-
-  const accountItems: NavItem[] = [
-    { icon: <TableIcon />, name: 'My Tickets', path: '/dashboard/tickets' },
-    { icon: <UserCircleIcon />, name: 'Following', path: '/dashboard/following' },
-    { icon: <DollarSign className="w-5 h-5" />, name: 'Payouts', path: '/dashboard/payouts' },
-    { icon: <ListIcon />, name: 'Settings', path: '/dashboard/settings' },
-    {
-      icon: <Phone className="w-5 h-5" />,
-      name: 'Contact 785',
-      onClick: () => setContactOpen(true),
-    },
-  ]
-
-  type MenuType = 'create' | 'account'
-
-  const [openSubmenu, setOpenSubmenu] = useState<{ type: MenuType; index: number } | null>(null)
-  const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>({})
-  const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   const isActive = useCallback(
     (path: string) => {
@@ -85,44 +69,6 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
     },
     [pathname]
   )
-
-  useEffect(() => {
-    let matched = false
-    const groups: Array<[MenuType, NavItem[]]> = [
-      ['create', createManageItems],
-      ['account', accountItems],
-    ]
-    groups.forEach(([type, items]) => {
-      items.forEach((nav, index) => {
-        nav.subItems?.forEach((sub) => {
-          if (isActive(sub.path)) {
-            setOpenSubmenu({ type, index })
-            matched = true
-          }
-        })
-      })
-    })
-    if (!matched) setOpenSubmenu(null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, isActive])
-
-  useEffect(() => {
-    if (openSubmenu !== null) {
-      const key = `${openSubmenu.type}-${openSubmenu.index}`
-      if (subMenuRefs.current[key]) {
-        setSubMenuHeight((prev) => ({
-          ...prev,
-          [key]: subMenuRefs.current[key]?.scrollHeight || 0,
-        }))
-      }
-    }
-  }, [openSubmenu])
-
-  const handleSubmenuToggle = (index: number, menuType: MenuType) => {
-    setOpenSubmenu((prev) =>
-      prev && prev.type === menuType && prev.index === index ? null : { type: menuType, index }
-    )
-  }
 
   const closeMobileMenu = () => {
     if (isMobileOpen) toggleMobileSidebar()
@@ -133,107 +79,6 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
     await supabase.auth.signOut()
     router.push('/login')
   }
-
-  const renderMenuItems = (items: NavItem[], menuType: MenuType) => (
-    <ul className="flex flex-col gap-1">
-      {items.map((nav, index) => (
-        <li key={nav.name}>
-          {nav.subItems ? (
-            <button
-              onClick={() => handleSubmenuToggle(index, menuType)}
-              className={`flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
-                openSubmenu?.type === menuType && openSubmenu?.index === index
-                  ? 'bg-white/10 text-white'
-                  : 'text-gray-300 hover:bg-white/5 hover:text-white'
-              }`}
-            >
-              <span className="shrink-0">{nav.icon}</span>
-              <span className="flex-1">{nav.name}</span>
-              <ChevronDownIcon
-                className={`h-5 w-5 shrink-0 transition-transform duration-200 ${
-                  openSubmenu?.type === menuType && openSubmenu?.index === index
-                    ? 'rotate-180 text-brand-400'
-                    : 'text-gray-500'
-                }`}
-              />
-            </button>
-          ) : nav.onClick ? (
-            <button
-              type="button"
-              onClick={() => {
-                closeMobileMenu()
-                nav.onClick?.()
-              }}
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-gray-300 transition-colors hover:bg-white/5 hover:text-white"
-            >
-              <span className="shrink-0">{nav.icon}</span>
-              <span>{nav.name}</span>
-            </button>
-          ) : (
-            nav.path && (
-              <Link
-                href={nav.path}
-                onClick={closeMobileMenu}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                  isActive(nav.path)
-                    ? 'bg-brand-600/20 text-white ring-1 ring-inset ring-brand-500/30'
-                    : 'text-gray-300 hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                <span className={`shrink-0 ${isActive(nav.path) ? 'text-brand-400' : 'text-gray-400'}`}>
-                  {nav.icon}
-                </span>
-                <span>{nav.name}</span>
-              </Link>
-            )
-          )}
-
-          {nav.subItems && (
-            <div
-              ref={(el) => {
-                subMenuRefs.current[`${menuType}-${index}`] = el
-              }}
-              className="overflow-hidden transition-all duration-300"
-              style={{
-                height:
-                  openSubmenu?.type === menuType && openSubmenu?.index === index
-                    ? `${subMenuHeight[`${menuType}-${index}`]}px`
-                    : '0px',
-              }}
-            >
-              <ul className="mt-1 space-y-1 py-1 pl-11">
-                {nav.subItems.map((subItem) => (
-                  <li key={subItem.name}>
-                    <Link
-                      href={subItem.path}
-                      onClick={closeMobileMenu}
-                      className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                        isActive(subItem.path)
-                          ? 'text-white font-semibold'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      {subItem.name}
-                      {subItem.new && (
-                        <span className="rounded bg-brand-600/30 px-1.5 py-0.5 text-[10px] uppercase text-brand-300">
-                          new
-                        </span>
-                      )}
-                      {subItem.pro && (
-                        <span className="rounded bg-brand-600/30 px-1.5 py-0.5 text-[10px] uppercase text-brand-300">
-                          pro
-                        </span>
-                      )}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </li>
-      ))}
-    </ul>
-  )
 
   return (
     <>
@@ -250,7 +95,7 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
           lg:w-[290px] lg:translate-x-0
         `}
       >
-        {/* Logo — links to the public site, unchanged */}
+        {/* Logo — unchanged image, links to public site */}
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
           <Link href="/" className="flex items-center" onClick={closeMobileMenu}>
             <Image
@@ -272,44 +117,80 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
           </button>
         </div>
 
-        {/* Explicit "back to site" link */}
-        <div className="border-b border-white/10 px-4 py-2.5">
-          <Link
-            href="/"
-            onClick={closeMobileMenu}
-            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-gray-400 transition hover:bg-white/5 hover:text-white"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Back to seveneightfive.com
-          </Link>
-        </div>
-
-        {/* Nav */}
+        {/* Nav — flat list, mockup active-state treatment */}
         <div className="no-scrollbar flex flex-1 flex-col overflow-y-auto px-4 py-6">
-          <nav className="flex flex-col gap-6">
-            <div>
-              <h2 className="mb-2 px-3 font-body text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-                Creator Hub
-              </h2>
-              {renderMenuItems(createManageItems, 'create')}
-            </div>
-            <div>
-              <h2 className="mb-2 px-3 font-body text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-                Account
-              </h2>
-              {renderMenuItems(accountItems, 'account')}
-            </div>
-          </nav>
+          <ul className="flex flex-col gap-1">
+            {navItems.map((nav) => {
+              const active = nav.path ? isActive(nav.path) : false
+              const baseCls =
+                'relative flex w-full items-center rounded-md px-3 py-2.5 text-left font-display text-[13px] font-semibold uppercase tracking-[0.08em] transition-colors'
+              const activeCls = active
+                ? 'bg-accent-500 text-gray-950'
+                : 'text-white/70 hover:bg-white/5 hover:text-white'
+
+              const content = (
+                <>
+                  {/* Magenta accent bar on the active item's left edge */}
+                  <span
+                    className={`absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-brand-600 transition-opacity ${
+                      active ? 'opacity-100' : 'opacity-0'
+                    }`}
+                  />
+                  {nav.name}
+                </>
+              )
+
+              if (nav.onClick) {
+                return (
+                  <li key={nav.name}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeMobileMenu()
+                        nav.onClick?.()
+                      }}
+                      className={`${baseCls} ${activeCls}`}
+                    >
+                      {content}
+                    </button>
+                  </li>
+                )
+              }
+
+              return (
+                <li key={nav.name}>
+                  <Link
+                    href={nav.path!}
+                    onClick={closeMobileMenu}
+                    className={`${baseCls} ${activeCls}`}
+                  >
+                    {content}
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
         </div>
 
-        {/* Bottom: theme toggle + identity/sign-in */}
+        {/* Dark Mode row — moon/sun icon + pill switch, mockup style */}
         <div className="border-t border-white/10 px-4 py-4">
           <button
             onClick={toggleTheme}
-            className="mb-3 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-300 transition-colors hover:bg-white/5 hover:text-white"
+            className="mb-3 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/85 transition-colors hover:bg-white/5"
           >
             {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            <span className="flex-1 text-left">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+            <span
+              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                theme === 'dark' ? 'bg-accent-500' : 'bg-white/15'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  theme === 'dark' ? 'translate-x-4' : 'translate-x-0.5'
+                }`}
+              />
+            </span>
           </button>
 
           {isGuest ? (
@@ -328,7 +209,7 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
               </Link>
             </div>
           ) : (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 border-t border-white/10 pt-4">
               <div
                 className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full ${
                   headerUser?.avatarUrl ? '' : 'bg-brand-600'
@@ -347,7 +228,7 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
                   </span>
                 )}
               </div>
-              {/* Name only — phone/email line removed per request */}
+              {/* Name only — no phone/email line */}
               <div className="min-w-0 flex-1">
                 <div className="truncate font-display text-sm font-bold uppercase tracking-wide text-white">
                   {headerUser?.fullName}

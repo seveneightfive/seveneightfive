@@ -8,17 +8,9 @@ import { Menu } from 'lucide-react'
 /**
  * Top bar for the dashboard shell.
  *
- * This used to hold the sidebar toggle, a static "Creator Hub" label, the
- * theme toggle, and the avatar menu. All of that has moved:
- *  - Sidebar toggle → mobile-only hamburger here, since desktop nav is now
- *    static and never needs toggling.
- *  - Theme toggle + avatar/sign-out → moved into AppSidebar.
- *
- * What's left is a real page header: a title + one-line description for
- * whatever section of the dashboard you're in (mirrors the "Account
- * Settings — manage your account, notifications, and preferences" pattern
- * from the reference screenshot), plus the persistent "+ Create New"
- * shortcut.
+ * Unchanged from before except the '/dashboard/events' entry, renamed
+ * from "Events" to "Event Manager" to match the sidebar nav label and
+ * the mockup's page title.
  */
 
 const PAGE_META: Record<string, { title: string; subtitle: string }> = {
@@ -27,8 +19,8 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
     subtitle: "Here's what's happening across your events and pages.",
   },
   '/dashboard/events': {
-    title: 'Events',
-    subtitle: "Events you're hosting or selling tickets for.",
+    title: 'Event Manager',
+    subtitle: 'All your events. Sell tickets, track scans, run marketing.',
   },
   '/dashboard/tickets': {
     title: 'My Tickets',
