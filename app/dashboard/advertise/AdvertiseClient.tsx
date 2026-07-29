@@ -114,8 +114,6 @@ export default function AdvertiseClient({
   const price = form.duration === 5 ? '$10' : '$15'
   const endDate = calcEndDate(form.start_date, form.duration)
 
-  // ─── Live availability check (debounced) ────────────────────────────
-  // Skipped in edit mode (we don't change dates) — fired in create + renew.
   useEffect(() => {
     if (!showForm || isEditingPaidAd) {
       setAvailability(null)
@@ -153,7 +151,6 @@ export default function AdvertiseClient({
     !uploading &&
     (isEditingPaidAd || !availability?.full)
 
-  // ─── Open modes ─────────────────────────────────────────────────────
   function openCreate() {
     setForm(EMPTY_FORM)
     setError('')
@@ -176,7 +173,6 @@ export default function AdvertiseClient({
   }
 
   function openRenew(ad: Ad) {
-    // Start date: today, OR last day of campaign if that's still in the future
     const startDate = ad.end_date > TODAY ? ad.end_date : TODAY
     setForm({
       headline: ad.headline ?? '',
@@ -197,7 +193,6 @@ export default function AdvertiseClient({
     setError('')
   }
 
-  // ─── Image upload ───────────────────────────────────────────────────
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -229,7 +224,6 @@ export default function AdvertiseClient({
     setUploading(false)
   }
 
-  // ─── Submit ─────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!canSubmit || !mode) return
@@ -238,7 +232,6 @@ export default function AdvertiseClient({
 
     try {
       if (mode.kind === 'edit') {
-        // PATCH the existing ad — no Stripe involved
         const res = await fetch(`/api/advertise/${mode.adId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -255,7 +248,6 @@ export default function AdvertiseClient({
           const json = await res.json().catch(() => ({}))
           throw new Error(json.error || 'Failed to save changes')
         }
-        // Update the local list
         setAds((list) =>
           list.map((a) =>
             a.id === mode.adId
@@ -275,7 +267,6 @@ export default function AdvertiseClient({
         return
       }
 
-      // create OR renew → both go through Stripe checkout
       const res = await fetch('/api/stripe/advertise/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -322,14 +313,14 @@ export default function AdvertiseClient({
         label: 'Scheduled',
         kind: 'scheduled' as const,
         classes:
-          'bg-blue-light-50 text-blue-light-700 border-blue-light-200 dark:bg-blue-light-500/15 dark:text-blue-light-400 dark:border-blue-light-500/30',
+          'bg-brand-50 text-brand-700 border-brand-200 dark:bg-brand-500/15 dark:text-brand-400 dark:border-brand-500/30',
       }
     if (today >= ad.start_date && today <= ad.end_date)
       return {
-        label: 'Active',
+        label: 'Live',
         kind: 'active' as const,
         classes:
-          'bg-success-50 text-success-700 border-success-200 dark:bg-success-500/15 dark:text-success-400 dark:border-success-500/30',
+          'bg-accent-100 text-gray-900 border-accent-200 dark:bg-accent-500/20 dark:text-accent-300 dark:border-accent-500/30',
       }
     return {
       label: 'Ended',
@@ -339,12 +330,8 @@ export default function AdvertiseClient({
     }
   }
 
-  // ─── Render ─────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* Action row — the page title/subtitle now live in the dashboard's
-          top header (AppHeader), so this is just the "+ Place New Ad"
-          shortcut, not a second page header. */}
       {ads.length > 0 && !showForm && (
         <div className="flex justify-end">
           <button
@@ -379,17 +366,19 @@ export default function AdvertiseClient({
         </Notice>
       )}
 
-      {/* Existing ads */}
-      {ads.length > 0 && (
+      {/* Existing ads — mockup-style row: status pill, name/placement,
+          right-aligned Price/Views/Clicks columns, action links below. */}
+      {ads.length > 0 && !showForm && (
         <div className="grid gap-4">
           {ads.map((ad) => {
             const info = adStatusInfo(ad)
+            const ctr = ad.clicks > 0 && ad.views > 0 ? ((ad.clicks / ad.views) * 100).toFixed(1) : null
             return (
               <div
                 key={ad.id}
-                className="grid grid-cols-1 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] md:grid-cols-[1fr_auto]"
+                className="grid grid-cols-1 gap-4 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:grid-cols-[1fr_auto] md:items-center"
               >
-                <div className="flex flex-col gap-2 p-5">
+                <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2.5">
                     <span
                       className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] ${info.classes}`}
@@ -403,37 +392,16 @@ export default function AdvertiseClient({
                     )}
                   </div>
                   {ad.headline && (
-                    <div className="font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+                    <div className="mt-1.5 font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
                       {ad.headline}
                     </div>
                   )}
                   {ad.ad_copy && (
-                    <p className="text-sm text-gray-600 dark:text-gray-300">{ad.ad_copy}</p>
+                    <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-300">{ad.ad_copy}</p>
                   )}
-                  <div className="mt-1 flex flex-wrap items-center gap-4 text-xs text-gray-600 dark:text-gray-300">
-                    <span>
-                      <strong className="font-semibold text-gray-800 dark:text-gray-100">{ad.views}</strong>{' '}
-                      views
-                    </span>
-                    <span>
-                      <strong className="font-semibold text-gray-800 dark:text-gray-100">{ad.clicks}</strong>{' '}
-                      clicks
-                    </span>
-                    {ad.clicks > 0 && ad.views > 0 && (
-                      <span>
-                        <strong className="font-semibold text-gray-800 dark:text-gray-100">
-                          {((ad.clicks / ad.views) * 100).toFixed(1)}%
-                        </strong>{' '}
-                        CTR
-                      </span>
-                    )}
-                    <span>
-                      ${(ad.price / 100).toFixed(0)} · {ad.duration} days
-                    </span>
-                  </div>
 
                   {/* Per-status action row */}
-                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <div className="mt-3 flex flex-wrap items-center gap-4">
                     {(info.kind === 'scheduled' || info.kind === 'active') && (
                       <button
                         type="button"
@@ -441,17 +409,7 @@ export default function AdvertiseClient({
                         className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 underline hover:no-underline dark:text-brand-400"
                       >
                         <Pencil className="h-3 w-3" />
-                        Edit content
-                      </button>
-                    )}
-                    {info.kind === 'ended' && (
-                      <button
-                        type="button"
-                        onClick={() => openRenew(ad)}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 underline hover:no-underline dark:text-brand-400"
-                      >
-                        <RotateCcw className="h-3 w-3" />
-                        Run this campaign again
+                        Edit
                       </button>
                     )}
                     {info.kind === 'active' && (
@@ -462,6 +420,16 @@ export default function AdvertiseClient({
                       >
                         <RotateCcw className="h-3 w-3" />
                         Extend campaign
+                      </button>
+                    )}
+                    {info.kind === 'ended' && (
+                      <button
+                        type="button"
+                        onClick={() => openRenew(ad)}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 underline hover:no-underline dark:text-brand-400"
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        Run this campaign again
                       </button>
                     )}
                     {info.kind === 'pending' && (
@@ -475,23 +443,24 @@ export default function AdvertiseClient({
                     )}
                   </div>
                 </div>
-                {ad.ad_image_url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  // Matches the real placement now: fixed 16:9, same as
-                  // AdvertisementBanner.tsx on the live site.
-                  <img
-                    src={ad.ad_image_url}
-                    alt={ad.headline || ''}
-                    className="aspect-video w-full object-cover md:aspect-video md:h-full md:w-56"
-                  />
-                )}
+
+                {/* Right-aligned stat columns — mockup treatment.
+                    "Price" replaces "Spend" since campaigns are flat-rate
+                    packages, not pay-per-impression — there's no real
+                    spend figure to show beyond what they paid upfront. */}
+                <div className="flex shrink-0 items-center gap-6 border-t border-gray-100 pt-3 dark:border-gray-800 md:border-t-0 md:pt-0 md:pl-6">
+                  <StatColumn label="Price" value={`$${(ad.price / 100).toFixed(0)}`} />
+                  <StatColumn label="Views" value={ad.views.toLocaleString()} />
+                  <StatColumn label="Clicks" value={ad.clicks.toLocaleString()} />
+                  {ctr && <StatColumn label="CTR" value={`${ctr}%`} />}
+                </div>
               </div>
             )
           })}
         </div>
       )}
 
-      {/* Create / Edit / Renew form */}
+      {/* Create / Edit / Renew form — replaces the list entirely while open */}
       {showForm && mode && (
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5 dark:border-gray-800">
@@ -516,7 +485,6 @@ export default function AdvertiseClient({
 
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2">
-              {/* Fields */}
               <div className="flex flex-col gap-5 border-b border-gray-200 p-6 dark:border-gray-800 md:max-h-[80vh] md:overflow-y-auto md:border-b-0 md:border-r">
                 {mode.kind === 'edit' && (
                   <div className="rounded-lg border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-xs text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-400">
@@ -660,7 +628,6 @@ export default function AdvertiseClient({
                   </Field>
                 </div>
 
-                {/* Availability widget — only shown when picking dates (create + renew) */}
                 {!isEditingPaidAd && (
                   <AvailabilityNotice
                     availability={availability}
@@ -669,7 +636,6 @@ export default function AdvertiseClient({
                   />
                 )}
 
-                {/* Price strip */}
                 <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-white/[0.02]">
                   <div>
                     <div className="text-xs text-gray-600 dark:text-gray-300">
@@ -709,11 +675,6 @@ export default function AdvertiseClient({
                 )}
               </div>
 
-              {/* Live preview — mirrors the real card: full-width, fixed
-                  16:9 image, text below (this panel is narrower than the
-                  live desktop placement, so it naturally previews close to
-                  the mobile/stacked layout — see the note below it for
-                  what changes on wider screens). */}
               <div className="flex flex-col gap-4 bg-gray-50 p-6 dark:bg-white/[0.02] md:sticky md:top-0">
                 <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
                   Live Preview
@@ -774,7 +735,6 @@ export default function AdvertiseClient({
         </div>
       )}
 
-      {/* Empty state */}
       {ads.length === 0 && !showForm && (
         <div className="rounded-2xl border border-gray-200 bg-white px-6 py-16 text-center dark:border-gray-800 dark:bg-white/[0.03]">
           <Megaphone className="mx-auto mb-4 h-10 w-10 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
@@ -798,7 +758,18 @@ export default function AdvertiseClient({
   )
 }
 
-// ─── Availability widget ──────────────────────────────────────────────
+function StatColumn({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="text-right">
+      <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-gray-500 dark:text-gray-400">
+        {label}
+      </div>
+      <div className="font-display text-base font-bold text-gray-900 dark:text-white">
+        {value}
+      </div>
+    </div>
+  )
+}
 
 function AvailabilityNotice({
   availability,
@@ -854,8 +825,6 @@ function AvailabilityNotice({
     </div>
   )
 }
-
-// ─── Bits ─────────────────────────────────────────────────────────────
 
 const inputCls =
   'w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90 dark:focus:border-brand-500'

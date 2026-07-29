@@ -10,6 +10,7 @@ import {
   Ticket,
   Music,
   Eye,
+  ExternalLink,
 } from 'lucide-react'
 
 type EventRow = {
@@ -22,6 +23,11 @@ type EventRow = {
   image_url: string | null
   source: 'created' | 'venue' | 'artist'
   views: number
+}
+
+type SellerInfo = {
+  is_seller: boolean
+  seller_slug: string | null
 }
 
 function formatDate(dateStr: string) {
@@ -61,6 +67,7 @@ function LoadingState() {
 function EventsPageInner() {
   const router = useRouter()
   const [events, setEvents] = useState<EventRow[]>([])
+  const [seller, setSeller] = useState<SellerInfo | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -72,6 +79,19 @@ function EventsPageInner() {
       if (!user) {
         router.push('/login')
         return
+      }
+
+      // Seller page link — only shown if this profile is an active seller
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_seller, seller_slug')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (profile) {
+        setSeller({
+          is_seller: !!profile.is_seller,
+          seller_slug: profile.seller_slug ?? null,
+        })
       }
 
       const SELECT = 'id, title, event_date, slug, status, ticketing_enabled, image_url'
@@ -143,22 +163,36 @@ function EventsPageInner() {
   const today = new Date().toISOString().slice(0, 10)
   const upcoming = events.filter((e) => e.event_date >= today)
   const past = events.filter((e) => e.event_date < today)
+  const showSellerLink = seller?.is_seller && seller?.seller_slug
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <p className="text-sm text-gray-600 dark:text-gray-300">
           {events.length === 0
             ? "You haven't created any events yet."
             : `${upcoming.length} upcoming · ${past.length} past`}
         </p>
-        <Link
-          href="/dashboard/events/edit"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-        >
-          <Plus className="h-4 w-4" />
-          New Event
-        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          {showSellerLink && (
+            <a
+              href={`/sellers/${seller!.seller_slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.05]"
+            >
+              <ExternalLink className="h-4 w-4" />
+              View Seller Page
+            </a>
+          )}
+          <Link
+            href="/dashboard/events/edit"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-4 py-2.5 font-display text-sm font-semibold uppercase tracking-wide text-gray-900 transition hover:bg-accent-600"
+          >
+            <Plus className="h-4 w-4" />
+            New Event
+          </Link>
+        </div>
       </div>
 
       {events.length === 0 && (
@@ -172,7 +206,7 @@ function EventsPageInner() {
           </p>
           <Link
             href="/dashboard/events/edit"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-5 py-2.5 font-semibold text-white transition hover:bg-brand-700"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-5 py-2.5 font-display text-sm font-semibold uppercase tracking-wide text-gray-900 transition hover:bg-accent-600"
           >
             <Plus className="h-4 w-4" />
             Create Event
@@ -226,32 +260,33 @@ function EventCard({
   return (
     <Link
       href={`/dashboard/events/${event.id}/tickets`}
-      className={`group flex items-center gap-3 rounded-2xl border border-gray-200 bg-white p-4 transition hover:border-gray-300 hover:shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] dark:hover:border-gray-700 ${
+      className={`group flex items-center gap-4 rounded-2xl border border-gray-200 bg-white p-4 transition hover:border-gray-300 hover:shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03] dark:hover:border-gray-700 ${
         dimmed ? 'opacity-60' : ''
       }`}
     >
-      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-gray-100 dark:bg-white/[0.05]">
-        {event.image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={event.image_url} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <Calendar className="h-5 w-5 text-gray-400 dark:text-gray-600" />
-          </div>
-        )}
+      {/* Date badge — black square, mockup style */}
+      <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-gray-950 text-white">
+        <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">
+          {new Date(event.event_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short' })}
+        </span>
+        <span className="font-display text-lg font-bold leading-none">
+          {new Date(event.event_date + 'T12:00:00').getDate()}
+        </span>
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="truncate font-display text-sm font-semibold uppercase tracking-wide text-gray-900 dark:text-white">
-          {event.title}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="truncate font-display text-sm font-semibold uppercase tracking-wide text-gray-900 dark:text-white">
+            {event.title}
+          </span>
+          {event.status && event.status !== 'published' && (
+            <Pill tone="gray">{event.status}</Pill>
+          )}
         </div>
         <div className="mt-1 text-xs text-gray-600 dark:text-gray-300">
           {formatDate(event.event_date)}
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          {event.status && event.status !== 'published' && (
-            <Pill tone="gray">{event.status}</Pill>
-          )}
           {event.ticketing_enabled && (
             <Pill tone="brand">
               <Ticket className="h-2.5 w-2.5" />

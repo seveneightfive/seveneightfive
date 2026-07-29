@@ -13,6 +13,18 @@ import {
   RefreshCw,
 } from 'lucide-react'
 
+/**
+ * Payouts — CSS restyle to match the mockup's cleaner card treatment.
+ *
+ * NOTE: the mockup shows Available / Pending / Paid Out YTD stat tiles.
+ * Those require pulling live numbers from the Stripe Balance API (for
+ * Available/Pending) and a transfers/payouts history query (for Paid
+ * Out YTD) — data this page doesn't currently fetch. That's flagged as
+ * a separate backend task, not included in this pass. Everything else
+ * here (connect flow, status card, seller details form, "what you can
+ * do" list) is the same logic as before, restyled.
+ */
+
 type Profile = {
   id: string
   full_name: string | null
@@ -62,7 +74,6 @@ function PayoutsPageInner() {
   const stripeError = searchParams.get('stripe_error')
   const stripeRefresh = searchParams.get('stripe_refresh') === '1'
 
-  // Initial profile load
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -88,11 +99,9 @@ function PayoutsPageInner() {
       setLoading(false)
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router])
 
-  // Self-heal: if they have a Stripe account but aren't enabled,
-  // silently re-check with Stripe. Catches the "closed the tab before
-  // the return URL fired" case and missing-webhook setups.
   useEffect(() => {
     if (!profile?.stripe_account_id) return
     if (profile.stripe_account_status === 'enabled') return
@@ -115,7 +124,6 @@ function PayoutsPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.stripe_account_id])
 
-  // Refresh-redirect handling
   useEffect(() => {
     if (stripeRefresh && profile && !connecting) {
       handleConnect()
@@ -150,7 +158,6 @@ function PayoutsPageInner() {
       const res = await fetch('/api/stripe/connect/sync', { method: 'POST' })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || 'Sync failed')
-      // Pull a fresh profile to reflect any side-effect fields too
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data } = await supabase
@@ -261,7 +268,7 @@ function PayoutsPageInner() {
             )}
           </div>
 
-          <div className="mb-6 flex items-center gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
+          <div className="mb-6 flex items-center gap-4 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
             <div
               className={`h-3 w-3 shrink-0 rounded-full ${
                 isEnabled
@@ -320,25 +327,25 @@ function PayoutsPageInner() {
               <button
                 onClick={handleConnect}
                 disabled={connecting}
-                className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-gray-950 px-4 py-2.5 font-display text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {connecting ? <Loader2 className="h-4 w-4 animate-spin" /> : ''}
-                {connecting ? 'Opening Stripe…' : hasAccount ? 'Continue setup' : 'Connect Stripe to start selling'}
+                {connecting ? 'Opening Stripe…' : hasAccount ? 'Continue setup' : 'Connect Stripe'}
               </button>
             </>
           )}
 
           {isEnabled && (
-<div className="flex gap-2 flex-wrap">
-  <a
-    href="https://dashboard.stripe.com/"
-    target="_blank"
-    rel="noopener noreferrer"
-    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
-  >
-    <ExternalLink className="h-4 w-4" />
-    Open Stripe dashboard
-  </a>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href="https://dashboard.stripe.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open Stripe dashboard
+              </a>
               <button
                 onClick={handleConnect}
                 disabled={connecting}
@@ -410,9 +417,7 @@ function PayoutsPageInner() {
                 {savingProfile ? 'Saving…' : 'Save seller details'}
               </button>
               {profileSaved && (
-                <span className="text-sm font-semibold text-success-600 dark:text-success-400">
-                  ✓ Saved
-                </span>
+                <span className="text-sm font-semibold text-success-600 dark:text-success-400">✓ Saved</span>
               )}
             </div>
           </form>
@@ -445,7 +450,7 @@ function PayoutsPageInner() {
                 </li>
               </ul>
 
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex flex-wrap gap-2">
                 <a
                   href="/dashboard/events"
                   className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"

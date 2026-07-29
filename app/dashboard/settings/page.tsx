@@ -2,10 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabaseBrowser'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import {
-  Mail,
-  Phone,
   Bell,
   User,
   Check,
@@ -14,7 +12,25 @@ import {
   Upload,
 } from 'lucide-react'
 
-type Tab = 'profile' | 'email' | 'phone' | 'notifications'
+/**
+ * Settings — restructured this pass:
+ *
+ *  - Tabs collapsed from 4 (Profile/Email/Phone/Notifications) to 2
+ *    (Account/Notifications). Account now holds avatar, full name,
+ *    username, email, and phone all in one form — matching the mockup's
+ *    simpler settings shell.
+ *  - The two SMS toggles that used to live in Notifications are gone.
+ *    In their place: a single "Send me text reminders" checkbox living
+ *    right next to the phone number field in Account, per request.
+ *  - Notifications subheadings ("Email" / "Push Notifications") no
+ *    longer have icons in front of them.
+ *  - "Weekly Top City digest" renamed to "seveneightfive weekender".
+ *    This still only writes to notification_settings in Supabase — see
+ *    the TODO comment at that toggle for the sender.net follow-up.
+ *  - Push "New events nearby" removed. "Artist activity" kept.
+ */
+
+type Tab = 'account' | 'notifications'
 
 type NotificationSettings = {
   email_event_reminders: boolean
@@ -22,10 +38,7 @@ type NotificationSettings = {
   email_artist_updates: boolean
   email_venue_news: boolean
   email_weekly_digest: boolean
-  sms_event_reminders: boolean
-  sms_last_minute_deals: boolean
   push_event_reminders: boolean
-  push_new_events_nearby: boolean
   push_artist_updates: boolean
 }
 
@@ -35,10 +48,7 @@ const NOTIFICATION_DEFAULTS: NotificationSettings = {
   email_artist_updates: true,
   email_venue_news: true,
   email_weekly_digest: true,
-  sms_event_reminders: false,
-  sms_last_minute_deals: false,
   push_event_reminders: true,
-  push_new_events_nearby: true,
   push_artist_updates: true,
 }
 
@@ -55,7 +65,7 @@ const EMAIL_TOGGLES: {
   {
     key: 'email_new_events',
     label: 'New events near you',
-    desc: "When events are added in Topeka that match your interests.",
+    desc: 'When events are added in Topeka that match your interests.',
   },
   {
     key: 'email_artist_updates',
@@ -69,25 +79,8 @@ const EMAIL_TOGGLES: {
   },
   {
     key: 'email_weekly_digest',
-    label: 'Weekly Top City digest',
-    desc: "A curated look at what's happening this week in 785.",
-  },
-]
-
-const SMS_TOGGLES: {
-  key: keyof NotificationSettings
-  label: string
-  desc: string
-}[] = [
-  {
-    key: 'sms_event_reminders',
-    label: 'Event reminders',
-    desc: 'Text reminder the day of events you have tickets to.',
-  },
-  {
-    key: 'sms_last_minute_deals',
-    label: 'Last-minute deals',
-    desc: 'Heads-up when same-day tickets drop in price.',
+    label: 'seveneightfive weekender',
+    desc: "A curated look at what's happening this week in seveneightfive.",
   },
 ]
 
@@ -102,11 +95,6 @@ const PUSH_TOGGLES: {
     desc: 'Push notification for upcoming events on your list.',
   },
   {
-    key: 'push_new_events_nearby',
-    label: 'New events nearby',
-    desc: 'Alert when new events are posted close to you.',
-  },
-  {
     key: 'push_artist_updates',
     label: 'Artist activity',
     desc: 'When followed artists announce new shows.',
@@ -116,50 +104,38 @@ const PUSH_TOGGLES: {
 export default function SettingsPage() {
   const supabase = createClient()
   const router = useRouter()
-  const [tab, setTab] = useState<Tab>('profile')
+  const [tab, setTab] = useState<Tab>('account')
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState('')
 
-  // Profile state
+  // Account state (avatar, name, username, email, phone, SMS opt-in)
   const [fullName, setFullName] = useState('')
   const [username, setUsername] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [usernameError, setUsernameError] = useState('')
   const [checkingUsername, setCheckingUsername] = useState(false)
-  const [savingProfile, setSavingProfile] = useState(false)
-  const [profileStatus, setProfileStatus] = useState<'idle' | 'success' | 'error'>('idle')
-  const [profileError, setProfileError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
 
-  // Email state
   const [currentEmail, setCurrentEmail] = useState('')
   const [newEmail, setNewEmail] = useState('')
   const [emailStep, setEmailStep] = useState<'form' | 'confirm'>('form')
-  const [emailSaving, setEmailSaving] = useState(false)
-  const [emailStatus, setEmailStatus] = useState<'idle' | 'error'>('idle')
-  const [emailError, setEmailError] = useState('')
 
-  // Phone state
   const [phone, setPhone] = useState('')
   const [currentPhone, setCurrentPhone] = useState('')
-  const [phoneSaving, setPhoneSaving] = useState(false)
-  const [phoneStatus, setPhoneStatus] = useState<'idle' | 'success' | 'error'>('idle')
-  const [phoneError, setPhoneError] = useState('')
+  const [smsOptIn, setSmsOptIn] = useState(false)
+  const [currentSmsOptIn, setCurrentSmsOptIn] = useState(false)
+
+  const [savingAccount, setSavingAccount] = useState(false)
+  const [accountStatus, setAccountStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [accountError, setAccountError] = useState('')
 
   // Notifications state
-  const [hasPhone, setHasPhone] = useState(false)
-  const [notifications, setNotifications] = useState<NotificationSettings>(
-    NOTIFICATION_DEFAULTS
-  )
-  const [notificationsSaved, setNotificationsSaved] = useState<NotificationSettings>(
-    NOTIFICATION_DEFAULTS
-  )
+  const [notifications, setNotifications] = useState<NotificationSettings>(NOTIFICATION_DEFAULTS)
+  const [notificationsSaved, setNotificationsSaved] = useState<NotificationSettings>(NOTIFICATION_DEFAULTS)
   const [notificationsSaving, setNotificationsSaving] = useState(false)
-  const [notificationsStatus, setNotificationsStatus] = useState<
-    'idle' | 'success' | 'error'
-  >('idle')
+  const [notificationsStatus, setNotificationsStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [notificationsError, setNotificationsError] = useState('')
 
   useEffect(() => {
@@ -174,7 +150,7 @@ export default function SettingsPage() {
       const { data } = await supabase
         .from('profiles')
         .select(
-          'full_name, username, avatar_url, email, phone_number, notification_settings'
+          'full_name, username, avatar_url, email, phone_number, sms_opt_in, notification_settings'
         )
         .eq('id', user.id)
         .single()
@@ -184,9 +160,10 @@ export default function SettingsPage() {
         setUsername(data.username || '')
         setAvatarUrl(data.avatar_url || '')
         setCurrentEmail(data.email || '')
-        setHasPhone(!!data.phone_number)
         setPhone(data.phone_number || '')
         setCurrentPhone(data.phone_number || '')
+        setSmsOptIn(!!data.sms_opt_in)
+        setCurrentSmsOptIn(!!data.sms_opt_in)
         const merged = {
           ...NOTIFICATION_DEFAULTS,
           ...(data.notification_settings || {}),
@@ -197,6 +174,7 @@ export default function SettingsPage() {
       setLoading(false)
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router])
 
   // Username uniqueness check
@@ -218,13 +196,10 @@ export default function SettingsPage() {
         .neq('id', userId)
         .maybeSingle()
       setCheckingUsername(false)
-      if (data) {
-        setUsernameError('That username is already taken.')
-      } else {
-        setUsernameError('')
-      }
+      setUsernameError(data ? 'That username is already taken.' : '')
     }, 500)
     return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username, userId])
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -252,30 +227,60 @@ export default function SettingsPage() {
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  const handleSaveProfile = async () => {
+  const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+
+  const formatPhone = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 10)
+    if (digits.length <= 3) return digits
+    if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
+  }
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhone(formatPhone(e.target.value))
+    setAccountStatus('idle')
+  }
+
+  // ─── Single "Save changes" for the whole Account tab ─────────────────
+  // Handles full_name/username/avatar_url + phone/sms_opt_in together.
+  // Email uses its own flow (Supabase requires a confirm-both-inboxes
+  // step) so it's saved separately via handleEmailSubmit below.
+  const handleSaveAccount = async () => {
     if (usernameError || checkingUsername) return
-    setSavingProfile(true)
-    setProfileStatus('idle')
+    const phoneDigits = phone.replace(/\D/g, '')
+    if (phone && phoneDigits.length !== 10) {
+      setAccountStatus('error')
+      setAccountError('Please enter a valid 10-digit US phone number.')
+      return
+    }
+    setSavingAccount(true)
+    setAccountStatus('idle')
     const { error } = await supabase
       .from('profiles')
       .update({
         full_name: fullName || null,
         username: username || null,
         avatar_url: avatarUrl || null,
+        phone_number: phone || null,
+        sms_opt_in: phone ? smsOptIn : false,
         updated_at: new Date().toISOString(),
       })
       .eq('id', userId)
-    setSavingProfile(false)
+    setSavingAccount(false)
     if (error) {
-      setProfileStatus('error')
-      setProfileError(error.message)
+      setAccountStatus('error')
+      setAccountError(error.message)
     } else {
-      setProfileStatus('success')
+      setCurrentPhone(phone)
+      setCurrentSmsOptIn(phone ? smsOptIn : false)
+      if (!phone) setSmsOptIn(false)
+      setAccountStatus('success')
     }
   }
 
-  const isValidEmail = (v: string) =>
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+  const [emailSaving, setEmailSaving] = useState(false)
+  const [emailStatus, setEmailStatus] = useState<'idle' | 'error'>('idle')
+  const [emailError, setEmailError] = useState('')
 
   const handleEmailSubmit = async () => {
     if (!isValidEmail(newEmail)) {
@@ -300,62 +305,6 @@ export default function SettingsPage() {
     }
   }
 
-  const formatPhone = (value: string) => {
-    const digits = value.replace(/\D/g, '').slice(0, 10)
-    if (digits.length <= 3) return digits
-    if (digits.length <= 6)
-      return `(${digits.slice(0, 3)}) ${digits.slice(3)}`
-    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
-  }
-
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPhone(formatPhone(e.target.value))
-    setPhoneStatus('idle')
-  }
-
-  const handlePhoneSave = async () => {
-    const digits = phone.replace(/\D/g, '')
-    if (phone && digits.length !== 10) {
-      setPhoneStatus('error')
-      setPhoneError('Please enter a valid 10-digit US phone number.')
-      return
-    }
-    setPhoneSaving(true)
-    setPhoneStatus('idle')
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        phone_number: phone || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', userId)
-    setPhoneSaving(false)
-    if (error) {
-      setPhoneStatus('error')
-      setPhoneError(error.message)
-    } else {
-      setCurrentPhone(phone)
-      setPhoneStatus('success')
-    }
-  }
-
-  const handlePhoneRemove = async () => {
-    setPhoneSaving(true)
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        phone_number: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', userId)
-    setPhoneSaving(false)
-    if (!error) {
-      setPhone('')
-      setCurrentPhone('')
-      setPhoneStatus('success')
-    }
-  }
-
   const handleNotificationsToggle = (key: keyof NotificationSettings) => {
     setNotifications((s) => ({ ...s, [key]: !s[key] }))
     setNotificationsStatus('idle')
@@ -364,6 +313,11 @@ export default function SettingsPage() {
   const handleNotificationsSave = async () => {
     setNotificationsSaving(true)
     setNotificationsStatus('idle')
+    // TODO: when email_weekly_digest is toggled on/off, also sync
+    // membership in the sender.net "seveneightfive weekender" group via
+    // their API (needs SENDER_NET_API_KEY + list ID). For now this only
+    // persists to Supabase notification_settings, same as every other
+    // toggle here.
     const { error } = await supabase
       .from('profiles')
       .update({
@@ -398,31 +352,21 @@ export default function SettingsPage() {
   }
 
   const initials = fullName
-    ? fullName
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase()
+    ? fullName.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
     : '?'
 
-  const profileHasChanges =
-    fullName !== (fullName || '') ||
-    username !== (username || '') ||
-    avatarUrl !== (avatarUrl || '')
+  const accountHasChanges =
+    phone !== currentPhone || smsOptIn !== currentSmsOptIn
 
   const notificationsHasChanges =
-    JSON.stringify(notifications) !==
-    JSON.stringify(notificationsSaved)
+    JSON.stringify(notifications) !== JSON.stringify(notificationsSaved)
 
   return (
     <div className="space-y-6">
-      {/* Tab navigation */}
+      {/* Tab navigation — simplified from 4 tabs to 2 */}
       <div className="flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-800 dark:bg-white/[0.02]">
         {[
-          { id: 'profile' as Tab, label: 'Profile', icon: User },
-          { id: 'email' as Tab, label: 'Email', icon: Mail },
-          { id: 'phone' as Tab, label: 'Phone', icon: Phone },
+          { id: 'account' as Tab, label: 'Account', icon: User },
           { id: 'notifications' as Tab, label: 'Notifications', icon: Bell },
         ].map(({ id, label, icon: Icon }) => (
           <button
@@ -440,35 +384,33 @@ export default function SettingsPage() {
         ))}
       </div>
 
-      {/* Tab content */}
       <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-        {/* PROFILE TAB */}
-        {tab === 'profile' && (
-          <div className="space-y-6">
+        {/* ACCOUNT TAB — avatar, name, username, email, phone + SMS opt-in */}
+        {tab === 'account' && (
+          <div className="space-y-8">
             <div>
               <h2 className="font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
-                Edit Profile
+                Account
               </h2>
               <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                Update your name, username, and avatar.
+                Your name, photo, and contact info.
               </p>
             </div>
 
-            {profileStatus === 'success' && (
+            {accountStatus === 'success' && (
               <div className="flex gap-2 rounded-lg border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
                 <Check className="h-4 w-4 shrink-0" />
-                Profile updated.
+                Account updated.
               </div>
             )}
-
-            {profileStatus === 'error' && (
+            {accountStatus === 'error' && (
               <div className="flex gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400">
                 <AlertCircle className="h-4 w-4 shrink-0" />
-                {profileError}
+                {accountError}
               </div>
             )}
 
-            {/* Avatar preview */}
+            {/* Avatar */}
             <div className="flex items-center gap-4">
               <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 border-gray-200 bg-brand-600 font-display font-bold text-white dark:border-gray-700">
                 {avatarUrl ? (
@@ -476,7 +418,7 @@ export default function SettingsPage() {
                   <img
                     src={avatarUrl}
                     alt={fullName}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full rounded-full object-cover"
                     onError={() => setAvatarUrl('')}
                   />
                 ) : (
@@ -484,17 +426,31 @@ export default function SettingsPage() {
                 )}
               </div>
               <div>
-                <p className="font-semibold text-gray-900 dark:text-white">
-                  {fullName || 'Your Name'}
-                </p>
-                <p className="text-xs text-gray-600 dark:text-gray-300">
-                  {username ? `@${username}` : 'No username set'}
-                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                  disabled={uploading}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
+                >
+                  <Upload className="h-4 w-4" />
+                  {uploading ? 'Uploading…' : avatarUrl ? 'Change Photo' : 'Upload Photo'}
+                </button>
+                {uploadError && (
+                  <p className="mt-1.5 text-xs text-brand-600 dark:text-brand-400">{uploadError}</p>
+                )}
               </div>
             </div>
 
-            {/* Fields */}
-            <div className="space-y-4">
+            {/* Name / Username */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
                   Full Name
@@ -504,13 +460,12 @@ export default function SettingsPage() {
                   value={fullName}
                   onChange={(e) => {
                     setFullName(e.target.value)
-                    setProfileStatus('idle')
+                    setAccountStatus('idle')
                   }}
                   placeholder="Your full name"
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90 dark:focus:border-brand-500 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                  className={accountInputCls}
                 />
               </div>
-
               <div>
                 <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
                   Username
@@ -520,245 +475,129 @@ export default function SettingsPage() {
                   value={username}
                   onChange={(e) => {
                     setUsername(e.target.value.toLowerCase())
-                    setProfileStatus('idle')
+                    setAccountStatus('idle')
                   }}
                   placeholder="your_handle"
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90 dark:focus:border-brand-500 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                  className={accountInputCls}
                 />
                 {usernameError ? (
-                  <p className="mt-1.5 text-xs text-brand-600 dark:text-brand-400">
-                    {usernameError}
-                  </p>
+                  <p className="mt-1.5 text-xs text-brand-600 dark:text-brand-400">{usernameError}</p>
                 ) : checkingUsername ? (
-                  <p className="mt-1.5 text-xs text-gray-600 dark:text-gray-300">
-                    Checking availability…
-                  </p>
-                ) : username && !usernameError ? (
-                  <p className="mt-1.5 text-xs text-success-600 dark:text-success-400">
-                    ✓ Available
-                  </p>
-                ) : (
-                  <p className="mt-1.5 text-xs text-gray-600 dark:text-gray-300">
-                    3–20 chars, lowercase letters, numbers, underscores only.
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
-                  Profile Photo
-                </label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleAvatarUpload}
-                  disabled={uploading || savingProfile}
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading || savingProfile}
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
-                >
-                  <Upload className="h-4 w-4" />
-                  {uploading
-                    ? 'Uploading…'
-                    : avatarUrl
-                      ? 'Change Photo'
-                      : 'Upload Photo'}
-                </button>
-                {uploadError && (
-                  <p className="mt-1.5 text-xs text-brand-600 dark:text-brand-400">
-                    {uploadError}
-                  </p>
-                )}
-                <p className="mt-1.5 text-xs text-gray-600 dark:text-gray-300">
-                  Square images work best. Max 8MB.
-                </p>
+                  <p className="mt-1.5 text-xs text-gray-600 dark:text-gray-300">Checking availability…</p>
+                ) : username ? (
+                  <p className="mt-1.5 text-xs text-success-600 dark:text-success-400">✓ Available</p>
+                ) : null}
               </div>
             </div>
 
-            <button
-              onClick={handleSaveProfile}
-              disabled={savingProfile || !profileHasChanges || !!usernameError}
-              className="rounded-lg bg-brand-600 px-4 py-2.5 font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {savingProfile ? 'Saving…' : 'Save changes'}
-            </button>
-          </div>
-        )}
-
-        {/* EMAIL TAB */}
-        {tab === 'email' && (
-          <div className="space-y-6">
+            {/* Email */}
             <div>
-              <h2 className="font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
-                Update Email
-              </h2>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                Change the email address associated with your account.
-              </p>
-            </div>
-
-            {emailStep === 'confirm' ? (
-              <>
-                <div className="flex gap-2 rounded-lg border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
-                  <Check className="h-4 w-4 shrink-0" />
-                  Confirmation emails sent.
-                </div>
-
-                <div className="rounded-lg border border-brand-200 bg-brand-50 p-4 dark:border-brand-500/30 dark:bg-brand-500/10">
-                  <p className="font-semibold text-brand-900 dark:text-brand-300">
-                    Check Both Inboxes
+              <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
+                Email
+              </label>
+              {emailStep === 'confirm' ? (
+                <div className="rounded-lg border border-brand-200 bg-brand-50 p-4 text-sm dark:border-brand-500/30 dark:bg-brand-500/10">
+                  <p className="font-semibold text-brand-900 dark:text-brand-300">Check both inboxes</p>
+                  <p className="mt-2 text-brand-700 dark:text-brand-400">
+                    We've sent a confirmation link to both <strong>{currentEmail}</strong> and{' '}
+                    <strong>{newEmail}</strong>. Click the link in both to complete the change.
                   </p>
-                  <p className="mt-2 text-sm text-brand-700 dark:text-brand-400">
-                    We've sent a confirmation link to both <strong>{currentEmail}</strong>{' '}
-                    and <strong>{newEmail}</strong>. Click the link in{' '}
-                    <strong>both</strong> emails to complete the change. The link
-                    expires in 24 hours.
-                  </p>
-                </div>
-
-                <div className="flex gap-2">
                   <button
                     onClick={() => {
                       setEmailStep('form')
                       setNewEmail('')
                     }}
-                    className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
+                    className="mt-3 text-xs font-semibold underline hover:no-underline"
                   >
                     Use a different email
                   </button>
                 </div>
-              </>
-            ) : (
-              <>
-                {emailStatus === 'error' && (
-                  <div className="flex gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400">
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                    {emailError}
+              ) : (
+                <>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <input
+                      type="email"
+                      value={currentEmail}
+                      disabled
+                      className={`${accountInputCls} bg-gray-50 text-gray-600 dark:bg-white/[0.02] dark:text-gray-400 sm:flex-1`}
+                    />
+                    <input
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => {
+                        setNewEmail(e.target.value)
+                        setEmailStatus('idle')
+                      }}
+                      placeholder="New email address"
+                      className={`${accountInputCls} sm:flex-1`}
+                    />
+                    <button
+                      onClick={handleEmailSubmit}
+                      disabled={emailSaving || !newEmail}
+                      className="shrink-0 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
+                    >
+                      {emailSaving ? 'Sending…' : 'Update'}
+                    </button>
                   </div>
-                )}
-
-                <div>
-                  <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
-                    Current Email
-                  </label>
-                  <input
-                    type="email"
-                    value={currentEmail}
-                    disabled
-                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-600 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
-                    New Email Address
-                  </label>
-                  <input
-                    type="email"
-                    value={newEmail}
-                    onChange={(e) => {
-                      setNewEmail(e.target.value)
-                      setEmailStatus('idle')
-                    }}
-                    placeholder="you@example.com"
-                    className="w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90 dark:focus:border-brand-500 placeholder:text-gray-400 dark:placeholder:text-gray-500"
-                  />
+                  {emailStatus === 'error' && (
+                    <p className="mt-1.5 text-xs text-brand-600 dark:text-brand-400">{emailError}</p>
+                  )}
                   <p className="mt-1.5 text-xs text-gray-600 dark:text-gray-300">
-                    A confirmation link will be sent to both your current and new
-                    email addresses. You must confirm from both to complete the
-                    change.
+                    Changing your email requires confirming from both your current and new address.
                   </p>
-                </div>
-
-                <button
-                  onClick={handleEmailSubmit}
-                  disabled={emailSaving || !newEmail}
-                  className="rounded-lg bg-brand-600 px-4 py-2.5 font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {emailSaving ? 'Sending…' : 'Send confirmation'}
-                </button>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* PHONE TAB */}
-        {tab === 'phone' && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
-                Phone Number
-              </h2>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                Used for SMS event reminders. Never shared publicly.
-              </p>
+                </>
+              )}
             </div>
 
-            {phoneStatus === 'success' && (
-              <div className="flex gap-2 rounded-lg border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
-                <Check className="h-4 w-4 shrink-0" />
-                {phone ? 'Phone number saved.' : 'Phone number removed.'}
-              </div>
-            )}
-
-            {phoneStatus === 'error' && (
-              <div className="flex gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                {phoneError}
-              </div>
-            )}
-
+            {/* Phone + SMS opt-in checkbox right beneath it */}
             <div>
               <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
-                US Phone Number
+                Phone
               </label>
               <div className="flex gap-2">
                 <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50 px-3 dark:border-gray-800 dark:bg-white/[0.02]">
-                  <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">
-                    🇺🇸 +1
-                  </span>
+                  <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">🇺🇸 +1</span>
                 </div>
                 <input
                   type="tel"
                   value={phone}
                   onChange={handlePhoneChange}
                   placeholder="(785) 000-0000"
-                  className="flex-1 rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90 dark:focus:border-brand-500 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                  className={`${accountInputCls} flex-1`}
                 />
               </div>
-              <p className="mt-1.5 text-xs text-gray-600 dark:text-gray-300">
-                We'll only use this for account recovery and SMS reminders you opt
-                into.
-              </p>
-            </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={handlePhoneSave}
-                disabled={phoneSaving || phone === currentPhone}
-                className="rounded-lg bg-brand-600 px-4 py-2.5 font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {phoneSaving ? 'Saving…' : 'Save number'}
-              </button>
-              {currentPhone && (
-                <button
-                  onClick={handlePhoneRemove}
-                  disabled={phoneSaving}
-                  className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
-                >
-                  Remove
-                </button>
+              <label className="mt-2.5 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={smsOptIn}
+                  disabled={!phone}
+                  onChange={(e) => {
+                    setSmsOptIn(e.target.checked)
+                    setAccountStatus('idle')
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 disabled:opacity-40"
+                />
+                Send me text reminders for events I have tickets to
+              </label>
+              {!phone && (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Add a phone number above to enable text reminders.
+                </p>
               )}
             </div>
+
+            <button
+              onClick={handleSaveAccount}
+              disabled={savingAccount || !accountHasChanges || !!usernameError}
+              className="rounded-lg bg-brand-600 px-4 py-2.5 font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {savingAccount ? 'Saving…' : 'Save changes'}
+            </button>
           </div>
         )}
 
-        {/* NOTIFICATIONS TAB */}
+        {/* NOTIFICATIONS TAB — icons removed from subheadings, SMS section gone */}
         {tab === 'notifications' && (
           <div className="space-y-6">
             <div>
@@ -776,7 +615,6 @@ export default function SettingsPage() {
                 Notification preferences saved.
               </div>
             )}
-
             {notificationsStatus === 'error' && (
               <div className="flex gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400">
                 <AlertCircle className="h-4 w-4 shrink-0" />
@@ -784,10 +622,9 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* Email */}
             <div>
               <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-600 dark:text-gray-400">
-                ✉ Email
+                Email
               </h3>
               <div className="space-y-3">
                 {EMAIL_TOGGLES.map((item) => (
@@ -801,39 +638,9 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* SMS */}
             <div>
               <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-600 dark:text-gray-400">
-                📱 SMS / Text
-              </h3>
-              {!hasPhone && (
-                <div className="mb-3 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-700 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-400">
-                  ⚡ Add a phone number in the Phone section to enable SMS
-                  notifications.
-                </div>
-              )}
-              <div
-                className="space-y-3"
-                style={{
-                  opacity: hasPhone ? 1 : 0.45,
-                  pointerEvents: hasPhone ? 'auto' : 'none',
-                }}
-              >
-                {SMS_TOGGLES.map((item) => (
-                  <NotificationToggle
-                    key={item.key}
-                    item={item}
-                    checked={notifications[item.key]}
-                    onChange={() => handleNotificationsToggle(item.key)}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Push */}
-            <div>
-              <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-600 dark:text-gray-400">
-                🔔 Push Notifications
+                Push Notifications
               </h3>
               <div className="space-y-3">
                 {PUSH_TOGGLES.map((item) => (
@@ -847,12 +654,14 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex gap-2 pt-4">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Text reminders are managed from the Account tab, next to your phone number.
+            </p>
+
+            <div className="flex gap-2 pt-2">
               <button
                 onClick={handleNotificationsSave}
-                disabled={
-                  notificationsSaving || !notificationsHasChanges
-                }
+                disabled={notificationsSaving || !notificationsHasChanges}
                 className="rounded-lg bg-brand-600 px-4 py-2.5 font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {notificationsSaving ? 'Saving…' : 'Save preferences'}
@@ -872,7 +681,8 @@ export default function SettingsPage() {
   )
 }
 
-// ─── Notification Toggle Component ─────────────────────────────────────────
+const accountInputCls =
+  'w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90 dark:focus:border-brand-500 placeholder:text-gray-400 dark:placeholder:text-gray-500'
 
 function NotificationToggle({
   item,
@@ -886,20 +696,14 @@ function NotificationToggle({
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-white/[0.02]">
       <div className="flex-1">
-        <p className="text-sm font-semibold text-gray-900 dark:text-white">
-          {item.label}
-        </p>
-        <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-300">
-          {item.desc}
-        </p>
+        <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.label}</p>
+        <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-300">{item.desc}</p>
       </div>
       <button
         type="button"
         onClick={onChange}
         className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${
-          checked
-            ? 'bg-brand-600'
-            : 'bg-gray-300 dark:bg-gray-700'
+          checked ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-700'
         }`}
       >
         <span

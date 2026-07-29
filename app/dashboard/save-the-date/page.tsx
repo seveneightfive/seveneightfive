@@ -364,9 +364,6 @@ function AddEventModal({
 }
 
 // ─── Event Detail Modal ───────────────────────────────────────────────────────
-// Icon-free date/location (no more 📅 / 📍 — just clear labels). Organizer,
-// Expected Capacity, and Needs now live at the end, after the description,
-// per request — rather than scattered above it.
 function EventDetailModal({ event, onClose }: { event: SaveTheDate; onClose: () => void }) {
   const startFmt = formatTime(event.start_time)
   const endFmt = formatTime(event.end_time)
@@ -416,7 +413,6 @@ function EventDetailModal({ event, onClose }: { event: SaveTheDate; onClose: () 
             </div>
           )}
 
-          {/* Organizer, capacity, and needs — after the description */}
           {event.organizer && (
             <div className="detail-section">
               <h4>Organizer</h4>
@@ -600,11 +596,8 @@ export default function SaveTheDatePage() {
   const [prefill, setPrefill] = useState({ name: '', email: '', phone: '' })
   const [prefillReady, setPrefillReady] = useState(false)
 
-  // Calendar view is always month-scoped — "year" grid doesn't make sense
-  // as a calendar, so the period toggle only applies in list mode.
   const periodMode: ListView = displayMode === 'calendar' ? 'month' : view
 
-  // Load user profile for form pre-fill
   useEffect(() => {
     async function loadProfile() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -678,7 +671,6 @@ export default function SaveTheDatePage() {
     setView((v) => v === 'month' ? 'year' : 'month')
   }
 
-  // Group year events by month
   const byMonth: Record<number, SaveTheDate[]> = {}
   if (displayMode === 'list' && view === 'year') {
     yearEvents.forEach((ev) => {
@@ -695,15 +687,12 @@ export default function SaveTheDatePage() {
     <>
       <style>{`
         :root {
-          --ink: #1a1814; --ink-soft: #6b6560; --ink-faint: #8a847d;
-          --white: #ffffff; --off: #f7f6f4; --warm: #f2ede6;
-          --accent: #c80650; --accent-light: #fdf1ec; --border: #ece8e2;
-          --gold: #FFCE03;
+          --ink: #171614; --ink-soft: #6B6B6B; --ink-faint: #9A968C;
+          --white: #ffffff; --off: #F7F6F3; --warm: #f2ede6;
+          --yellow: #F5C518; --magenta: #E5316B;
+          --border: #E5E3DD;
           --serif: 'Oswald', sans-serif; --sans: 'DM Sans', system-ui, sans-serif;
         }
-        /* Page-scoped override — the site default body background is a
-           warm off-white; this page reads better flat white, matching the
-           /events/[slug] page it should feel like a companion to. */
         html, body { background: var(--white) !important; }
 
         .std-page {
@@ -748,9 +737,19 @@ export default function SaveTheDatePage() {
           gap: 24px;
           margin-bottom: 28px;
         }
+        .std-eyebrow {
+          font-family: var(--serif);
+          font-size: 0.72rem;
+          font-weight: 700;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          color: var(--magenta);
+          margin-bottom: 6px;
+          display: block;
+        }
         .std-header h1 {
           font-family: var(--serif);
-          font-size: 2rem;
+          font-size: 2.25rem;
           font-weight: 700;
           letter-spacing: 0.01em;
           text-transform: uppercase;
@@ -759,12 +758,58 @@ export default function SaveTheDatePage() {
           color: var(--ink);
         }
         .std-header p { font-size: 0.95rem; font-weight: 400; color: var(--ink-soft); max-width: 520px; line-height: 1.55; }
-        .btn-primary { background: var(--accent); color: #fff; border: none; padding: 11px 20px; font-family: var(--serif); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; border-radius: 8px; cursor: pointer; white-space: nowrap; transition: opacity 0.15s; }
-        .btn-primary:hover { opacity: 0.85; }
+
+        /* Buttons — mockup treatment: yellow primary CTA, black text,
+           bold uppercase Oswald label, fully rounded pill corners. */
+        .btn-primary {
+          background: var(--yellow);
+          color: #171614;
+          border: none;
+          padding: 12px 22px;
+          font-family: var(--serif);
+          font-size: 0.78rem;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          border-radius: 8px;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: background 0.15s, transform 0.1s;
+        }
+        .btn-primary:hover { background: #e6b910; }
+        .btn-primary:active { transform: scale(0.98); }
         .btn-primary:disabled { opacity: 0.4; cursor: default; }
-        .btn-ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--border); padding: 9px 16px; font-size: 14px; font-weight: 500; border-radius: 8px; cursor: pointer; transition: border-color 0.15s; }
-        .btn-ghost:hover { border-color: var(--ink-faint); }
-        .btn-outline { background: #fff; color: var(--ink); border: 1.5px solid var(--border); padding: 8px 14px; font-size: 13px; font-weight: 600; border-radius: 7px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: border-color 0.15s, background 0.15s; }
+
+        .btn-ghost {
+          background: transparent;
+          color: var(--ink);
+          border: 1.5px solid var(--border);
+          padding: 11px 20px;
+          font-family: var(--serif);
+          font-size: 0.78rem;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: border-color 0.15s, background 0.15s;
+        }
+        .btn-ghost:hover { border-color: var(--ink-faint); background: var(--off); }
+
+        .btn-outline {
+          background: #fff;
+          color: var(--ink);
+          border: 1.5px solid var(--border);
+          padding: 8px 14px;
+          font-size: 13px;
+          font-weight: 600;
+          border-radius: 7px;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          transition: border-color 0.15s, background 0.15s;
+        }
         .btn-outline:hover { border-color: var(--ink-faint); background: var(--off); }
 
         /* Mode toggle — Calendar / List */
@@ -802,7 +847,7 @@ export default function SaveTheDatePage() {
         .agenda-title { font-size: 15px; font-weight: 600; color: var(--ink); }
         .agenda-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .agenda-organizer { font-size: 13px; font-weight: 500; color: var(--ink-soft); }
-        .agenda-type-chip { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); background: var(--accent-light); border-radius: 100px; padding: 3px 10px; }
+        .agenda-type-chip { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--magenta); background: #fdf0f4; border-radius: 100px; padding: 3px 10px; }
         .agenda-location { font-size: 12px; font-weight: 500; color: var(--ink-faint); }
         .agenda-multiday { font-size: 11px; font-weight: 500; color: var(--ink-faint); font-style: italic; }
 
@@ -835,10 +880,10 @@ export default function SaveTheDatePage() {
         .cal-grid-cell:nth-child(7n) { border-right: none; }
         .cal-grid-cell-out { background: var(--off); }
         .cal-grid-cell-out .cal-grid-daynum { color: var(--ink-faint); }
-        .cal-grid-cell-today { background: var(--accent-light); }
+        .cal-grid-cell-today { background: #fdf0f4; border: 1.5px solid var(--magenta); }
         .cal-grid-daynum { font-size: 0.78rem; font-weight: 700; color: var(--ink); }
         .cal-grid-events { display: flex; flex-direction: column; gap: 3px; }
-        .cal-grid-chip { display: block; width: 100%; text-align: left; background: var(--accent); color: #fff; border: none; border-radius: 4px; padding: 2px 6px; font-size: 0.7rem; font-weight: 600; font-family: var(--sans); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cal-grid-chip { display: block; width: 100%; text-align: left; background: var(--ink); color: #fff; border: none; border-radius: 4px; padding: 2px 6px; font-size: 0.7rem; font-weight: 600; font-family: var(--sans); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .cal-grid-chip:hover { opacity: 0.85; }
         .cal-grid-more { font-size: 0.66rem; font-weight: 600; color: var(--ink-faint); padding: 0 2px; }
         @media (max-width: 640px) {
@@ -846,32 +891,47 @@ export default function SaveTheDatePage() {
           .cal-grid-chip { font-size: 0.62rem; }
         }
 
-        .modal-backdrop { position: fixed; inset: 0; background: rgba(26,24,20,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .modal { background: #fff; border-radius: 14px; width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,0.18); }
+        /* Modal — mockup treatment: larger radius, cleaner label sizing,
+           rounder inputs, and the yellow/black button pairing. */
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(23,22,20,0.55); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .modal { background: #fff; border-radius: 16px; width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,0.2); }
         .modal-detail { max-width: 520px; }
-        .modal-header { display: flex; align-items: flex-start; justify-content: space-between; padding: 24px 24px 0; gap: 12px; }
-        .modal-header h2 { font-family: var(--serif); font-size: 1.35rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; margin-top: 6px; color: var(--ink); }
-        .close-btn { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--ink-faint); padding: 0; line-height: 1; flex-shrink: 0; }
-        .close-btn:hover { color: var(--ink); }
-        .modal-form { padding: 20px 24px 24px; }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        .modal-header { display: flex; align-items: flex-start; justify-content: space-between; padding: 28px 28px 0; gap: 12px; }
+        .modal-header h2 { font-family: var(--serif); font-size: 1.4rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; margin-top: 6px; color: var(--ink); }
+        .close-btn { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--ink-faint); padding: 4px; line-height: 1; flex-shrink: 0; border-radius: 6px; transition: background 0.15s, color 0.15s; }
+        .close-btn:hover { color: var(--ink); background: var(--off); }
+        .modal-form { padding: 22px 28px 28px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
         .form-group.full { grid-column: 1 / -1; }
         .form-group label { font-size: 13px; font-weight: 600; color: var(--ink); }
         .optional { font-weight: 400; color: var(--ink-faint); }
-        .form-group input, .form-group select, .form-group textarea { border: 1.5px solid var(--border); border-radius: 7px; padding: 9px 12px; font-size: 14px; font-family: inherit; color: var(--ink); outline: none; transition: border-color 0.15s; background: #fff; }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--ink); }
+        .form-group input, .form-group select, .form-group textarea {
+          border: 1.5px solid var(--border);
+          border-radius: 8px;
+          padding: 10px 13px;
+          font-size: 14px;
+          font-family: inherit;
+          color: var(--ink);
+          outline: none;
+          transition: border-color 0.15s, box-shadow 0.15s;
+          background: #fff;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+          border-color: var(--ink);
+          box-shadow: 0 0 0 3px rgba(23,22,20,0.06);
+        }
         .form-group textarea { resize: vertical; }
         .checkboxes { flex-direction: column; justify-content: flex-end; gap: 10px; }
         .checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--ink); }
-        .checkbox-label input { width: 16px; height: 16px; cursor: pointer; }
-        .submitter-confirm { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 12px; background: var(--off); border-radius: 7px; font-size: 13px; }
+        .checkbox-label input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--ink); }
+        .submitter-confirm { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding: 11px 14px; background: var(--off); border-radius: 8px; font-size: 13px; }
         .submitter-confirm-label { font-weight: 700; color: var(--ink-soft); white-space: nowrap; }
         .submitter-confirm-value { color: var(--ink); font-weight: 500; }
-        .form-error { color: var(--accent); font-size: 13px; font-weight: 500; margin-top: 10px; padding: 10px 12px; background: var(--accent-light); border-radius: 6px; }
-        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-        .event-type-badge { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); background: var(--accent-light); border-radius: 100px; padding: 4px 11px; display: inline-block; margin-bottom: 6px; }
-        .detail-body { padding: 20px 24px 28px; }
+        .form-error { color: var(--magenta); font-size: 13px; font-weight: 500; margin-top: 10px; padding: 10px 12px; background: #fdf0f4; border-radius: 8px; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+        .event-type-badge { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--magenta); background: #fdf0f4; border-radius: 100px; padding: 4px 11px; display: inline-block; margin-bottom: 6px; }
+        .detail-body { padding: 20px 28px 28px; }
         .detail-row { margin-bottom: 16px; font-size: 14px; }
         .detail-label { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 4px; }
         .detail-value { font-size: 1rem; font-weight: 400; color: var(--ink); }
@@ -882,7 +942,7 @@ export default function SaveTheDatePage() {
         .detail-section { margin-top: 18px; }
         .detail-section h4 { font-family: var(--serif); font-size: 0.72rem; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; }
         .detail-section p { font-size: 14px; font-weight: 400; color: var(--ink); line-height: 1.6; }
-        .needs-section { background: #fffbf0; border-radius: 8px; padding: 12px 14px; border-left: 3px solid var(--gold); }
+        .needs-section { background: #fffbf0; border-radius: 8px; padding: 12px 14px; border-left: 3px solid var(--yellow); }
         .needs-section h4 { color: #a07b00; }
         .needs-section p { color: var(--ink-soft); }
         .contact-section { background: var(--off); border-radius: 8px; padding: 12px 14px; }
@@ -906,6 +966,7 @@ export default function SaveTheDatePage() {
 
         <div className="std-header">
           <div>
+            <span className="std-eyebrow">Planning</span>
             <h1>Save The Date</h1>
             <p>
               Annual Planning Calendar — let&apos;s work together to decrease overlap and ensure everyone hosts successful events.
