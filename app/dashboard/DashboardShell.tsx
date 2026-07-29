@@ -1,5 +1,4 @@
 'use client'
-import AppHeader from '@/layout/AppHeader'
 import AppSidebar from '@/layout/AppSidebar'
 import Backdrop from '@/layout/Backdrop'
 import React from 'react'
@@ -14,11 +13,17 @@ export type HeaderUser = {
 /**
  * Client shell for /dashboard/*.
  *
- * Simplified from the previous version: the sidebar is now a static
- * 290px column on desktop (no expand/collapse/hover states), so the
- * content margin is a fixed lg:ml-[290px] instead of a computed value.
- * headerUser now goes to AppSidebar (identity block + sign out live
- * there), not AppHeader.
+ * CHANGE (this pass): AppHeader (the separate top bar with its own
+ * title/subtitle) is gone. Every dashboard page already renders its own
+ * eyebrow + H1 + description at the top of its content (Save the Date,
+ * Event Manager, Advertising, etc. all do this) — so the old AppHeader
+ * was duplicating that same heading in a second bar above it, which is
+ * exactly the double "SAVE THE DATE" you'd see stacked on that page.
+ *
+ * Content area also widens: mockup uses more of the available desktop
+ * real estate than the old max-w-screen-2xl + p-4/p-6 wrapper allowed.
+ * Padding increases slightly at the top since there's no header bar
+ * anymore to create natural breathing room before the content starts.
  */
 export default function DashboardShell({
   children,
@@ -32,8 +37,9 @@ export default function DashboardShell({
       <AppSidebar headerUser={headerUser} />
       <Backdrop />
       <div className="flex-1 lg:ml-[290px]">
-        <AppHeader />
-        <div className="mx-auto max-w-screen-2xl p-4 md:p-6">{children}</div>
+        <div className="mx-auto max-w-[1600px] px-6 py-8 md:px-10 md:py-10">
+          {children}
+        </div>
       </div>
     </div>
   )
