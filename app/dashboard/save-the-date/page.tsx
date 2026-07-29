@@ -448,57 +448,55 @@ function EventDetailModal({ event, onClose }: { event: SaveTheDate; onClose: () 
   )
 }
 
-// ─── Agenda List ──────────────────────────────────────────────────────────────
-function AgendaList({
+// ─── Upcoming List (new) ───────────────────────────────────────────────────────
+// Flat "next N events from today forward" list under the calendar grid,
+// mirroring the mockup's "UPCOMING" section. Pulled from whichever
+// events are already loaded (year events cover this without a new
+// fetch, since it's always a superset of the current month).
+function UpcomingList({
   events,
-  loading,
-  emptyLabel,
   onSelect,
 }: {
   events: SaveTheDate[]
-  loading: boolean
-  emptyLabel: string
   onSelect: (e: SaveTheDate) => void
 }) {
-  if (loading) return <div className="loading-state">Loading events…</div>
-  if (events.length === 0) {
-    return (
-      <div className="agenda-empty">
-        <strong>{emptyLabel}</strong>
-        Be the first to claim a date!
-      </div>
-    )
-  }
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const upcoming = events
+    .filter((e) => e.event_date >= todayStr)
+    .sort((a, b) => a.event_date.localeCompare(b.event_date))
+    .slice(0, 6)
+
+  if (upcoming.length === 0) return null
+
   return (
-    <>
-      {events.map((ev) => {
-        const d = new Date(ev.event_date + 'T12:00:00')
-        const dayNum = d.getDate()
-        const dayName = DAY_NAMES[d.getDay()]
-        const isMultiDay = ev.event_end_date && ev.event_end_date !== ev.event_date
-        return (
-          <div key={ev.id} className="agenda-item" onClick={() => onSelect(ev)}>
-            <div className="agenda-date">
-              <div className="agenda-date-day">{dayNum}</div>
-              <div className="agenda-date-dow">{dayName}</div>
-            </div>
-            <div className="agenda-content">
-              <div className="agenda-title">{ev.title}</div>
-              <div className="agenda-meta">
-                {ev.organizer && <span className="agenda-organizer">{ev.organizer}</span>}
-                <span className="agenda-type-chip">{ev.event_type}</span>
+    <div className="upcoming-section">
+      <h2 className="upcoming-heading">Upcoming</h2>
+      <div className="upcoming-list">
+        {upcoming.map((ev) => {
+          const d = new Date(ev.event_date + 'T12:00:00')
+          const isMultiDay = ev.event_end_date && ev.event_end_date !== ev.event_date
+          return (
+            <div key={ev.id} className="upcoming-item" onClick={() => onSelect(ev)}>
+              <div className="upcoming-date">
+                <div className="upcoming-date-month">
+                  {d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
+                </div>
+                <div className="upcoming-date-day">{d.getDate()}</div>
               </div>
-              {ev.location_name && (
-                <div className="agenda-location">@ {ev.location_name}</div>
-              )}
-              {isMultiDay && (
-                <div className="agenda-multiday">through {formatDate(ev.event_end_date)}</div>
-              )}
+              <div className="upcoming-content">
+                <div className="upcoming-title">{ev.title}</div>
+                <div className="upcoming-meta">
+                  {ev.location_name && <span>{ev.location_name}</span>}
+                  {ev.location_name && ev.organizer && <span> · </span>}
+                  {ev.organizer && <span>{ev.organizer}</span>}
+                  {isMultiDay && <span className="upcoming-multiday"> · through {formatDate(ev.event_end_date)}</span>}
+                </div>
+              </div>
             </div>
-          </div>
-        )
-      })}
-    </>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -547,7 +545,7 @@ function CalendarGrid({
   return (
     <div className="cal-grid">
       <div className="cal-grid-dow">
-        {DAY_NAMES.map((d) => <div key={d} className="cal-grid-dow-cell">{d}</div>)}
+        {DAY_NAMES.map((d) => <div key={d} className="cal-grid-dow-cell">{d[0]}</div>)}
       </div>
       <div className="cal-grid-body">
         {cells.map((cell, i) => (
@@ -584,7 +582,7 @@ function CalendarGrid({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function SaveTheDatePage() {
   const today = new Date()
-  const [displayMode, setDisplayMode] = useState<DisplayMode>('list')
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('calendar')
   const [view, setView] = useState<ListView>('year')
   const [month, setMonth] = useState<number>(today.getMonth())
   const [year, setYear] = useState<number>(today.getFullYear())
@@ -656,6 +654,17 @@ export default function SaveTheDatePage() {
     else fetchYearEvents()
   }, [periodMode, fetchMonthEvents, fetchYearEvents])
 
+  // The "Upcoming" list under the calendar view needs events extending
+  // past the current month, so it piggybacks on the year fetch even
+  // while in calendar mode — cheap since it's already the shape needed
+  // for the year/list view too, just fetched once more if not already
+  // in memory for this year.
+  useEffect(() => {
+    if (displayMode === 'calendar' && yearEvents.length === 0) {
+      fetchYearEvents()
+    }
+  }, [displayMode, yearEvents.length, fetchYearEvents])
+
   function prevPeriod() {
     if (periodMode === 'year') { setYear((y) => y - 1); return }
     if (month === 0) { setMonth(11); setYear((y) => y - 1) }
@@ -665,6 +674,10 @@ export default function SaveTheDatePage() {
     if (periodMode === 'year') { setYear((y) => y + 1); return }
     if (month === 11) { setMonth(0); setYear((y) => y + 1) }
     else setMonth((m) => m + 1)
+  }
+  function goToToday() {
+    setMonth(today.getMonth())
+    setYear(today.getFullYear())
   }
 
   function toggleListPeriod() {
@@ -683,6 +696,8 @@ export default function SaveTheDatePage() {
   const displayLabel = periodMode === 'year' ? String(year) : `${MONTH_NAMES[month]} ${year}`
   const allEvents = periodMode === 'year' ? yearEvents : events
 
+  const isShowingCurrentMonth = periodMode === 'month' && month === today.getMonth() && year === today.getFullYear()
+
   return (
     <>
       <style>{`
@@ -693,42 +708,12 @@ export default function SaveTheDatePage() {
           --border: #E5E3DD;
           --serif: 'Oswald', sans-serif; --sans: 'DM Sans', system-ui, sans-serif;
         }
-        html, body { background: var(--white) !important; }
 
         .std-page {
           font-family: var(--sans);
-          max-width: 900px;
-          margin: 0 auto;
-          padding: 0 24px 80px;
+          width: 100%;
           color: var(--ink);
           -webkit-font-smoothing: antialiased;
-        }
-        .std-topnav {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 16px 0;
-          border-bottom: 1px solid var(--border);
-          margin-bottom: 32px;
-        }
-        .std-back {
-          font-family: var(--serif);
-          font-size: 0.72rem;
-          font-weight: 600;
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-          color: var(--ink-faint);
-          text-decoration: none;
-          transition: color 0.15s;
-        }
-        .std-back:hover { color: var(--ink); }
-        .std-page-label {
-          font-family: var(--serif);
-          font-size: 0.72rem;
-          font-weight: 600;
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-          color: var(--ink-faint);
         }
         .std-header {
           display: flex;
@@ -757,10 +742,8 @@ export default function SaveTheDatePage() {
           line-height: 1.05;
           color: var(--ink);
         }
-        .std-header p { font-size: 0.95rem; font-weight: 400; color: var(--ink-soft); max-width: 520px; line-height: 1.55; }
+        .std-header p { font-size: 0.95rem; font-weight: 400; color: var(--ink-soft); max-width: 620px; line-height: 1.55; }
 
-        /* Buttons — mockup treatment: yellow primary CTA, black text,
-           bold uppercase Oswald label, fully rounded pill corners. */
         .btn-primary {
           background: var(--yellow);
           color: #171614;
@@ -800,10 +783,10 @@ export default function SaveTheDatePage() {
           background: #fff;
           color: var(--ink);
           border: 1.5px solid var(--border);
-          padding: 8px 14px;
+          padding: 9px 16px;
           font-size: 13px;
           font-weight: 600;
-          border-radius: 7px;
+          border-radius: 8px;
           cursor: pointer;
           display: inline-flex;
           align-items: center;
@@ -812,24 +795,52 @@ export default function SaveTheDatePage() {
         }
         .btn-outline:hover { border-color: var(--ink-faint); background: var(--off); }
 
-        /* Mode toggle — Calendar / List */
-        .mode-toggle { display: inline-flex; gap: 2px; background: var(--off); border-radius: 8px; padding: 3px; margin-bottom: 16px; }
-        .mode-toggle-btn { font-family: var(--serif); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px 18px; border-radius: 6px; border: none; background: transparent; color: var(--ink-soft); cursor: pointer; transition: background 0.15s, color 0.15s; }
-        .mode-toggle-btn.active { background: var(--ink); color: #fff; }
+        /* Card wrapper — the whole calendar controls + grid now sit
+           inside one bordered card, matching the mockup's boxed look
+           (previously the controls floated loose above a separate grid). */
+        .cal-card {
+          border: 1.5px solid var(--border);
+          border-radius: 14px;
+          padding: 20px 24px;
+          margin-bottom: 8px;
+        }
 
-        .cal-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .cal-topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; flex-wrap: wrap; gap: 12px; }
+        .cal-topbar-left { display: flex; align-items: center; gap: 10px; }
+        .cal-nav { background: none; border: 1.5px solid var(--border); border-radius: 8px; width: 36px; height: 36px; cursor: pointer; font-size: 17px; display: flex; align-items: center; justify-content: center; transition: border-color 0.15s, background 0.15s; color: var(--ink); }
+        .cal-nav:hover { border-color: var(--ink-faint); background: var(--off); }
         .cal-month-label {
           font-family: var(--serif);
-          font-size: 22px;
+          font-size: 24px;
           font-weight: 700;
           letter-spacing: 0.02em;
           text-transform: uppercase;
-          min-width: 180px;
           color: var(--ink);
         }
-        .cal-nav { background: none; border: 1.5px solid var(--border); border-radius: 7px; width: 34px; height: 34px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: border-color 0.15s; color: var(--ink); }
-        .cal-nav:hover { border-color: var(--ink-faint); }
-        .view-toggle { background: none; border: 1.5px solid var(--border); border-radius: 7px; padding: 6px 14px; font-size: 13px; font-weight: 700; cursor: pointer; transition: border-color 0.15s, background 0.15s, color 0.15s; font-family: var(--serif); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); }
+        .cal-today-btn {
+          background: none;
+          border: 1.5px solid var(--border);
+          border-radius: 8px;
+          padding: 8px 16px;
+          font-family: var(--serif);
+          font-size: 0.72rem;
+          font-weight: 700;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: var(--ink);
+          cursor: pointer;
+          transition: border-color 0.15s, background 0.15s;
+        }
+        .cal-today-btn:hover:not(:disabled) { border-color: var(--ink-faint); background: var(--off); }
+        .cal-today-btn:disabled { opacity: 0.35; cursor: default; }
+
+        /* Mode toggle — Calendar / List */
+        .mode-toggle { display: inline-flex; gap: 2px; background: var(--off); border-radius: 8px; padding: 3px; margin: 16px 0; }
+        .mode-toggle-btn { font-family: var(--serif); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px 18px; border-radius: 6px; border: none; background: transparent; color: var(--ink-soft); cursor: pointer; transition: background 0.15s, color 0.15s; }
+        .mode-toggle-btn.active { background: var(--ink); color: #fff; }
+
+        .cal-controls-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+        .view-toggle { background: none; border: 1.5px solid var(--border); border-radius: 7px; padding: 7px 14px; font-size: 13px; font-weight: 700; cursor: pointer; transition: border-color 0.15s, background 0.15s, color 0.15s; font-family: var(--serif); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); }
         .view-toggle:hover { border-color: var(--ink-faint); }
         .view-toggle.active { background: var(--ink); border-color: var(--ink); color: #fff; }
         .download-group { margin-left: auto; display: flex; gap: 8px; }
@@ -870,29 +881,94 @@ export default function SaveTheDatePage() {
         .year-month-empty { font-size: 13px; font-weight: 500; color: var(--ink-faint); padding: 12px 0; font-style: italic; }
         .loading-state { padding: 40px 24px; text-align: center; color: var(--ink-faint); font-size: 14px; font-weight: 500; }
 
-        /* Calendar grid */
-        .cal-grid { border: 1.5px solid var(--border); border-radius: 12px; overflow: hidden; }
-        .cal-grid-loading { padding: 40px 24px; text-align: center; color: var(--ink-faint); font-size: 14px; font-weight: 500; border: 1.5px solid var(--border); border-radius: 12px; }
-        .cal-grid-dow { display: grid; grid-template-columns: repeat(7, 1fr); background: var(--off); border-bottom: 1px solid var(--border); }
-        .cal-grid-dow-cell { padding: 10px 8px; text-align: center; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em; color: var(--ink-faint); }
-        .cal-grid-body { display: grid; grid-template-columns: repeat(7, 1fr); }
-        .cal-grid-cell { min-height: 96px; padding: 8px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
-        .cal-grid-cell:nth-child(7n) { border-right: none; }
-        .cal-grid-cell-out { background: var(--off); }
+        /* Calendar grid — mockup treatment: lighter cell fill, yellow
+           chips instead of solid black, taller cells, tighter dow row. */
+        .cal-grid { border-radius: 12px; overflow: hidden; }
+        .cal-grid-loading { padding: 40px 24px; text-align: center; color: var(--ink-faint); font-size: 14px; font-weight: 500; }
+        .cal-grid-dow { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 6px; }
+        .cal-grid-dow-cell { padding: 6px 8px; text-align: center; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; color: var(--ink-faint); }
+        .cal-grid-body { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        .cal-grid-cell {
+          min-height: 108px;
+          padding: 8px;
+          border-radius: 8px;
+          background: var(--off);
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          transition: background 0.12s;
+        }
+        .cal-grid-cell-out { background: transparent; }
         .cal-grid-cell-out .cal-grid-daynum { color: var(--ink-faint); }
-        .cal-grid-cell-today { background: #fdf0f4; border: 1.5px solid var(--magenta); }
-        .cal-grid-daynum { font-size: 0.78rem; font-weight: 700; color: var(--ink); }
+        .cal-grid-cell-today { border: 1.5px solid var(--magenta); background: #fdf0f4; }
+        .cal-grid-daynum { font-size: 0.85rem; font-weight: 700; color: var(--ink); }
         .cal-grid-events { display: flex; flex-direction: column; gap: 3px; }
-        .cal-grid-chip { display: block; width: 100%; text-align: left; background: var(--ink); color: #fff; border: none; border-radius: 4px; padding: 2px 6px; font-size: 0.7rem; font-weight: 600; font-family: var(--sans); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .cal-grid-chip:hover { opacity: 0.85; }
+        .cal-grid-chip {
+          display: block;
+          width: 100%;
+          text-align: left;
+          background: var(--yellow);
+          color: #171614;
+          border: none;
+          border-radius: 5px;
+          padding: 3px 7px;
+          font-size: 0.7rem;
+          font-weight: 600;
+          font-family: var(--sans);
+          cursor: pointer;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          transition: background 0.12s;
+        }
+        .cal-grid-chip:hover { background: #e6b910; }
         .cal-grid-more { font-size: 0.66rem; font-weight: 600; color: var(--ink-faint); padding: 0 2px; }
-        @media (max-width: 640px) {
-          .cal-grid-cell { min-height: 70px; padding: 5px; }
+        @media (max-width: 900px) {
+          .cal-grid-cell { min-height: 80px; padding: 6px; }
           .cal-grid-chip { font-size: 0.62rem; }
         }
 
-        /* Modal — mockup treatment: larger radius, cleaner label sizing,
-           rounder inputs, and the yellow/black button pairing. */
+        /* Upcoming list — new section under calendar view */
+        .upcoming-section { margin-top: 32px; }
+        .upcoming-heading {
+          font-family: var(--serif);
+          font-size: 1.5rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.01em;
+          margin-bottom: 16px;
+          color: var(--ink);
+        }
+        .upcoming-list { display: flex; flex-direction: column; gap: 10px; }
+        .upcoming-item {
+          display: grid;
+          grid-template-columns: 64px 1fr;
+          align-items: center;
+          gap: 16px;
+          border: 1.5px solid var(--border);
+          border-radius: 12px;
+          padding: 14px 18px;
+          cursor: pointer;
+          transition: border-color 0.12s, background 0.12s;
+        }
+        .upcoming-item:hover { border-color: var(--ink-faint); background: var(--off); }
+        .upcoming-date {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background: var(--ink);
+          border-radius: 8px;
+          padding: 8px 4px;
+          color: #fff;
+        }
+        .upcoming-date-month { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; color: #9A968C; }
+        .upcoming-date-day { font-family: var(--serif); font-size: 1.15rem; font-weight: 700; line-height: 1.1; }
+        .upcoming-content { min-width: 0; }
+        .upcoming-title { font-size: 15px; font-weight: 600; color: var(--ink); }
+        .upcoming-meta { margin-top: 2px; font-size: 13px; color: var(--ink-soft); }
+        .upcoming-multiday { font-style: italic; }
+
         .modal-backdrop { position: fixed; inset: 0; background: rgba(23,22,20,0.55); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
         .modal { background: #fff; border-radius: 16px; width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,0.2); }
         .modal-detail { max-width: 520px; }
@@ -951,19 +1027,14 @@ export default function SaveTheDatePage() {
           .std-header { flex-direction: column; }
           .form-grid { grid-template-columns: 1fr; }
           .form-group.full { grid-column: 1; }
-          .download-group { margin-left: 0; }
-          .cal-controls { gap: 6px; }
+          .cal-card { padding: 14px 16px; }
+          .cal-controls-row { gap: 6px; }
           .download-group { margin-left: 0; margin-top: 10px; width: 100%; justify-content: flex-start; }
-          .std-page { padding: 0 16px 60px; }
+          .upcoming-item { grid-template-columns: 52px 1fr; padding: 12px 14px; }
         }
       `}</style>
 
       <div className="std-page">
-        <div className="std-topnav">
-          <a href="/dashboard" className="std-back">← Dashboard</a>
-          <span className="std-page-label">Save The Date</span>
-        </div>
-
         <div className="std-header">
           <div>
             <span className="std-eyebrow">Planning</span>
@@ -982,105 +1053,181 @@ export default function SaveTheDatePage() {
           </button>
         </div>
 
-        <div className="mode-toggle">
-          <button
-            className={`mode-toggle-btn${displayMode === 'calendar' ? ' active' : ''}`}
-            onClick={() => setDisplayMode('calendar')}
-          >
-            Calendar
-          </button>
-          <button
-            className={`mode-toggle-btn${displayMode === 'list' ? ' active' : ''}`}
-            onClick={() => setDisplayMode('list')}
-          >
-            List
-          </button>
-        </div>
-
-        <div className="cal-controls">
-          <button className="cal-nav" onClick={prevPeriod}>‹</button>
-          {displayMode === 'list' && (
-            <button
-              className={`view-toggle${view === 'year' ? ' active' : ''}`}
-              onClick={toggleListPeriod}
-            >
-              Year
-            </button>
-          )}
-          <button className="cal-nav" onClick={nextPeriod}>›</button>
-          <span className="cal-month-label">{displayLabel}</span>
-          <div className="download-group">
-            <button className="btn-outline" onClick={() => downloadCSV(allEvents)}>⬇ CSV</button>
-            <button className="btn-outline" onClick={() => downloadPDF(allEvents, displayLabel)}>⬇ PDF</button>
+        <div className="cal-card">
+          <div className="cal-topbar">
+            <div className="cal-topbar-left">
+              <button className="cal-nav" onClick={prevPeriod} aria-label="Previous">‹</button>
+              <button className="cal-nav" onClick={nextPeriod} aria-label="Next">›</button>
+              <span className="cal-month-label">{displayLabel}</span>
+            </div>
+            {displayMode === 'calendar' && (
+              <button className="cal-today-btn" onClick={goToToday} disabled={isShowingCurrentMonth}>
+                Today
+              </button>
+            )}
           </div>
-        </div>
 
-        {displayMode === 'calendar' && (
-          <CalendarGrid
-            month={month}
-            year={year}
-            events={events}
-            loading={loading}
-            onSelect={setSelectedEvent}
-          />
-        )}
+          <div className="cal-controls-row">
+            <div className="mode-toggle" style={{ margin: 0 }}>
+              <button
+                className={`mode-toggle-btn${displayMode === 'calendar' ? ' active' : ''}`}
+                onClick={() => setDisplayMode('calendar')}
+              >
+                Calendar
+              </button>
+              <button
+                className={`mode-toggle-btn${displayMode === 'list' ? ' active' : ''}`}
+                onClick={() => setDisplayMode('list')}
+              >
+                List
+              </button>
+            </div>
+            {displayMode === 'list' && (
+              <button
+                className={`view-toggle${view === 'year' ? ' active' : ''}`}
+                onClick={toggleListPeriod}
+              >
+                Year
+              </button>
+            )}
+            <div className="download-group">
+              <button className="btn-outline" onClick={() => downloadCSV(allEvents)}>⬇ CSV</button>
+              <button className="btn-outline" onClick={() => downloadPDF(allEvents, displayLabel)}>⬇ PDF</button>
+            </div>
+          </div>
 
-        {displayMode === 'list' && view === 'month' && (
-          <div className="agenda-list">
-            <AgendaList
+          {displayMode === 'calendar' && (
+            <CalendarGrid
+              month={month}
+              year={year}
               events={events}
               loading={loading}
-              emptyLabel={`No events saved for ${MONTH_NAMES[month]} ${year}`}
               onSelect={setSelectedEvent}
             />
-          </div>
-        )}
+          )}
 
-        {displayMode === 'list' && view === 'year' && (
-          loading ? (
+          {displayMode === 'list' && view === 'month' && (
             <div className="agenda-list">
-              <div className="loading-state">Loading events…</div>
+              <AgendaList
+                events={events}
+                loading={loading}
+                emptyLabel={`No events saved for ${MONTH_NAMES[month]} ${year}`}
+                onSelect={setSelectedEvent}
+              />
             </div>
-          ) : (
-            MONTH_NAMES.map((mName, mIdx) => {
-              const mEvents = byMonth[mIdx] || []
-              return (
-                <div key={mIdx} className="year-month-section">
-                  <div className="year-month-heading">
-                    {mName}
-                    {mEvents.length > 0 && (
-                      <span className="year-month-count">{mEvents.length} event{mEvents.length !== 1 ? 's' : ''}</span>
+          )}
+
+          {displayMode === 'list' && view === 'year' && (
+            loading ? (
+              <div className="agenda-list">
+                <div className="loading-state">Loading events…</div>
+              </div>
+            ) : (
+              MONTH_NAMES.map((mName, mIdx) => {
+                const mEvents = byMonth[mIdx] || []
+                return (
+                  <div key={mIdx} className="year-month-section">
+                    <div className="year-month-heading">
+                      {mName}
+                      {mEvents.length > 0 && (
+                        <span className="year-month-count">{mEvents.length} event{mEvents.length !== 1 ? 's' : ''}</span>
+                      )}
+                    </div>
+                    {mEvents.length === 0 ? (
+                      <div className="year-month-empty">No events</div>
+                    ) : (
+                      <div className="agenda-list">
+                        <AgendaList
+                          events={mEvents}
+                          loading={false}
+                          emptyLabel=""
+                          onSelect={setSelectedEvent}
+                        />
+                      </div>
                     )}
                   </div>
-                  {mEvents.length === 0 ? (
-                    <div className="year-month-empty">No events</div>
-                  ) : (
-                    <div className="agenda-list">
-                      <AgendaList
-                        events={mEvents}
-                        loading={false}
-                        emptyLabel=""
-                        onSelect={setSelectedEvent}
-                      />
-                    </div>
-                  )}
-                </div>
-              )
-            })
-          )
+                )
+              })
+            )
+          )}
+        </div>
+
+        {/* Upcoming list — only shown in Calendar mode, mirrors the mockup */}
+        {displayMode === 'calendar' && (
+          <UpcomingList events={yearEvents} onSelect={setSelectedEvent} />
         )}
       </div>
 
       {showAdd && (
         <AddEventModal
           onClose={() => setShowAdd(false)}
-          onSuccess={() => periodMode === 'month' ? fetchMonthEvents() : fetchYearEvents()}
+          onSuccess={() => {
+            if (periodMode === 'month') fetchMonthEvents()
+            else fetchYearEvents()
+            // Keep the Upcoming list's source data fresh too, since it
+            // always reads from yearEvents regardless of period mode.
+            fetchYearEvents()
+          }}
           prefill={prefill}
         />
       )}
       {selectedEvent && (
         <EventDetailModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
       )}
+    </>
+  )
+}
+
+// ─── Agenda List (unchanged) ────────────────────────────────────────────────
+function AgendaList({
+  events,
+  loading,
+  emptyLabel,
+  onSelect,
+}: {
+  events: SaveTheDate[]
+  loading: boolean
+  emptyLabel: string
+  onSelect: (e: SaveTheDate) => void
+}) {
+  if (loading) return <div className="loading-state">Loading events…</div>
+  if (events.length === 0) {
+    return (
+      <div className="agenda-empty">
+        <strong>{emptyLabel}</strong>
+        Be the first to claim a date!
+      </div>
+    )
+  }
+  return (
+    <>
+      {events.map((ev) => {
+        const d = new Date(ev.event_date + 'T12:00:00')
+        const dayNum = d.getDate()
+        const dayName = DAY_NAMES[d.getDay()]
+        const isMultiDay = ev.event_end_date && ev.event_end_date !== ev.event_date
+        return (
+          <div key={ev.id} className="agenda-item" onClick={() => onSelect(ev)}>
+            <div className="agenda-date">
+              <div className="agenda-date-day">{dayNum}</div>
+              <div className="agenda-date-dow">{dayName}</div>
+            </div>
+            <div className="agenda-content">
+              <div className="agenda-title">{ev.title}</div>
+              <div className="agenda-meta">
+                {ev.organizer && <span className="agenda-organizer">{ev.organizer}</span>}
+                <span className="agenda-type-chip">{ev.event_type}</span>
+              </div>
+              {ev.location_name && (
+                <div className="agenda-location">@ {ev.location_name}</div>
+              )}
+              {isMultiDay && (
+                <div className="agenda-multiday">through {formatDate(ev.event_end_date)}</div>
+              )}
+            </div>
+          </div>
+        )
+      })}
     </>
   )
 }
