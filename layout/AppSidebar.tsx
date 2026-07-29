@@ -23,12 +23,12 @@ import type { HeaderUser } from '@/app/dashboard/DashboardShell'
 /**
  * Sidebar — always-dark, always-static shell.
  *
- * Change in this version: the logo now links to the public site ("/")
- * instead of "/dashboard". On mobile there was previously no way back to
- * the regular site once you were in the dashboard — no visible nav item
- * pointed there. Logo-as-home-link is a common pattern but easy to miss,
- * so there's also now an explicit small "Back to site" link right below
- * it for anyone who wouldn't think to tap the logo.
+ * Logo links to the public site ("/") — unchanged from before.
+ *
+ * CHANGE (this pass): the bottom identity row no longer shows the
+ * phone/email line under the user's name — just avatar, name, and the
+ * sign-out icon button. Simpler, and avoids showing a phone number in
+ * a nav element that's visible on every dashboard page.
  */
 
 const LOGO_WHITE =
@@ -250,7 +250,7 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
           lg:w-[290px] lg:translate-x-0
         `}
       >
-        {/* Logo — now links to the public site, not /dashboard */}
+        {/* Logo — links to the public site, unchanged */}
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
           <Link href="/" className="flex items-center" onClick={closeMobileMenu}>
             <Image
@@ -272,9 +272,7 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
           </button>
         </div>
 
-        {/* Explicit "back to site" link — the logo alone is an easy-to-miss
-            affordance, so this spells it out for anyone who wouldn't
-            think to tap it. */}
+        {/* Explicit "back to site" link */}
         <div className="border-b border-white/10 px-4 py-2.5">
           <Link
             href="/"
@@ -349,11 +347,11 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
                   </span>
                 )}
               </div>
+              {/* Name only — phone/email line removed per request */}
               <div className="min-w-0 flex-1">
                 <div className="truncate font-display text-sm font-bold uppercase tracking-wide text-white">
                   {headerUser?.fullName}
                 </div>
-                <div className="truncate text-xs text-gray-500">{headerUser?.phoneOrEmail}</div>
               </div>
               <button
                 onClick={handleLogout}
