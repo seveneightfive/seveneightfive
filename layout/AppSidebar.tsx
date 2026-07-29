@@ -1,39 +1,35 @@
 'use client'
 import React, { useState, useCallback } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSidebar } from '@/context/SidebarContext'
 import { useTheme } from '@/context/ThemeContext'
 import { createClient } from '@/lib/supabaseBrowser'
-import { X, Phone, LogOut, Moon, Sun } from 'lucide-react'
+import { X, LogOut, Moon, Sun } from 'lucide-react'
 import ContactModal from '@/components/common/ContactModal'
 import type { HeaderUser } from '@/app/dashboard/DashboardShell'
 
 /**
- * Sidebar — rebuilt to match the mockup's visual language while keeping
- * this codebase's actual logo, routes, and Supabase-driven auth/user data.
+ * Sidebar — matches the mockup's full visual spec this pass:
  *
- * What changed vs. the previous version:
- *  - Flat single-level nav (no "Creator Hub" / "Account" section headers,
- *    no collapsible submenus) — matches the mockup's 5-item list.
- *  - Active item is a solid yellow pill with black text, plus a thin
- *    magenta accent bar on the left edge (mockup detail) — replaces the
- *    old translucent-brand-ring active state.
- *  - Dark Mode row now uses a moon/sun icon + a real pill toggle switch
- *    instead of a plain button, matching the mockup's switch control.
- *  - "My Tickets" / "Following" / "Contact 785" (previously a separate
- *    "Account" group) are folded into the same flat list, since the
- *    mockup doesn't have a second grouped section. Payouts and Settings
- *    stay as-is.
- *  - Logo is untouched — still your existing image, still links to "/".
- *    No yellow badge added (kept as your actual logo per your last note).
- *  - User row: avatar + name + sign-out icon only, no phone/email line
- *    (unchanged from the previous pass).
+ *  - Brand block: 36×36 yellow rounded-square badge with "785" in black,
+ *    plus "SEVENEIGHTFIVE" wordmark and a small magenta dot, replacing
+ *    the plain logo image. Still links to "/". (Per explicit request
+ *    this time — the earlier "keep the plain logo" instruction is
+ *    superseded by this pass's reference screenshot.)
+ *  - Nav items: stronger Oswald weight, more letter-spacing, more
+ *    vertical breathing room between items — matches the mockup's
+ *    denser-but-clearer type treatment.
+ *  - Footer block added: a "Contact" link (opens the existing
+ *    ContactModal, same one previously reachable from the nav list)
+ *    plus a copyright line, pinned below the user row. Terms/Privacy/
+ *    Help are left out — those pages don't exist on the site yet, so
+ *    there's nothing real to link to. Add them here once they do.
+ *  - Dark Mode row and user row (avatar + name + sign-out, no phone)
+ *    unchanged from the previous pass.
+ *  - No top AppHeader bar anymore (removed in DashboardShell) — the
+ *    sidebar is now the only persistent chrome, matching the mockup.
  */
-
-const LOGO_WHITE =
-  'https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785-Splash-512-White.png'
 
 type NavItem = {
   name: string
@@ -49,7 +45,6 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
   const [contactOpen, setContactOpen] = useState(false)
   const isGuest = !headerUser
 
-  // Flat nav — matches the mockup's single list, no grouping headers.
   const navItems: NavItem[] = [
     { name: 'My Pages', path: '/dashboard/pages' },
     { name: 'Save the Date', path: '/dashboard/save-the-date' },
@@ -59,7 +54,6 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
     { name: 'Following', path: '/dashboard/following' },
     { name: 'Payouts', path: '/dashboard/payouts' },
     { name: 'Settings', path: '/dashboard/settings' },
-    { name: 'Contact 785', onClick: () => setContactOpen(true) },
   ]
 
   const isActive = useCallback(
@@ -90,23 +84,21 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
       )}
 
       <aside
-        className={`fixed top-0 left-0 z-50 flex h-screen flex-col border-r border-white/10 bg-gray-950 transition-transform duration-300 ease-in-out
+        className={`fixed top-0 left-0 z-50 flex h-screen flex-col bg-gray-950 transition-transform duration-300 ease-in-out
           ${isMobileOpen ? 'w-screen max-w-none translate-x-0' : 'w-[290px] -translate-x-full'}
           lg:w-[290px] lg:translate-x-0
         `}
       >
-        {/* Logo — unchanged image, links to public site */}
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
-          <Link href="/" className="flex items-center" onClick={closeMobileMenu}>
-            <Image
-              src={LOGO_WHITE}
-              alt="785 Magazine — back to seveneightfive.com"
-              width={140}
-              height={56}
-              priority
-              unoptimized
-              className="h-11 w-auto"
-            />
+        {/* Brand block — yellow "785" badge + wordmark, mockup style */}
+        <div className="flex items-center justify-between px-5 py-6">
+          <Link href="/" className="flex items-center gap-3" onClick={closeMobileMenu}>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-500">
+              <span className="font-display text-[15px] font-bold text-gray-950">785</span>
+            </span>
+            <span className="flex items-center gap-1.5 font-display text-[17px] font-bold tracking-[0.16em] text-white">
+              SEVENEIGHTFIVE
+              <span className="mb-2 h-[7px] w-[7px] rounded-full bg-brand-600" />
+            </span>
           </Link>
           <button
             onClick={() => toggleMobileSidebar()}
@@ -117,20 +109,19 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
           </button>
         </div>
 
-        {/* Nav — flat list, mockup active-state treatment */}
-        <div className="no-scrollbar flex flex-1 flex-col overflow-y-auto px-4 py-6">
-          <ul className="flex flex-col gap-1">
+        {/* Nav — flat list, stronger Oswald weight + more spacing */}
+        <div className="no-scrollbar flex flex-1 flex-col overflow-y-auto px-4 py-2">
+          <ul className="flex flex-col gap-2">
             {navItems.map((nav) => {
               const active = nav.path ? isActive(nav.path) : false
               const baseCls =
-                'relative flex w-full items-center rounded-md px-3 py-2.5 text-left font-display text-[13px] font-semibold uppercase tracking-[0.08em] transition-colors'
+                'relative flex w-full items-center rounded-md px-3 py-3 text-left font-display text-[14px] font-bold uppercase tracking-[0.1em] transition-colors'
               const activeCls = active
                 ? 'bg-accent-500 text-gray-950'
                 : 'text-white/70 hover:bg-white/5 hover:text-white'
 
               const content = (
                 <>
-                  {/* Magenta accent bar on the active item's left edge */}
                   <span
                     className={`absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-brand-600 transition-opacity ${
                       active ? 'opacity-100' : 'opacity-0'
@@ -172,11 +163,11 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
           </ul>
         </div>
 
-        {/* Dark Mode row — moon/sun icon + pill switch, mockup style */}
+        {/* Dark Mode row */}
         <div className="border-t border-white/10 px-4 py-4">
           <button
             onClick={toggleTheme}
-            className="mb-3 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/85 transition-colors hover:bg-white/5"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/85 transition-colors hover:bg-white/5"
           >
             {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             <span className="flex-1 text-left">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
@@ -192,7 +183,10 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
               />
             </span>
           </button>
+        </div>
 
+        {/* User row */}
+        <div className="border-t border-white/10 px-4 py-4">
           {isGuest ? (
             <div className="flex gap-2">
               <Link
@@ -209,7 +203,7 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
               </Link>
             </div>
           ) : (
-            <div className="flex items-center gap-3 border-t border-white/10 pt-4">
+            <div className="flex items-center gap-3">
               <div
                 className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full ${
                   headerUser?.avatarUrl ? '' : 'bg-brand-600'
@@ -228,7 +222,6 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
                   </span>
                 )}
               </div>
-              {/* Name only — no phone/email line */}
               <div className="min-w-0 flex-1">
                 <div className="truncate font-display text-sm font-bold uppercase tracking-wide text-white">
                   {headerUser?.fullName}
@@ -243,6 +236,25 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
               </button>
             </div>
           )}
+        </div>
+
+        {/* Footer — Contact opens the existing modal (reused from the nav
+            list above). Terms/Privacy/Help omitted: those pages don't
+            exist on the site yet, so there's nothing to link to until
+            they're built. Add them here once real routes exist. */}
+        <div className="border-t border-white/10 px-5 py-5">
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-500">
+            <button
+              type="button"
+              onClick={() => setContactOpen(true)}
+              className="transition hover:text-gray-300"
+            >
+              Contact
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-gray-600">
+            © {new Date().getFullYear()} Seveneightfive.
+          </p>
         </div>
       </aside>
 
