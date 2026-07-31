@@ -24,6 +24,7 @@ const HIDE_MOBILE_HEADER_PATHS = [
   '/events',
   '/artists',
   '/venues',
+  '/magazine',
 ]
 
 // Of those, the browse (non-home) pages also replace the desktop topnav —
