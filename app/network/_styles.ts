@@ -12,6 +12,15 @@ export const NETWORK_BASE_STYLES = `
   }
   html, body { background: var(--white) !important; }
 
+  /* Defensive guard against the mobile "shift right" on first check-in/
+     connect: any transient element (autofocus keyboard, live search
+     results, etc.) that's briefly wider than the viewport before layout
+     settles can otherwise create real horizontal scroll room. Pinning
+     overflow-x here means that room simply can't exist, on this subtree,
+     regardless of which element caused it. */
+  html, body { overflow-x: hidden; max-width: 100vw; }
+  * { box-sizing: border-box; }
+
   .net-page {
     font-family: var(--sans);
     max-width: 900px;
@@ -19,6 +28,7 @@ export const NETWORK_BASE_STYLES = `
     padding: 32px 24px 80px;
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
   }
   .net-topbar {
     width: 100%;
@@ -72,6 +82,17 @@ export const NETWORK_BASE_STYLES = `
     transition: border-color 0.15s, background 0.15s;
   }
   .btn-outline:hover { border-color: var(--ink-faint); background: var(--off); }
+
+  /* Bottom-of-page nav CTAs (Connect → Live, Live → Map, Map → Insights):
+     full width on mobile so it's an easy thumb target, auto-width and
+     centered once there's room to spare. */
+  .net-cta-block {
+    display: block; text-align: center; text-decoration: none;
+    margin-top: 28px; width: 100%; box-sizing: border-box;
+  }
+  @media (min-width: 560px) {
+    .net-cta-block { width: auto; max-width: 320px; margin-left: auto; margin-right: auto; }
+  }
 
   .chip {
     font-size: 0.66rem; font-weight: 700; letter-spacing: 0.06em;
