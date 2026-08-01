@@ -23,7 +23,7 @@ const MUSIC_ROLE_SLUGS = ['musician', 'ensemble_member', 'dj']
 const GENRES = [
   'Rock', 'Pop', 'Jazz', 'Classical', 'Electronic', 'Hip-Hop', 'Country',
   'Reggae', 'Blues', 'Folk', 'Singer-Songwriter', 'Spoken Word', 'Motown',
-  'Funk', 'Americana', 'Punk', 'Grunge', 'Jam Band', 'Tejano', 'Latin',
+  'Funk', 'Americana', 'Punk', 'Metal', 'Grunge', 'Jam Band', 'Tejano', 'Latin',
   'DJ', 'Bluegrass', 'Rap',
 ]
 
