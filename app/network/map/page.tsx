@@ -22,6 +22,9 @@ const ROLE_COLORS: Record<string, string> = {
   journalist: '#a2673e',
   record_store: '#da1e28',
   sound_engineer: '#6b6560',
+  educator: '#1192e8',
+  lyricist_poet: '#9f1853',
+  instrument_repair: '#005d5d',
 }
 const DEFAULT_COLOR = '#8a847d'
 
