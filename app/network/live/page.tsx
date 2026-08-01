@@ -25,25 +25,32 @@ interface RecentConnection {
   type_label: string
   created_at: string
 }
+interface RolePersonCount {
+  role_label: string
+  person_count: number
+}
 
 export default function LiveDashboardPage() {
   const [summary, setSummary] = useState<Summary | null>(null)
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([])
   const [byRole, setByRole] = useState<RoleCount[]>([])
   const [recent, setRecent] = useState<RecentConnection[]>([])
+  const [rolePersonCounts, setRolePersonCounts] = useState<RolePersonCount[]>([])
   const [loading, setLoading] = useState(true)
 
   const loadAll = useCallback(async () => {
-    const [summaryRes, leaderboardRes, byRoleRes, recentRes] = await Promise.all([
+    const [summaryRes, leaderboardRes, byRoleRes, recentRes, rolePersonCountsRes] = await Promise.all([
       supabase.rpc('network_summary').single(),
       supabase.rpc('connection_leaderboard'),
       supabase.rpc('connections_by_role'),
       supabase.rpc('recent_connections', { limit_count: 8 }),
+      supabase.rpc('roles_person_counts'),
     ])
     if (summaryRes.data) setSummary(summaryRes.data as Summary)
     if (leaderboardRes.data) setLeaderboard((leaderboardRes.data as LeaderboardRow[]).slice(0, 5))
     if (byRoleRes.data) setByRole(byRoleRes.data as RoleCount[])
     if (recentRes.data) setRecent(recentRes.data as RecentConnection[])
+    if (rolePersonCountsRes.data) setRolePersonCounts(rolePersonCountsRes.data as RolePersonCount[])
     setLoading(false)
   }, [])
 
@@ -55,6 +62,7 @@ export default function LiveDashboardPage() {
       .channel('network-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'connections' }, () => loadAll())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'event_people' }, () => loadAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_people_roles' }, () => loadAll())
       .subscribe()
 
     return () => {
@@ -93,7 +101,7 @@ export default function LiveDashboardPage() {
 
         <div className="net-header">
           <h1>The Room, Right Now</h1>
-          <p>Updates live as people check in and connect</p>
+          <p>Updates live as people check in and log connections</p>
         </div>
 
         {loading ? (
@@ -143,6 +151,10 @@ export default function LiveDashboardPage() {
                 )}
 
                 <h3 style={{ ...sectionHeadingStyle, marginTop: 24 }}>Connections by Role</h3>
+                <p style={{ fontSize: 12, color: 'var(--ink-faint)', marginBottom: 10 }}>
+                  Only roles with at least one logged connection show up here — a role stays off this
+                  list until someone holding it connects with someone.
+                </p>
                 {byRole.length === 0 ? (
                   <div className="empty-state" style={{ padding: '24px 12px' }}>No data yet.</div>
                 ) : (
@@ -160,7 +172,7 @@ export default function LiveDashboardPage() {
               </div>
 
               <div>
-                <h3 style={sectionHeadingStyle}>Recent Connections</h3>
+                <h3 style={sectionHeadingStyle}>New Connections Tonight</h3>
                 {recent.length === 0 ? (
                   <div className="empty-state" style={{ padding: '24px 12px' }}>Nothing logged yet.</div>
                 ) : (
@@ -177,6 +189,34 @@ export default function LiveDashboardPage() {
                 )}
               </div>
             </div>
+
+            <h3 style={{ ...sectionHeadingStyle, marginTop: 36 }}>All Roles Tonight</h3>
+            <p style={{ fontSize: 12, color: 'var(--ink-faint)', marginBottom: 10 }}>
+              Every role currently in the system and how many checked-in people hold it — including
+              roles nobody&apos;s picked yet.
+            </p>
+            <div style={{ border: '1.5px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 28 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+                <thead>
+                  <tr style={{ background: 'var(--off)' }}>
+                    <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: 600, fontSize: 12, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>Role</th>
+                    <th style={{ textAlign: 'right', padding: '10px 14px', fontWeight: 600, fontSize: 12, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>People</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rolePersonCounts.map((r, i) => (
+                    <tr key={r.role_label} style={{ borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px 14px' }}>{r.role_label}</td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600 }}>{r.person_count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <a href="/network/map" className="btn-primary net-cta-block">
+              See the Network Map →
+            </a>
           </>
         )}
       </div>
