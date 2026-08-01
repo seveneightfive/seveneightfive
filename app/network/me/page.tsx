@@ -102,7 +102,7 @@ export default function MyConnectionsPage() {
       <div className="net-topbar">
         <div className="net-topbar-inner">
           <a href="/network" className="net-back">← Network</a>
-          <span className="net-page-label">My Connections</span>
+          <span className="net-page-label">My Music Connections</span>
         </div>
       </div>
 
@@ -173,7 +173,7 @@ export default function MyConnectionsPage() {
             {connectedTo.length === 0 ? (
               <div className="empty-state">
                 No connections logged yet — head to{' '}
-                <a href="/network/connect" style={{ color: 'var(--accent)' }}>Connections</a> to add some.
+                <a href="/network/connect" style={{ color: 'var(--accent)' }}>Connect</a> to add some.
               </div>
             ) : (
               <>

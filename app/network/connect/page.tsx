@@ -56,7 +56,7 @@ export default function ConnectPage() {
       <div className="net-topbar">
         <div className="net-topbar-inner">
           <a href="/network" className="net-back">← Network</a>
-          <span className="net-page-label">Connections</span>
+          <span className="net-page-label">Connect</span>
         </div>
       </div>
 

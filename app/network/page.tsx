@@ -10,8 +10,8 @@ interface LinkTile {
 }
 
 const BASE_LINKS: LinkTile[] = [
-  { href: '/network/connect', title: 'Connections', description: "See who's here tonight and log how you know each other." },
-  { href: '/network/me', title: 'My Connections', description: 'Your personal stats — connections, genres bridged, and your community rank.' },
+  { href: '/network/connect', title: 'Connect', description: "See who's here tonight and log how you know each other." },
+  { href: '/network/me', title: 'My Music Connections', description: 'Your personal stats — connections, genres bridged, and your community rank.' },
   { href: '/network/live', title: 'Live Dashboard', description: 'Live totals, leaderboard, and activity as the room fills in.' },
   { href: '/network/map', title: 'Network Map', description: 'Everyone tonight, plotted as a connected graph.' },
   { href: '/network/insights', title: 'Network Insights', description: 'Which roles and genres are most interconnected across the scene.' },
@@ -42,7 +42,7 @@ export default function NetworkHubPage() {
           {
             href: '/network/me',
             title: `Welcome back, ${meName.split(' ')[0]}`,
-            description: "You're checked in. Tap here for your stats, or head straight to Connections.",
+            description: "You're checked in. Tap here for your stats, or head straight to Connect.",
           },
           ...BASE_LINKS,
         ]
