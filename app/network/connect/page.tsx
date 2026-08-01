@@ -12,38 +12,89 @@ interface Attendee {
   connected: boolean
   connection_type_slugs: string[]
 }
+interface LeaderboardRow {
+  person_id: string
+  name: string
+  connection_count: number
+}
+interface GenreBridge {
+  person_id: string
+  name: string
+  genres_bridged: number
+}
 
-// Matches the six connection_types slugs in Supabase. If you rename or add
-// types in the `connection_types` table, update this list to match.
-const CONNECTION_TYPE_OPTIONS = [
-  { slug: 'played_together', label: 'Performed with them' },
-  { slug: 'organized_event', label: 'Organized an event together' },
-  { slug: 'recording', label: 'Recorded together' },
-  { slug: 'shared_bill', label: 'Shared a bill' },
-  { slug: 'behind_scenes', label: 'Worked behind the scenes together' },
-  { slug: 'collaborated', label: 'Collaborated in any music-related way' },
-]
-
-export default function ConnectPage() {
-  const [meId, setMeId] = useState<string | null | undefined>(undefined) // undefined = not checked yet
-  const [attendees, setAttendees] = useState<Attendee[]>([])
+export default function MyConnectionsPage() {
+  const [meId, setMeId] = useState<string | null | undefined>(undefined)
+  const [meName, setMeName] = useState('')
   const [loading, setLoading] = useState(true)
-  const [activeAttendee, setActiveAttendee] = useState<Attendee | null>(null)
 
-  useEffect(() => {
-    setMeId(localStorage.getItem('network_person_id'))
-  }, [])
+  const [connectedTo, setConnectedTo] = useState<Attendee[]>([])
+  const [avgDegrees, setAvgDegrees] = useState<number | null>(null)
+  const [rank, setRank] = useState<number | null>(null)
+  const [totalRanked, setTotalRanked] = useState<number>(0)
+  const [genresBridged, setGenresBridged] = useState<number>(0)
+  const [furthest, setFurthest] = useState<{ names: string[]; depth: number } | null>(null)
 
-  const loadAttendees = useCallback(async (id: string) => {
+  const loadStats = useCallback(async (id: string) => {
     setLoading(true)
-    const { data, error } = await supabase.rpc('get_attendees_with_connection_status', { me_id: id })
-    if (!error) setAttendees((data as Attendee[]) ?? [])
+    const [attendeesRes, avgRes, leaderboardRes, genreRes, furthestRes] = await Promise.all([
+      supabase.rpc('get_attendees_with_connection_status', { me_id: id }),
+      supabase.rpc('avg_degrees_from', { start_id: id }),
+      supabase.rpc('connection_leaderboard'),
+      supabase.rpc('genre_bridge_scores'),
+      supabase.rpc('furthest_connections_from', { start_id: id }),
+    ])
+
+    if (attendeesRes.data) {
+      const all = attendeesRes.data as Attendee[]
+      setConnectedTo(all.filter((a) => a.connected))
+    }
+    if (avgRes.data !== null && avgRes.data !== undefined) {
+      setAvgDegrees(Number(avgRes.data))
+    } else {
+      setAvgDegrees(null)
+    }
+    if (leaderboardRes.data) {
+      const board = leaderboardRes.data as LeaderboardRow[]
+      setTotalRanked(board.filter((b) => b.connection_count > 0).length)
+      const idx = board.findIndex((b) => b.person_id === id)
+      setRank(idx >= 0 && board[idx].connection_count > 0 ? idx + 1 : null)
+    }
+    if (genreRes.data) {
+      const bridges = genreRes.data as GenreBridge[]
+      const mine = bridges.find((b) => b.person_id === id)
+      setGenresBridged(mine?.genres_bridged ?? 0)
+    }
+    if (furthestRes.data && (furthestRes.data as { name: string; depth: number }[]).length > 0) {
+      const rows = furthestRes.data as { name: string; depth: number }[]
+      setFurthest({ names: rows.map((r) => r.name), depth: rows[0].depth })
+    } else {
+      setFurthest(null)
+    }
     setLoading(false)
   }, [])
 
   useEffect(() => {
-    if (meId) loadAttendees(meId)
-  }, [meId, loadAttendees])
+    const id = localStorage.getItem('network_person_id')
+    const nm = localStorage.getItem('network_person_name')
+    setMeId(id)
+    setMeName(nm ?? '')
+  }, [])
+
+  useEffect(() => {
+    if (meId) loadStats(meId)
+  }, [meId, loadStats])
+
+  // Tally connections by role — a person with multiple roles counts toward
+  // each of them, matching how the roles were captured at check-in.
+  const roleCounts: Record<string, number> = {}
+  connectedTo.forEach((a) => {
+    a.role_labels.forEach((label) => {
+      roleCounts[label] = (roleCounts[label] ?? 0) + 1
+    })
+  })
+  const roleCountEntries = Object.entries(roleCounts).sort((a, b) => b[1] - a[1])
+  const distinctRolesConnected = roleCountEntries.length
 
   return (
     <>
@@ -51,7 +102,7 @@ export default function ConnectPage() {
       <div className="net-page">
         <div className="net-topnav">
           <a href="/network" className="net-back">← Network</a>
-          <span className="net-page-label">Connections</span>
+          <span className="net-page-label">My Connections</span>
         </div>
 
         {meId === undefined ? null : !meId ? (
@@ -67,146 +118,97 @@ export default function ConnectPage() {
               Check In →
             </a>
           </div>
+        ) : loading ? (
+          <div className="loading-state">Pulling your stats…</div>
         ) : (
           <>
             <div className="net-header">
-              <h1>Who Do You Know Here?</h1>
-              <p>
-                Tap a name if you&apos;ve performed together, organized an event together, recorded together,
-                shared a bill, worked behind the scenes together, or collaborated in any music-related way.
-              </p>
+              <h1>{meName || 'Your Night'}</h1>
+              <p>Here&apos;s how you&apos;re showing up in tonight&apos;s network.</p>
             </div>
 
-            {loading ? (
-              <div className="loading-state">Loading tonight&apos;s attendees…</div>
-            ) : attendees.length === 0 ? (
-              <div className="empty-state">No one else has checked in yet — check back soon.</div>
-            ) : (
-              attendees.map((a) => (
-                <div
-                  key={a.person_id}
-                  className="card"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 15 }}>{a.name}</div>
-                    {a.organization && (
-                      <div style={{ fontSize: 12, color: 'var(--ink-faint)' }}>{a.organization}</div>
-                    )}
-                    <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {a.role_labels.map((r) => (
-                        <span key={r} className="chip chip-neutral">{r}</span>
-                      ))}
-                    </div>
-                  </div>
-                  {a.connected ? (
-                    <button className="btn-outline" onClick={() => setActiveAttendee(a)}>
-                      ✓ Connected ({a.connection_type_slugs.length})
-                    </button>
-                  ) : (
-                    <button className="btn-primary" onClick={() => setActiveAttendee(a)}>
-                      I&apos;m connected
-                    </button>
-                  )}
+            <div className="stat-grid">
+              <div className="stat-card">
+                <div className="num">{connectedTo.length}</div>
+                <div className="label">Connections</div>
+              </div>
+              <div className="stat-card">
+                <div className="num">{genresBridged}</div>
+                <div className="label">Genres Bridged</div>
+              </div>
+              <div className="stat-card">
+                <div className="num">{distinctRolesConnected}</div>
+                <div className="label">Roles Connected</div>
+              </div>
+              <div className="stat-card">
+                <div className="num">{avgDegrees !== null ? avgDegrees.toFixed(1) : '—'}</div>
+                <div className="label">Avg. Separation</div>
+              </div>
+              <div className="stat-card">
+                <div className="num">{furthest ? furthest.depth : '—'}</div>
+                <div className="label">
+                  Furthest Reach{furthest ? ` · ${furthest.names[0]}${furthest.names.length > 1 ? ` +${furthest.names.length - 1}` : ''}` : ''}
                 </div>
-              ))
+              </div>
+            </div>
+
+            {rank && (
+              <div
+                className="card"
+                style={{
+                  background: 'var(--accent-light)', borderColor: 'var(--accent)',
+                  textAlign: 'center', fontFamily: 'var(--serif)', fontWeight: 700,
+                  fontSize: '0.9rem', letterSpacing: '0.04em', textTransform: 'uppercase',
+                  color: 'var(--accent)', marginBottom: 24,
+                }}
+              >
+                ⭐ #{rank} Community Connector{totalRanked ? ` of ${totalRanked}` : ''}
+              </div>
+            )}
+
+            <h3 style={sectionHeadingStyle}>Connected To</h3>
+            {connectedTo.length === 0 ? (
+              <div className="empty-state">
+                No connections logged yet — head to{' '}
+                <a href="/network/connect" style={{ color: 'var(--accent)' }}>Connections</a> to add some.
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                  {roleCountEntries.map(([label, count]) => (
+                    <span key={label} className="chip chip-neutral">
+                      {count} {label}{count !== 1 ? 's' : ''}
+                    </span>
+                  ))}
+                </div>
+                {connectedTo.map((a) => (
+                  <div
+                    key={a.person_id}
+                    className="card"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px' }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{a.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--ink-faint)' }}>{a.role_labels.join(', ')}</div>
+                    </div>
+                    <span className="chip">{a.connection_type_slugs.length}</span>
+                  </div>
+                ))}
+              </>
             )}
           </>
         )}
       </div>
-
-      {activeAttendee && meId && (
-        <ConnectionModal
-          attendee={activeAttendee}
-          meId={meId}
-          onClose={() => setActiveAttendee(null)}
-          onSaved={() => {
-            setActiveAttendee(null)
-            loadAttendees(meId)
-          }}
-        />
-      )}
     </>
   )
 }
 
-function ConnectionModal({
-  attendee,
-  meId,
-  onClose,
-  onSaved,
-}: {
-  attendee: Attendee
-  meId: string
-  onClose: () => void
-  onSaved: () => void
-}) {
-  const [selected, setSelected] = useState<string[]>(attendee.connection_type_slugs)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-
-  function toggle(slug: string) {
-    setSelected((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]))
-  }
-
-  async function handleSave() {
-    setSaving(true)
-    setError('')
-    const { error: err } = await supabase.rpc('set_connection', {
-      p_person_a: meId,
-      p_person_b: attendee.person_id,
-      p_type_slugs: selected,
-    })
-    setSaving(false)
-    if (err) {
-      setError(err.message)
-      return
-    }
-    onSaved()
-  }
-
-  async function handleNotConnected() {
-    setSaving(true)
-    const { error: err } = await supabase.rpc('set_connection', {
-      p_person_a: meId,
-      p_person_b: attendee.person_id,
-      p_type_slugs: [],
-    })
-    setSaving(false)
-    if (!err) onSaved()
-  }
-
-  return (
-    <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
-        <div className="modal-header">
-          <h2>You &amp; {attendee.name}</h2>
-          <button className="close-btn" onClick={onClose}>✕</button>
-        </div>
-        <div className="modal-body">
-          <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 14 }}>
-            Select everything that applies — you can pick more than one, and it&apos;ll show up on{' '}
-            {attendee.name.split(' ')[0]}&apos;s list too.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {CONNECTION_TYPE_OPTIONS.map((opt) => (
-              <label key={opt.slug} className={`checkbox-tile${selected.includes(opt.slug) ? ' checked' : ''}`}>
-                <input type="checkbox" checked={selected.includes(opt.slug)} onChange={() => toggle(opt.slug)} />
-                {opt.label}
-              </label>
-            ))}
-          </div>
-          {error && <p className="form-error">{error}</p>}
-          <div className="modal-footer">
-            <button className="btn-ghost" onClick={handleNotConnected} disabled={saving}>
-              Not connected
-            </button>
-            <button className="btn-primary" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+const sectionHeadingStyle: React.CSSProperties = {
+  fontFamily: 'var(--serif)',
+  fontSize: '0.8rem',
+  fontWeight: 700,
+  letterSpacing: '0.1em',
+  textTransform: 'uppercase',
+  color: 'var(--ink-soft)',
+  marginBottom: 10,
 }
