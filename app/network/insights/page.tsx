@@ -121,8 +121,7 @@ export default function NetworkInsightsPage() {
 
             <h3 style={sectionHeadingStyle}>Genre Bridges</h3>
             <p style={{ fontSize: 13, color: 'var(--ink-faint)', marginBottom: 14 }}>
-              How many distinct genres each person&apos;s direct connections span — the people pulling different
-              corners of the scene together. Tap a name to see which genres.
+              How many distinct genres each person&apos;s direct connections span. Tap a name to see which genres.
             </p>
             {genreBridges.length === 0 ? (
               <div className="empty-state">No genre data yet — this only counts musicians &amp; DJs.</div>
