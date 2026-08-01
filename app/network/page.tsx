@@ -9,13 +9,7 @@ interface LinkTile {
   description: string
 }
 
-const BASE_LINKS: LinkTile[] = [
-  { href: '/network/connect', title: 'Connect', description: "See who's here tonight and log how you know each other." },
-  { href: '/network/me', title: 'My Music Connections', description: 'Your personal stats — connections, genres bridged, and your community rank.' },
-  { href: '/network/live', title: 'Live Dashboard', description: 'Live totals, leaderboard, and activity as the room fills in.' },
-  { href: '/network/map', title: 'Network Map', description: 'Everyone tonight, plotted as a connected graph.' },
-  { href: '/network/insights', title: 'Network Insights', description: 'Which roles and genres are most interconnected across the scene.' },
-]
+const LOGO_URL = 'https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785-Splash-512-White.png'
 
 const CHECKIN_LINK: LinkTile = {
   href: '/network/checkin',
@@ -32,21 +26,24 @@ export default function NetworkHubPage() {
     setCheckedForMe(true)
   }, [])
 
-  // Not checked in yet -> Check In is the first tile.
-  // Already checked in -> replace it with a "Welcome back" tile pointing at
-  // My Connections instead, so the same action isn't offered twice.
-  const links: LinkTile[] = !checkedForMe
-    ? BASE_LINKS
-    : meName
-      ? [
-          {
-            href: '/network/me',
-            title: `Welcome back, ${meName.split(' ')[0]}`,
-            description: "You're checked in. Tap here for your stats, or head straight to Connect.",
-          },
-          ...BASE_LINKS,
-        ]
-      : [CHECKIN_LINK, ...BASE_LINKS]
+  const isCheckedIn = checkedForMe && !!meName
+  const firstName = meName ? meName.split(' ')[0] : ''
+
+  // "My Music Connections" tile's own label changes once someone's checked
+  // in — no separate "welcome back" tile added, so the grid stays 5 tiles
+  // instead of growing to 6.
+  const links: LinkTile[] = [
+    ...(!checkedForMe || isCheckedIn ? [] : [CHECKIN_LINK]),
+    { href: '/network/connect', title: 'Connect', description: "See who's here tonight and log how you know each other." },
+    {
+      href: '/network/me',
+      title: isCheckedIn ? `${firstName} · Music Connections` : 'My Music Connections',
+      description: 'Your personal stats — connections, genres bridged, and your community rank.',
+    },
+    { href: '/network/live', title: 'Live Dashboard', description: 'Live totals, leaderboard, and activity as the room fills in.' },
+    { href: '/network/map', title: 'Network Map', description: 'Everyone tonight, plotted as a connected graph.' },
+    { href: '/network/insights', title: 'Network Insights', description: 'Which roles and genres are most interconnected across the scene.' },
+  ]
 
   return (
     <>
@@ -59,15 +56,11 @@ export default function NetworkHubPage() {
         }
         .net-hub-inner { max-width: 900px; margin: 0 auto; }
         .net-hub-logo {
-          font-family: var(--serif);
-          font-size: 2.4rem;
-          font-weight: 700;
-          letter-spacing: 4px;
-          color: #ffffff;
-          text-align: center;
-          margin-bottom: 4px;
+          display: block;
+          margin: 0 auto 8px;
+          height: 84px;
+          width: auto;
         }
-        .net-hub-logo span { color: var(--accent); }
         .net-hub-title {
           font-family: var(--serif);
           font-size: 1.1rem;
@@ -100,8 +93,7 @@ export default function NetworkHubPage() {
           margin-bottom: 6px;
         }
         .net-hub-card-desc { font-size: 13px; color: #9a948c; line-height: 1.5; }
-        .net-hub-welcome { border-color: var(--gold); }
-        .net-hub-welcome .net-hub-card-title { color: var(--gold); }
+        .net-hub-checked-in .net-hub-card-title { color: var(--gold); }
         .net-hub-back {
           display: block;
           text-align: center;
@@ -119,9 +111,8 @@ export default function NetworkHubPage() {
 
       <div className="net-hub">
         <div className="net-hub-inner">
-          <div className="net-hub-logo">
-            785<span>.</span>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={LOGO_URL} alt="785" className="net-hub-logo" />
           <div className="net-hub-title">Topeka Music Network</div>
 
           <div className="net-hub-grid">
@@ -129,7 +120,7 @@ export default function NetworkHubPage() {
               <a
                 key={link.href}
                 href={link.href}
-                className={`net-hub-card${link.title.startsWith('Welcome back') ? ' net-hub-welcome' : ''}`}
+                className={`net-hub-card${link.href === '/network/me' && isCheckedIn ? ' net-hub-checked-in' : ''}`}
               >
                 <div className="net-hub-card-title">{link.title}</div>
                 <div className="net-hub-card-desc">{link.description}</div>
