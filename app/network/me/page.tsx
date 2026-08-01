@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { NETWORK_BASE_STYLES } from '../_styles'
+import ConnectionModal, { ConnectionTypeOption } from '../ConnectionModal'
 
 interface Attendee {
   person_id: string
@@ -29,6 +30,9 @@ export default function MyConnectionsPage() {
   const [loading, setLoading] = useState(true)
 
   const [connectedTo, setConnectedTo] = useState<Attendee[]>([])
+  const [connectionTypes, setConnectionTypes] = useState<ConnectionTypeOption[]>([])
+  const [activeAttendee, setActiveAttendee] = useState<Attendee | null>(null)
+
   const [avgDegrees, setAvgDegrees] = useState<number | null>(null)
   const [rank, setRank] = useState<number | null>(null)
   const [totalRanked, setTotalRanked] = useState<number>(0)
@@ -84,6 +88,14 @@ export default function MyConnectionsPage() {
   useEffect(() => {
     if (meId) loadStats(meId)
   }, [meId, loadStats])
+
+  useEffect(() => {
+    async function loadConnectionTypes() {
+      const { data } = await supabase.from('connection_types').select('slug, label').order('id')
+      setConnectionTypes((data as ConnectionTypeOption[]) ?? [])
+    }
+    loadConnectionTypes()
+  }, [])
 
   // Tally connections by role — a person with multiple roles counts toward
   // each of them, matching how the roles were captured at check-in.
@@ -169,7 +181,7 @@ export default function MyConnectionsPage() {
               </div>
             )}
 
-            <h3 style={sectionHeadingStyle}>Connected To</h3>
+            <h3 style={sectionHeadingStyle}>My Connections</h3>
             {connectedTo.length === 0 ? (
               <div className="empty-state">
                 No connections logged yet — head to{' '}
@@ -177,6 +189,9 @@ export default function MyConnectionsPage() {
               </div>
             ) : (
               <>
+                <p style={{ fontSize: 13, color: 'var(--ink-faint)', marginBottom: 14 }}>
+                  Tap a name to update how you&apos;re connected.
+                </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
                   {roleCountEntries.map(([label, count]) => (
                     <span key={label} className="chip chip-neutral">
@@ -185,23 +200,41 @@ export default function MyConnectionsPage() {
                   ))}
                 </div>
                 {connectedTo.map((a) => (
-                  <div
+                  <button
                     key={a.person_id}
+                    onClick={() => setActiveAttendee(a)}
                     className="card"
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px' }}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '10px 14px', width: '100%', textAlign: 'left', cursor: 'pointer',
+                      background: 'none', font: 'inherit', color: 'inherit',
+                    }}
                   >
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{a.name}</div>
                       <div style={{ fontSize: 12, color: 'var(--ink-faint)' }}>{a.role_labels.join(', ')}</div>
                     </div>
                     <span className="chip">{a.connection_type_slugs.length}</span>
-                  </div>
+                  </button>
                 ))}
               </>
             )}
           </>
         )}
       </div>
+
+      {activeAttendee && meId && (
+        <ConnectionModal
+          attendee={activeAttendee}
+          meId={meId}
+          connectionTypes={connectionTypes}
+          onClose={() => setActiveAttendee(null)}
+          onSaved={() => {
+            setActiveAttendee(null)
+            loadStats(meId)
+          }}
+        />
+      )}
     </>
   )
 }
