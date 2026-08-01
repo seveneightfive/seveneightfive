@@ -52,13 +52,13 @@ export default function NetworkHubPage() {
         .net-hub {
           background: #0a0a0a;
           min-height: 100vh;
-          padding: 64px 24px 80px;
+          padding: 28px 24px 48px;
         }
         .net-hub-inner { max-width: 900px; margin: 0 auto; }
         .net-hub-logo {
           display: block;
           margin: 0 auto 8px;
-          height: 84px;
+          height: 64px;
           width: auto;
         }
         .net-hub-title {
@@ -69,7 +69,7 @@ export default function NetworkHubPage() {
           text-transform: uppercase;
           color: var(--gold);
           text-align: center;
-          margin-bottom: 48px;
+          margin-bottom: 28px;
         }
         .net-hub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         @media (max-width: 560px) { .net-hub-grid { grid-template-columns: 1fr; } }
