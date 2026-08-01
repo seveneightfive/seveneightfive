@@ -152,7 +152,7 @@ export default function LiveDashboardPage() {
 
                 <h3 style={{ ...sectionHeadingStyle, marginTop: 24 }}>Connections by Role</h3>
                 <p style={{ fontSize: 12, color: 'var(--ink-faint)', marginBottom: 10 }}>
-                  Only roles with at least one logged connection show up here — a role stays off this
+                  Roles with at least one logged connection. A role stays off this
                   list until someone holding it connects with someone.
                 </p>
                 {byRole.length === 0 ? (
@@ -192,7 +192,7 @@ export default function LiveDashboardPage() {
 
             <h3 style={{ ...sectionHeadingStyle, marginTop: 36 }}>All Roles Tonight</h3>
             <p style={{ fontSize: 12, color: 'var(--ink-faint)', marginBottom: 10 }}>
-              Every role currently in the system and how many checked-in people hold it — including
+              Every role currently in the system and how many checked-in people hold it, including
               roles nobody&apos;s picked yet.
             </p>
             <div style={{ border: '1.5px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 28 }}>
