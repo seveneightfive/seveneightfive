@@ -10,6 +10,11 @@ interface RoleOption {
   slug: string
   label: string
 }
+interface ExistingPerson {
+  id: string
+  name: string
+  organization: string | null
+}
 
 // Roles that trigger the genre picker — matches roles seeded in Supabase
 // (musician, ensemble_member, dj).
@@ -32,6 +37,13 @@ export default function CheckInPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // "Welcome back" search — lets someone who already checked in earlier
+  // tonight (but lost localStorage, or is on a different device) find their
+  // existing check-in instead of accidentally creating a duplicate.
+  const [lookupQuery, setLookupQuery] = useState('')
+  const [lookupResults, setLookupResults] = useState<ExistingPerson[]>([])
+  const [lookupLoading, setLookupLoading] = useState(false)
+
   useEffect(() => {
     async function loadRoles() {
       const { data } = await supabase.from('roles').select('id, slug, label').order('label')
@@ -39,6 +51,32 @@ export default function CheckInPage() {
     }
     loadRoles()
   }, [])
+
+  useEffect(() => {
+    const query = lookupQuery.trim()
+    if (query.length < 2) {
+      setLookupResults([])
+      return
+    }
+    const timeout = setTimeout(async () => {
+      setLookupLoading(true)
+      const { data } = await supabase
+        .from('event_people')
+        .select('id, name, organization')
+        .ilike('name', `%${query}%`)
+        .order('name')
+        .limit(8)
+      setLookupResults((data as ExistingPerson[]) ?? [])
+      setLookupLoading(false)
+    }, 300)
+    return () => clearTimeout(timeout)
+  }, [lookupQuery])
+
+  function claimExisting(person: ExistingPerson) {
+    localStorage.setItem('network_person_id', person.id)
+    localStorage.setItem('network_person_name', person.name)
+    router.push('/network/connect')
+  }
 
   const selectedSlugs = roles.filter((r) => selectedRoleIds.includes(r.id)).map((r) => r.slug)
   const showGenres = selectedSlugs.some((s) => MUSIC_ROLE_SLUGS.includes(s))
@@ -116,6 +154,55 @@ export default function CheckInPage() {
         <div className="net-header">
           <h1>Who&apos;s Here Tonight</h1>
           <p>Tell us who you are so we can start mapping how the Topeka music scene connects.</p>
+        </div>
+
+        <div className="form-group">
+          <label>Already checked in earlier tonight?</label>
+          <input
+            value={lookupQuery}
+            onChange={(e) => setLookupQuery(e.target.value)}
+            placeholder="Search your name…"
+          />
+        </div>
+
+        {lookupLoading && <p style={{ fontSize: 13, color: 'var(--ink-faint)', marginBottom: 12 }}>Searching…</p>}
+
+        {lookupResults.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            {lookupResults.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => claimExisting(p)}
+                className="card"
+                style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  width: '100%', textAlign: 'left', cursor: 'pointer', background: 'none',
+                  font: 'inherit', color: 'inherit',
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{p.name}</div>
+                  {p.organization && <div style={{ fontSize: 12, color: 'var(--ink-faint)' }}>{p.organization}</div>}
+                </div>
+                <span className="chip chip-neutral">This is me →</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {lookupQuery.trim().length >= 2 && !lookupLoading && lookupResults.length === 0 && (
+          <p style={{ fontSize: 13, color: 'var(--ink-faint)', marginBottom: 24 }}>
+            No match yet — check the spelling, or check in as new below.
+          </p>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '28px 0' }}>
+          <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
+            Or check in as new
+          </span>
+          <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
         </div>
 
         <form onSubmit={handleSubmit}>
