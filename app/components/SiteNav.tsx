@@ -15,6 +15,7 @@ const IMMERSIVE_PREFIXES = [
   '/events/',
   '/stories/',
   '/sellers/',
+  '/network/',
 ]
 
 // Routes with their own BrowseHeader (logo/back + title + Search & Filter),
