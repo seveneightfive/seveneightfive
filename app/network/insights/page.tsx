@@ -88,7 +88,7 @@ export default function NetworkInsightsPage() {
             <h3 style={sectionHeadingStyle}>Role Interconnection</h3>
             <p style={{ fontSize: 13, color: 'var(--ink-faint)', marginBottom: 14 }}>
               How often each pair of roles shows up on either side of a logged connection. Longer bar = more
-              connections between those two roles.
+              connections between two roles.
             </p>
             {rolePairs.length === 0 ? (
               <div className="empty-state" style={{ marginBottom: 32 }}>No connections logged yet.</div>
