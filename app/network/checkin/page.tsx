@@ -145,11 +145,14 @@ export default function CheckInPage() {
   return (
     <>
       <style>{NETWORK_BASE_STYLES}</style>
-      <div className="net-page">
-        <div className="net-topnav">
+      <div className="net-topbar">
+        <div className="net-topbar-inner">
           <a href="/network" className="net-back">← Network</a>
           <span className="net-page-label">Check In</span>
         </div>
+      </div>
+
+      <div className="net-page">
 
         <div className="net-header">
           <h1>Who&apos;s Here Tonight</h1>

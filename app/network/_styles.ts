@@ -16,13 +16,22 @@ export const NETWORK_BASE_STYLES = `
     font-family: var(--sans);
     max-width: 900px;
     margin: 0 auto;
-    padding: 0 24px 80px;
+    padding: 32px 24px 80px;
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
   }
-  .net-topnav {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 16px 0; border-bottom: 1px solid var(--border); margin-bottom: 32px;
+  .net-topbar {
+    width: 100%;
+    border-bottom: 1px solid var(--border);
+    background: #fff;
+  }
+  .net-topbar-inner {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
   .net-back {
     font-family: var(--serif); font-size: 0.72rem; font-weight: 600;

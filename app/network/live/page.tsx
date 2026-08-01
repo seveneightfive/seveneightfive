@@ -74,11 +74,14 @@ export default function LiveDashboardPage() {
   return (
     <>
       <style>{NETWORK_BASE_STYLES}</style>
-      <div className="net-page">
-        <div className="net-topnav">
+      <div className="net-topbar">
+        <div className="net-topbar-inner">
           <a href="/network" className="net-back">← Network</a>
           <span className="net-page-label">Live Dashboard</span>
         </div>
+      </div>
+
+      <div className="net-page">
 
         <div className="net-header">
           <h1>The Room, Right Now</h1>
