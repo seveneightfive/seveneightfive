@@ -244,6 +244,12 @@ export default function NetworkMapPage() {
           </>
         )}
       </div>
+
+      <div className="net-page" style={{ maxWidth: 900, paddingTop: 0 }}>
+        <a href="/network/insights" className="btn-primary net-cta-block">
+          See Network Insights →
+        </a>
+      </div>
     </>
   )
 }
