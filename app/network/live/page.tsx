@@ -85,7 +85,7 @@ export default function LiveDashboardPage() {
 
         <div className="net-header">
           <h1>The Room, Right Now</h1>
-          <p>Updates live as people check in and log connections tonight.</p>
+          <p>Updates live as people check in and log connections</p>
         </div>
 
         {loading ? (
