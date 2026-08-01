@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { NETWORK_BASE_STYLES } from '../_styles'
+import ConnectionModal, { ConnectionTypeOption } from '../ConnectionModal'
 
 interface Attendee {
   person_id: string
@@ -11,10 +12,6 @@ interface Attendee {
   role_labels: string[]
   connected: boolean
   connection_type_slugs: string[]
-}
-interface ConnectionTypeOption {
-  slug: string
-  label: string
 }
 
 export default function ConnectPage() {
@@ -50,6 +47,11 @@ export default function ConnectPage() {
     if (meId) loadAttendees(meId)
   }, [meId, loadAttendees])
 
+  // Once someone's marked as connected, they drop off this list — this
+  // screen is now specifically "who haven't you logged yet", and editing
+  // an existing connection happens from the "My Connections" list on /me.
+  const unconnected = attendees.filter((a) => !a.connected)
+
   return (
     <>
       <style>{NETWORK_BASE_STYLES}</style>
@@ -82,6 +84,8 @@ export default function ConnectPage() {
               <p>
                 Tap a name if you&apos;ve performed together, organized an event together, recorded together,
                 shared a bill, worked behind the scenes together, or collaborated in any music-related way.
+                Already logged someone? Edit it from{' '}
+                <a href="/network/me" style={{ color: 'var(--accent)' }}>My Connections</a>.
               </p>
             </div>
 
@@ -89,8 +93,14 @@ export default function ConnectPage() {
               <div className="loading-state">Loading tonight&apos;s attendees…</div>
             ) : attendees.length === 0 ? (
               <div className="empty-state">No one else has checked in yet — check back soon.</div>
+            ) : unconnected.length === 0 ? (
+              <div className="empty-state">
+                You&apos;re connected with everyone who&apos;s checked in so far — nice work. Check back as more
+                people arrive, or review/edit what you&apos;ve logged on{' '}
+                <a href="/network/me" style={{ color: 'var(--accent)' }}>My Connections</a>.
+              </div>
             ) : (
-              attendees.map((a) => (
+              unconnected.map((a) => (
                 <div
                   key={a.person_id}
                   className="card"
@@ -107,18 +117,16 @@ export default function ConnectPage() {
                       ))}
                     </div>
                   </div>
-                  {a.connected ? (
-                    <button className="btn-outline" onClick={() => setActiveAttendee(a)}>
-                      ✓ Connected ({a.connection_type_slugs.length})
-                    </button>
-                  ) : (
-                    <button className="btn-primary" onClick={() => setActiveAttendee(a)}>
-                      I&apos;m connected
-                    </button>
-                  )}
+                  <button className="btn-primary" onClick={() => setActiveAttendee(a)}>
+                    I&apos;m connected
+                  </button>
                 </div>
               ))
             )}
+
+            <a href="/network/live" className="btn-primary net-cta-block">
+              See The Network →
+            </a>
           </>
         )}
       </div>
@@ -136,88 +144,5 @@ export default function ConnectPage() {
         />
       )}
     </>
-  )
-}
-
-function ConnectionModal({
-  attendee,
-  meId,
-  connectionTypes,
-  onClose,
-  onSaved,
-}: {
-  attendee: Attendee
-  meId: string
-  connectionTypes: ConnectionTypeOption[]
-  onClose: () => void
-  onSaved: () => void
-}) {
-  const [selected, setSelected] = useState<string[]>(attendee.connection_type_slugs)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-
-  function toggle(slug: string) {
-    setSelected((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]))
-  }
-
-  async function handleSave() {
-    setSaving(true)
-    setError('')
-    const { error: err } = await supabase.rpc('set_connection', {
-      p_person_a: meId,
-      p_person_b: attendee.person_id,
-      p_type_slugs: selected,
-    })
-    setSaving(false)
-    if (err) {
-      setError(err.message)
-      return
-    }
-    onSaved()
-  }
-
-  async function handleNotConnected() {
-    setSaving(true)
-    const { error: err } = await supabase.rpc('set_connection', {
-      p_person_a: meId,
-      p_person_b: attendee.person_id,
-      p_type_slugs: [],
-    })
-    setSaving(false)
-    if (!err) onSaved()
-  }
-
-  return (
-    <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
-        <div className="modal-header">
-          <h2>You &amp; {attendee.name}</h2>
-          <button className="close-btn" onClick={onClose}>✕</button>
-        </div>
-        <div className="modal-body">
-          <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 14 }}>
-            Select everything that applies — you can pick more than one, and it&apos;ll show up on{' '}
-            {attendee.name.split(' ')[0]}&apos;s list too.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {connectionTypes.map((opt) => (
-              <label key={opt.slug} className={`checkbox-tile${selected.includes(opt.slug) ? ' checked' : ''}`}>
-                <input type="checkbox" checked={selected.includes(opt.slug)} onChange={() => toggle(opt.slug)} />
-                {opt.label}
-              </label>
-            ))}
-          </div>
-          {error && <p className="form-error">{error}</p>}
-          <div className="modal-footer">
-            <button className="btn-ghost" onClick={handleNotConnected} disabled={saving}>
-              Not connected
-            </button>
-            <button className="btn-primary" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
   )
 }
