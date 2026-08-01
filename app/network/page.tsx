@@ -55,12 +55,6 @@ export default function NetworkHubPage() {
           padding: 28px 24px 48px;
         }
         .net-hub-inner { max-width: 900px; margin: 0 auto; }
-        .net-hub-logo {
-          display: block;
-          margin: 0 auto 8px;
-          height: 64px;
-          width: auto;
-        }
         .net-hub-title {
           font-family: var(--serif);
           font-size: 1.1rem;
@@ -94,9 +88,38 @@ export default function NetworkHubPage() {
         }
         .net-hub-card-desc { font-size: 13px; color: #9a948c; line-height: 1.5; }
         .net-hub-checked-in .net-hub-card-title { color: var(--gold); }
-        .net-hub-back {
+        .net-hub-footer {
+          margin-top: 40px;
+          padding-top: 28px;
+          border-top: 1px solid #222;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 18px;
+        }
+        .net-hub-logo-link { display: block; }
+        .net-hub-logo {
           display: block;
-          text-align: center;
+          height: 56px;
+          width: auto;
+        }
+        .net-hub-footer-links {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 10px;
+        }
+        .net-hub-live-music {
+          font-family: var(--serif);
+          font-size: 0.72rem;
+          font-weight: 700;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: var(--gold);
+          text-decoration: none;
+        }
+        .net-hub-live-music:hover { color: #fff; }
+        .net-hub-back {
           font-family: var(--serif);
           font-size: 0.68rem;
           font-weight: 600;
@@ -104,15 +127,12 @@ export default function NetworkHubPage() {
           text-transform: uppercase;
           color: #6b6560;
           text-decoration: none;
-          margin-top: 40px;
         }
         .net-hub-back:hover { color: #ffffff; }
       `}</style>
 
       <div className="net-hub">
         <div className="net-hub-inner">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={LOGO_URL} alt="785" className="net-hub-logo" />
           <div className="net-hub-title">Topeka Music Network</div>
 
           <div className="net-hub-grid">
@@ -128,7 +148,16 @@ export default function NetworkHubPage() {
             ))}
           </div>
 
-          <a href="/" className="net-hub-back">Back to seveneightfive.com</a>
+          <div className="net-hub-footer">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <a href="/" className="net-hub-logo-link" aria-label="seveneightfive.com home">
+              <img src={LOGO_URL} alt="785" className="net-hub-logo" />
+            </a>
+            <div className="net-hub-footer-links">
+              <a href="/live-music" className="net-hub-live-music">Live Music Events →</a>
+              <a href="/" className="net-hub-back">Back to seveneightfive.com</a>
+            </div>
+          </div>
         </div>
       </div>
     </>
