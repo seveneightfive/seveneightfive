@@ -71,6 +71,14 @@ export default function LiveDashboardPage() {
     return `${hrs}h ago`
   }
 
+  // Each connection row links two people, so a person's average degree is
+  // (2 × connections) ÷ attendees — not connections ÷ attendees, which
+  // would undercount by half.
+  const avgConnectionsPerPerson =
+    summary && summary.total_attendees > 0
+      ? ((summary.total_connections * 2) / summary.total_attendees).toFixed(1)
+      : '0.0'
+
   return (
     <>
       <style>{NETWORK_BASE_STYLES}</style>
@@ -85,7 +93,7 @@ export default function LiveDashboardPage() {
 
         <div className="net-header">
           <h1>The Room, Right Now</h1>
-          <p>Updates live as people check in and log connections</p>
+          <p>Updates live as people check in and connect</p>
         </div>
 
         {loading ? (
@@ -106,6 +114,10 @@ export default function LiveDashboardPage() {
                   {summary?.top_connector_name ?? '—'}
                 </div>
                 <div className="label">Top Connector{summary?.top_connector_count ? ` · ${summary.top_connector_count}` : ''}</div>
+              </div>
+              <div className="stat-card">
+                <div className="num">{avgConnectionsPerPerson}</div>
+                <div className="label">Avg Connections / Person</div>
               </div>
             </div>
 
@@ -148,7 +160,7 @@ export default function LiveDashboardPage() {
               </div>
 
               <div>
-                <h3 style={sectionHeadingStyle}>New Connections Tonight</h3>
+                <h3 style={sectionHeadingStyle}>Recent Connections</h3>
                 {recent.length === 0 ? (
                   <div className="empty-state" style={{ padding: '24px 12px' }}>Nothing logged yet.</div>
                 ) : (
