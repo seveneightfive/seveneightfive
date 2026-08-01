@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { usePathname } from "next/navigation"
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -49,12 +50,21 @@ const BENEFITS = [
 ]
 
 export default function InstallButton() {
+  const pathname = usePathname()
+  // The /network/* flow (check-in, connect, live dashboard, etc.) is a
+  // single-purpose, often walk-up mobile experience — the install prompt
+  // interrupting mid check-in was causing confusion, so it's suppressed
+  // for that whole subtree rather than tuned per-page.
+  const isNetworkPage = pathname?.startsWith("/network") ?? false
+
   const [prompt, setPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isIOS, setIsIOS] = useState(false)
   const [visible, setVisible] = useState(false)
   const [animateIn, setAnimateIn] = useState(false)
 
   useEffect(() => {
+    if (isNetworkPage) return
+
     const isStandalone = window.matchMedia("(display-mode: standalone)").matches
     if (isStandalone || localStorage.getItem(INSTALLED_KEY)) return
 
@@ -90,7 +100,7 @@ export default function InstallButton() {
     }
 
     return () => window.removeEventListener("beforeinstallprompt", handler)
-  }, [])
+  }, [isNetworkPage])
 
   const dismiss = () => {
     setAnimateIn(false)
@@ -111,6 +121,9 @@ export default function InstallButton() {
     setPrompt(null)
   }
 
+  // Belt-and-suspenders: even if a timer set on another page fires after
+  // the person has since navigated into /network, never render here.
+  if (isNetworkPage) return null
   if (!visible) return null
   if (!isIOS && !prompt) return null
 
