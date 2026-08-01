@@ -165,7 +165,7 @@ export default function MyConnectionsPage() {
                   color: 'var(--accent)', marginBottom: 24,
                 }}
               >
-                ⭐ #{rank} Community Connector{totalRanked ? ` of ${totalRanked}` : ''}
+                 #{rank} Community Connector{totalRanked ? ` of ${totalRanked}` : ''}
               </div>
             )}
 
