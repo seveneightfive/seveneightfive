@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { NETWORK_BASE_STYLES } from '../_styles'
-import ConnectionModal, { ConnectionTypeOption } from '../ConnectionModal'
 
 interface Attendee {
   person_id: string
@@ -23,6 +22,19 @@ interface GenreBridge {
   name: string
   genres_bridged: number
 }
+interface RoleOption {
+  id: number
+  slug: string
+  label: string
+}
+
+const MUSIC_ROLE_SLUGS = ['musician', 'ensemble_member', 'dj']
+const GENRES = [
+  'Rock', 'Pop', 'Jazz', 'Classical', 'Electronic', 'Hip-Hop', 'Country',
+  'Reggae', 'Blues', 'Folk', 'Singer-Songwriter', 'Spoken Word', 'Motown',
+  'Funk', 'Americana', 'Punk', 'Grunge', 'Jam Band', 'Tejano', 'Latin',
+  'DJ', 'Bluegrass', 'Rap',
+]
 
 export default function MyConnectionsPage() {
   const [meId, setMeId] = useState<string | null | undefined>(undefined)
@@ -30,14 +42,27 @@ export default function MyConnectionsPage() {
   const [loading, setLoading] = useState(true)
 
   const [connectedTo, setConnectedTo] = useState<Attendee[]>([])
-  const [connectionTypes, setConnectionTypes] = useState<ConnectionTypeOption[]>([])
-  const [activeAttendee, setActiveAttendee] = useState<Attendee | null>(null)
-
   const [avgDegrees, setAvgDegrees] = useState<number | null>(null)
   const [rank, setRank] = useState<number | null>(null)
   const [totalRanked, setTotalRanked] = useState<number>(0)
   const [genresBridged, setGenresBridged] = useState<number>(0)
   const [furthest, setFurthest] = useState<{ names: string[]; depth: number } | null>(null)
+
+  const [allRoles, setAllRoles] = useState<RoleOption[]>([])
+  const [myRoleIds, setMyRoleIds] = useState<number[]>([])
+  const [myGenres, setMyGenres] = useState<string[]>([])
+  const [editingRoles, setEditingRoles] = useState(false)
+
+  const loadMyRolesAndGenres = useCallback(async (id: string) => {
+    const [rolesTableRes, myRolesRes, myGenresRes] = await Promise.all([
+      supabase.from('roles').select('id, slug, label').order('label'),
+      supabase.from('event_people_roles').select('role_id').eq('person_id', id),
+      supabase.from('event_people_genres').select('genre').eq('person_id', id),
+    ])
+    setAllRoles((rolesTableRes.data as RoleOption[]) ?? [])
+    setMyRoleIds(((myRolesRes.data ?? []) as { role_id: number }[]).map((r) => r.role_id))
+    setMyGenres(((myGenresRes.data ?? []) as { genre: string }[]).map((g) => g.genre))
+  }, [])
 
   const loadStats = useCallback(async (id: string) => {
     setLoading(true)
@@ -86,16 +111,11 @@ export default function MyConnectionsPage() {
   }, [])
 
   useEffect(() => {
-    if (meId) loadStats(meId)
-  }, [meId, loadStats])
-
-  useEffect(() => {
-    async function loadConnectionTypes() {
-      const { data } = await supabase.from('connection_types').select('slug, label').order('id')
-      setConnectionTypes((data as ConnectionTypeOption[]) ?? [])
+    if (meId) {
+      loadStats(meId)
+      loadMyRolesAndGenres(meId)
     }
-    loadConnectionTypes()
-  }, [])
+  }, [meId, loadStats, loadMyRolesAndGenres])
 
   // Tally connections by role — a person with multiple roles counts toward
   // each of them, matching how the roles were captured at check-in.
@@ -142,6 +162,23 @@ export default function MyConnectionsPage() {
               <p>Here&apos;s how you&apos;re showing up in tonight&apos;s network.</p>
             </div>
 
+            <div
+              className="card"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 24 }}
+            >
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {allRoles
+                  .filter((r) => myRoleIds.includes(r.id))
+                  .map((r) => (
+                    <span key={r.id} className="chip chip-neutral">{r.label}</span>
+                  ))}
+                {myRoleIds.length === 0 && (
+                  <span style={{ fontSize: 13, color: 'var(--ink-faint)' }}>No roles set yet</span>
+                )}
+              </div>
+              <button className="btn-outline" onClick={() => setEditingRoles(true)}>Edit</button>
+            </div>
+
             <div className="stat-grid">
               <div className="stat-card">
                 <div className="num">{connectedTo.length}</div>
@@ -177,11 +214,11 @@ export default function MyConnectionsPage() {
                   color: 'var(--accent)', marginBottom: 24,
                 }}
               >
-                 #{rank} Community Connector{totalRanked ? ` of ${totalRanked}` : ''}
+                ⭐ #{rank} Community Connector{totalRanked ? ` of ${totalRanked}` : ''}
               </div>
             )}
 
-            <h3 style={sectionHeadingStyle}>My Connections</h3>
+            <h3 style={sectionHeadingStyle}>Connected To</h3>
             {connectedTo.length === 0 ? (
               <div className="empty-state">
                 No connections logged yet — head to{' '}
@@ -189,9 +226,6 @@ export default function MyConnectionsPage() {
               </div>
             ) : (
               <>
-                <p style={{ fontSize: 13, color: 'var(--ink-faint)', marginBottom: 14 }}>
-                  Tap a name to update how you&apos;re connected.
-                </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
                   {roleCountEntries.map(([label, count]) => (
                     <span key={label} className="chip chip-neutral">
@@ -200,22 +234,17 @@ export default function MyConnectionsPage() {
                   ))}
                 </div>
                 {connectedTo.map((a) => (
-                  <button
+                  <div
                     key={a.person_id}
-                    onClick={() => setActiveAttendee(a)}
                     className="card"
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '10px 14px', width: '100%', textAlign: 'left', cursor: 'pointer',
-                      background: 'none', font: 'inherit', color: 'inherit',
-                    }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px' }}
                   >
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{a.name}</div>
                       <div style={{ fontSize: 12, color: 'var(--ink-faint)' }}>{a.role_labels.join(', ')}</div>
                     </div>
                     <span className="chip">{a.connection_type_slugs.length}</span>
-                  </button>
+                  </div>
                 ))}
               </>
             )}
@@ -223,19 +252,127 @@ export default function MyConnectionsPage() {
         )}
       </div>
 
-      {activeAttendee && meId && (
-        <ConnectionModal
-          attendee={activeAttendee}
+      {editingRoles && meId && (
+        <RoleEditModal
           meId={meId}
-          connectionTypes={connectionTypes}
-          onClose={() => setActiveAttendee(null)}
+          allRoles={allRoles}
+          myRoleIds={myRoleIds}
+          myGenres={myGenres}
+          onClose={() => setEditingRoles(false)}
           onSaved={() => {
-            setActiveAttendee(null)
+            setEditingRoles(false)
+            loadMyRolesAndGenres(meId)
             loadStats(meId)
           }}
         />
       )}
     </>
+  )
+}
+
+function RoleEditModal({
+  meId,
+  allRoles,
+  myRoleIds,
+  myGenres,
+  onClose,
+  onSaved,
+}: {
+  meId: string
+  allRoles: RoleOption[]
+  myRoleIds: number[]
+  myGenres: string[]
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>(myRoleIds)
+  const [selectedGenres, setSelectedGenres] = useState<string[]>(myGenres)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const selectedSlugs = allRoles.filter((r) => selectedRoleIds.includes(r.id)).map((r) => r.slug)
+  const showGenres = selectedSlugs.some((s) => MUSIC_ROLE_SLUGS.includes(s))
+
+  function toggleRole(id: number) {
+    setSelectedRoleIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+  function toggleGenre(g: string) {
+    setSelectedGenres((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]))
+  }
+
+  async function handleSave() {
+    setError('')
+    if (selectedRoleIds.length === 0) {
+      setError('Select at least one role.')
+      return
+    }
+    setSaving(true)
+    const { error: roleErr } = await supabase.rpc('set_person_roles', {
+      p_person_id: meId,
+      p_role_ids: selectedRoleIds,
+    })
+    if (roleErr) {
+      setError(roleErr.message)
+      setSaving(false)
+      return
+    }
+    const { error: genreErr } = await supabase.rpc('set_person_genres', {
+      p_person_id: meId,
+      p_genres: showGenres ? selectedGenres : [],
+    })
+    setSaving(false)
+    if (genreErr) {
+      setError(genreErr.message)
+      return
+    }
+    onSaved()
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <h2>Edit Your Roles</h2>
+          <button className="close-btn" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <div className="checkbox-grid" style={{ marginBottom: showGenres ? 16 : 0 }}>
+            {allRoles.map((role) => (
+              <label key={role.id} className={`checkbox-tile${selectedRoleIds.includes(role.id) ? ' checked' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={selectedRoleIds.includes(role.id)}
+                  onChange={() => toggleRole(role.id)}
+                />
+                {role.label}
+              </label>
+            ))}
+          </div>
+
+          {showGenres && (
+            <>
+              <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Genre(s)</p>
+              <div className="checkbox-grid">
+                {GENRES.map((g) => (
+                  <label key={g} className={`checkbox-tile${selectedGenres.includes(g) ? ' checked' : ''}`}>
+                    <input type="checkbox" checked={selectedGenres.includes(g)} onChange={() => toggleGenre(g)} />
+                    {g}
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+
+          {error && <p className="form-error">{error}</p>}
+          <div className="modal-footer">
+            <button className="btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
+            <button className="btn-primary" onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
