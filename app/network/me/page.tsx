@@ -53,6 +53,26 @@ export default function MyConnectionsPage() {
   const [myGenres, setMyGenres] = useState<string[]>([])
   const [editingRoles, setEditingRoles] = useState(false)
 
+  const [claimedPage, setClaimedPage] = useState<{ type: 'artist' | 'venue'; slug: string; name: string } | null>(null)
+  const [claimModalOpen, setClaimModalOpen] = useState(false)
+
+  const loadClaimedPage = useCallback(async (id: string) => {
+    const { data } = await supabase
+      .from('event_people')
+      .select('artist_id, venue_id, artists(slug, name), venues(slug, name)')
+      .eq('id', id)
+      .single()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const row = data as any
+    if (row?.artist_id && row.artists) {
+      setClaimedPage({ type: 'artist', slug: row.artists.slug, name: row.artists.name })
+    } else if (row?.venue_id && row.venues) {
+      setClaimedPage({ type: 'venue', slug: row.venues.slug, name: row.venues.name })
+    } else {
+      setClaimedPage(null)
+    }
+  }, [])
+
   const loadMyRolesAndGenres = useCallback(async (id: string) => {
     const [rolesTableRes, myRolesRes, myGenresRes] = await Promise.all([
       supabase.from('roles').select('id, slug, label').order('label'),
@@ -114,8 +134,9 @@ export default function MyConnectionsPage() {
     if (meId) {
       loadStats(meId)
       loadMyRolesAndGenres(meId)
+      loadClaimedPage(meId)
     }
-  }, [meId, loadStats, loadMyRolesAndGenres])
+  }, [meId, loadStats, loadMyRolesAndGenres, loadClaimedPage])
 
   // Tally connections by role — a person with multiple roles counts toward
   // each of them, matching how the roles were captured at check-in.
@@ -177,6 +198,36 @@ export default function MyConnectionsPage() {
                 )}
               </div>
               <button className="btn-outline" onClick={() => setEditingRoles(true)}>Edit</button>
+            </div>
+
+            <div
+              className="card"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 24 }}
+            >
+              {claimedPage ? (
+                <>
+                  <div>
+                    <div style={{ fontSize: 13, color: 'var(--ink-faint)', marginBottom: 2 }}>Your page</div>
+                    <div style={{ fontWeight: 600, fontSize: 15 }}>{claimedPage.name}</div>
+                  </div>
+                  <a
+                    href={`/${claimedPage.type === 'venue' ? 'venues' : 'artists'}/${claimedPage.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-outline"
+                  >
+                    View Page →
+                  </a>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 15 }}>Got an artist or venue page?</div>
+                    <div style={{ fontSize: 13, color: 'var(--ink-faint)' }}>Link it so people can find you on seveneightfive.com.</div>
+                  </div>
+                  <button className="btn-primary" onClick={() => setClaimModalOpen(true)}>Link It</button>
+                </>
+              )}
             </div>
 
             <div className="stat-grid">
@@ -263,6 +314,18 @@ export default function MyConnectionsPage() {
             setEditingRoles(false)
             loadMyRolesAndGenres(meId)
             loadStats(meId)
+          }}
+        />
+      )}
+
+      {claimModalOpen && meId && (
+        <ClaimPageModal
+          meId={meId}
+          defaultName={meName}
+          onClose={() => setClaimModalOpen(false)}
+          onSaved={() => {
+            setClaimModalOpen(false)
+            loadClaimedPage(meId)
           }}
         />
       )}
@@ -370,6 +433,137 @@ function RoleEditModal({
               {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface PageMatch {
+  target_type: 'artist' | 'venue'
+  id: string
+  name: string
+  slug: string
+  image_url: string | null
+}
+
+function ClaimPageModal({
+  meId,
+  defaultName,
+  onClose,
+  onSaved,
+}: {
+  meId: string
+  defaultName: string
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [query, setQuery] = useState(defaultName)
+  const [results, setResults] = useState<PageMatch[]>([])
+  const [searching, setSearching] = useState(false)
+  const [selected, setSelected] = useState<PageMatch | null>(null)
+  const [email, setEmail] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const q = query.trim()
+    if (q.length < 2) {
+      setResults([])
+      return
+    }
+    const timeout = setTimeout(async () => {
+      setSearching(true)
+      const { data } = await supabase.rpc('search_artists_and_venues', { search_query: q })
+      setResults((data as PageMatch[]) ?? [])
+      setSearching(false)
+    }, 300)
+    return () => clearTimeout(timeout)
+  }, [query])
+
+  async function handleConfirm() {
+    if (!selected) return
+    if (!email.trim()) {
+      setError('Enter the email you use for that page — helps us keep the link accurate.')
+      return
+    }
+    setError('')
+    setSaving(true)
+    const { error: err } = await supabase.rpc('claim_page', {
+      p_person_id: meId,
+      p_target_type: selected.target_type,
+      p_target_id: selected.id,
+      p_email: email.trim(),
+    })
+    setSaving(false)
+    if (err) {
+      setError(err.message)
+      return
+    }
+    onSaved()
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <h2>{selected ? 'Confirm It\u2019s You' : 'Find Your Page'}</h2>
+          <button className="close-btn" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          {!selected ? (
+            <>
+              <div className="form-group">
+                <label>Artist or venue name</label>
+                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search…" autoFocus />
+              </div>
+              {searching && <p style={{ fontSize: 13, color: 'var(--ink-faint)' }}>Searching…</p>}
+              {!searching && query.trim().length >= 2 && results.length === 0 && (
+                <p style={{ fontSize: 13, color: 'var(--ink-faint)' }}>No matches — check spelling, or ask an admin to add your page first.</p>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {results.map((r) => (
+                  <button
+                    key={`${r.target_type}-${r.id}`}
+                    type="button"
+                    onClick={() => setSelected(r)}
+                    className="card"
+                    style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      width: '100%', textAlign: 'left', cursor: 'pointer', background: 'none',
+                      font: 'inherit', color: 'inherit', margin: 0,
+                    }}
+                  >
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>{r.name}</span>
+                    <span className="chip chip-neutral">{r.target_type === 'venue' ? 'Venue' : 'Artist'}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <p style={{ fontSize: 14, marginBottom: 16 }}>
+                Confirming <strong>{selected.name}</strong> ({selected.target_type === 'venue' ? 'Venue' : 'Artist'}) is your page.
+              </p>
+              <div className="form-group">
+                <label>Your email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  autoFocus
+                />
+              </div>
+              {error && <p className="form-error">{error}</p>}
+              <div className="modal-footer">
+                <button className="btn-ghost" onClick={() => setSelected(null)} disabled={saving}>Back</button>
+                <button className="btn-primary" onClick={handleConfirm} disabled={saving}>
+                  {saving ? 'Linking…' : 'Yes, this is me'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
