@@ -14,34 +14,30 @@ interface GenreBridge {
   name: string
   genres_bridged: number
 }
-interface GrowthPoint {
-  bucket: string
-  new_connections: number
-  cumulative_connections: number
-}
 
 export default function NetworkInsightsPage() {
   const [rolePairs, setRolePairs] = useState<RolePair[]>([])
   const [genreBridges, setGenreBridges] = useState<GenreBridge[]>([])
-  const [growth, setGrowth] = useState<GrowthPoint[]>([])
+  const [monthlyConnections, setMonthlyConnections] = useState<number>(0)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
-      const [pairsRes, bridgesRes, growthRes] = await Promise.all([
+      const [pairsRes, bridgesRes, monthlyRes] = await Promise.all([
         supabase.rpc('role_pair_matrix'),
         supabase.rpc('genre_bridge_scores'),
-        supabase.rpc('connections_growth'),
+        supabase.rpc('connections_this_month'),
       ])
       if (pairsRes.data) setRolePairs(pairsRes.data as RolePair[])
       if (bridgesRes.data) setGenreBridges((bridgesRes.data as GenreBridge[]).slice(0, 8))
-      if (growthRes.data) setGrowth(growthRes.data as GrowthPoint[])
+      if (monthlyRes.data !== null && monthlyRes.data !== undefined) setMonthlyConnections(Number(monthlyRes.data))
       setLoading(false)
     }
     load()
   }, [])
 
   const maxCount = Math.max(1, ...rolePairs.map((r) => r.connection_count))
+  const significantRolePairs = rolePairs.filter((r) => r.connection_count >= 3)
   const maxBridge = Math.max(1, ...genreBridges.map((g) => g.genres_bridged))
 
   return (
@@ -70,25 +66,28 @@ export default function NetworkInsightsPage() {
           <>
             <h3 style={sectionHeadingStyle}>Network Growth</h3>
             <p style={{ fontSize: 13, color: 'var(--ink-faint)', marginBottom: 14 }}>
-              Total connections logged, hour by hour. As you run more nights like this, this same view will show
-              the community getting more interconnected over months and years.
+              As this app runs across more events over time, this number tracks the community getting more
+              interconnected month over month.
             </p>
-            {growth.length === 0 ? (
-              <div className="empty-state" style={{ marginBottom: 32 }}>No connections logged yet.</div>
-            ) : (
-              <GrowthChart data={growth} />
-            )}
+            <div className="stat-grid" style={{ marginBottom: 32 }}>
+              <div className="stat-card">
+                <div className="num">{monthlyConnections}</div>
+                <div className="label">New Connections This Month</div>
+              </div>
+            </div>
 
             <h3 style={{ ...sectionHeadingStyle, marginTop: 32 }}>Role Interconnection</h3>
             <p style={{ fontSize: 13, color: 'var(--ink-faint)', marginBottom: 14 }}>
-              How often each pair of roles shows up on either side of a logged connection. Longer bar = more
-              connections between those two roles.
+              How often each pair of roles shows up on either side of a logged connection. Only showing pairs with
+              3+ connections — longer bar = more connections between those two roles.
             </p>
-            {rolePairs.length === 0 ? (
-              <div className="empty-state" style={{ marginBottom: 32 }}>No connections logged yet.</div>
+            {significantRolePairs.length === 0 ? (
+              <div className="empty-state" style={{ marginBottom: 32 }}>
+                No role pair has 3+ connections yet.
+              </div>
             ) : (
               <div style={{ marginBottom: 36 }}>
-                {rolePairs.map((r, i) => (
+                {significantRolePairs.map((r, i) => (
                   <div key={i} style={{ marginBottom: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
                       <span style={{ fontWeight: 600 }}>
@@ -159,48 +158,4 @@ const sectionHeadingStyle: React.CSSProperties = {
   textTransform: 'uppercase',
   color: 'var(--ink-soft)',
   marginBottom: 6,
-}
-
-function GrowthChart({ data }: { data: GrowthPoint[] }) {
-  const width = 800
-  const height = 220
-  const padding = { top: 16, right: 16, bottom: 28, left: 16 }
-  const plotW = width - padding.left - padding.right
-  const plotH = height - padding.top - padding.bottom
-
-  const maxVal = Math.max(1, ...data.map((d) => d.cumulative_connections))
-  const points = data.map((d, i) => {
-    const x = padding.left + (data.length === 1 ? plotW / 2 : (i / (data.length - 1)) * plotW)
-    const y = padding.top + plotH - (d.cumulative_connections / maxVal) * plotH
-    return { x, y, d }
-  })
-
-  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
-  const areaPath = `${linePath} L ${points[points.length - 1].x} ${padding.top + plotH} L ${points[0].x} ${padding.top + plotH} Z`
-
-  function formatBucket(iso: string) {
-    return new Date(iso).toLocaleString('en-US', { weekday: 'short', hour: 'numeric' })
-  }
-
-  return (
-    <div style={{ border: '1.5px solid var(--border)', borderRadius: 12, padding: '16px 8px', marginBottom: 32 }}>
-      <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="auto" style={{ display: 'block' }}>
-        <path d={areaPath} fill="var(--accent-light)" stroke="none" />
-        <path d={linePath} fill="none" stroke="var(--accent)" strokeWidth={2} />
-        {points.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={3} fill="var(--accent)" />
-        ))}
-        {points.map((p, i) => (
-          (i === 0 || i === points.length - 1 || i === Math.floor(points.length / 2)) && (
-            <text key={`label-${i}`} x={p.x} y={height - 8} textAnchor="middle" fontSize={10} fill="#8a847d">
-              {formatBucket(p.d.bucket)}
-            </text>
-          )
-        ))}
-        <text x={points[points.length - 1].x} y={points[points.length - 1].y - 10} textAnchor="middle" fontSize={12} fontWeight={700} fill="var(--accent)">
-          {points[points.length - 1].d.cumulative_connections}
-        </text>
-      </svg>
-    </div>
-  )
 }
