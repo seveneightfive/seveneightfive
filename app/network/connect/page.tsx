@@ -35,7 +35,7 @@ export default function ConnectPage() {
       // Pulls every row from connection_types live, in the order you defined
       // them (id ascending) — add or rename types in Supabase and this list
       // updates automatically, no code change needed.
-      const { data } = await supabase.from('connection_types').select('slug, label').order('id')
+      const { data } = await supabase.from('connection_types').select('slug, label').order('sort_order')
       setConnectionTypes((data as ConnectionTypeOption[]) ?? [])
     }
     loadConnectionTypes()
