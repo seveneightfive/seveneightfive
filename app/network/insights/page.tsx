@@ -14,49 +14,32 @@ interface GenreBridge {
   name: string
   genres_bridged: number
 }
-interface GenreDetail {
-  genre: string
-  connection_count: number
+interface GrowthPoint {
+  bucket: string
+  new_connections: number
+  cumulative_connections: number
 }
 
 export default function NetworkInsightsPage() {
   const [rolePairs, setRolePairs] = useState<RolePair[]>([])
   const [genreBridges, setGenreBridges] = useState<GenreBridge[]>([])
+  const [growth, setGrowth] = useState<GrowthPoint[]>([])
   const [loading, setLoading] = useState(true)
-
-  // Expand-on-click state for the Genre Bridges list. Detail is fetched
-  // once per person and cached in genreDetails — clicking a name again
-  // just re-toggles the dropdown, no refetch.
-  const [expandedPersonId, setExpandedPersonId] = useState<string | null>(null)
-  const [genreDetails, setGenreDetails] = useState<Record<string, GenreDetail[]>>({})
-  const [detailLoading, setDetailLoading] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
-      const [pairsRes, bridgesRes] = await Promise.all([
+      const [pairsRes, bridgesRes, growthRes] = await Promise.all([
         supabase.rpc('role_pair_matrix'),
         supabase.rpc('genre_bridge_scores'),
+        supabase.rpc('connections_growth'),
       ])
       if (pairsRes.data) setRolePairs(pairsRes.data as RolePair[])
       if (bridgesRes.data) setGenreBridges((bridgesRes.data as GenreBridge[]).slice(0, 8))
+      if (growthRes.data) setGrowth(growthRes.data as GrowthPoint[])
       setLoading(false)
     }
     load()
   }, [])
-
-  async function toggleBridgeRow(personId: string) {
-    if (expandedPersonId === personId) {
-      setExpandedPersonId(null)
-      return
-    }
-    setExpandedPersonId(personId)
-    if (!genreDetails[personId]) {
-      setDetailLoading(personId)
-      const { data } = await supabase.rpc('genre_bridge_detail', { p_person_id: personId })
-      setGenreDetails((prev) => ({ ...prev, [personId]: (data as GenreDetail[]) ?? [] }))
-      setDetailLoading(null)
-    }
-  }
 
   const maxCount = Math.max(1, ...rolePairs.map((r) => r.connection_count))
   const maxBridge = Math.max(1, ...genreBridges.map((g) => g.genres_bridged))
@@ -85,10 +68,21 @@ export default function NetworkInsightsPage() {
           <div className="loading-state">Crunching the connections…</div>
         ) : (
           <>
-            <h3 style={sectionHeadingStyle}>Role Interconnection</h3>
+            <h3 style={sectionHeadingStyle}>Network Growth</h3>
+            <p style={{ fontSize: 13, color: 'var(--ink-faint)', marginBottom: 14 }}>
+              Total connections logged, hour by hour. As you run more nights like this, this same view will show
+              the community getting more interconnected over months and years.
+            </p>
+            {growth.length === 0 ? (
+              <div className="empty-state" style={{ marginBottom: 32 }}>No connections logged yet.</div>
+            ) : (
+              <GrowthChart data={growth} />
+            )}
+
+            <h3 style={{ ...sectionHeadingStyle, marginTop: 32 }}>Role Interconnection</h3>
             <p style={{ fontSize: 13, color: 'var(--ink-faint)', marginBottom: 14 }}>
               How often each pair of roles shows up on either side of a logged connection. Longer bar = more
-              connections between two roles.
+              connections between those two roles.
             </p>
             {rolePairs.length === 0 ? (
               <div className="empty-state" style={{ marginBottom: 32 }}>No connections logged yet.</div>
@@ -121,75 +115,34 @@ export default function NetworkInsightsPage() {
 
             <h3 style={sectionHeadingStyle}>Genre Bridges</h3>
             <p style={{ fontSize: 13, color: 'var(--ink-faint)', marginBottom: 14 }}>
-              How many distinct genres each person&apos;s direct connections span. Tap a name to see which genres.
+              How many distinct genres each person&apos;s direct connections span — the people pulling different
+              corners of the scene together.
             </p>
             {genreBridges.length === 0 ? (
               <div className="empty-state">No genre data yet — this only counts musicians &amp; DJs.</div>
             ) : (
-              genreBridges.map((g) => {
-                const isExpanded = expandedPersonId === g.person_id
-                const details = genreDetails[g.person_id]
-                const isDetailLoading = detailLoading === g.person_id
-
-                return (
-                  <div key={g.person_id} className="card" style={{ padding: '10px 14px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <button
-                        onClick={() => toggleBridgeRow(g.person_id)}
+              genreBridges.map((g) => (
+                <div
+                  key={g.person_id}
+                  className="card"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px' }}
+                >
+                  <span style={{ fontSize: 14, fontWeight: 500 }}>{g.name}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: '0 0 140px' }}>
+                    <div style={{ background: 'var(--off)', borderRadius: 100, height: 6, flex: 1, overflow: 'hidden' }}>
+                      <div
                         style={{
-                          background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', gap: 6, font: 'inherit', color: 'inherit',
+                          width: `${(g.genres_bridged / maxBridge) * 100}%`,
+                          background: 'var(--gold)',
+                          height: '100%',
+                          borderRadius: 100,
                         }}
-                        aria-expanded={isExpanded}
-                      >
-                        <span
-                          style={{
-                            fontSize: 11, color: 'var(--ink-faint)',
-                            transform: isExpanded ? 'rotate(90deg)' : 'none',
-                            transition: 'transform 0.15s', display: 'inline-block',
-                          }}
-                        >
-                          ▶
-                        </span>
-                        <span style={{ fontSize: 14, fontWeight: 500, textDecoration: 'underline', textDecorationColor: 'var(--border)' }}>
-                          {g.name}
-                        </span>
-                      </button>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: '0 0 140px' }}>
-                        <div style={{ background: 'var(--off)', borderRadius: 100, height: 6, flex: 1, overflow: 'hidden' }}>
-                          <div
-                            style={{
-                              width: `${(g.genres_bridged / maxBridge) * 100}%`,
-                              background: 'var(--gold)',
-                              height: '100%',
-                              borderRadius: 100,
-                            }}
-                          />
-                        </div>
-                        <span className="chip chip-neutral">{g.genres_bridged}</span>
-                      </div>
+                      />
                     </div>
-
-                    {isExpanded && (
-                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-                        {isDetailLoading ? (
-                          <p style={{ fontSize: 12, color: 'var(--ink-faint)' }}>Loading genres…</p>
-                        ) : !details || details.length === 0 ? (
-                          <p style={{ fontSize: 12, color: 'var(--ink-faint)' }}>No genre detail found.</p>
-                        ) : (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                            {details.map((d) => (
-                              <span key={d.genre} className="chip chip-neutral">
-                                {d.genre} · {d.connection_count}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    <span className="chip chip-neutral">{g.genres_bridged}</span>
                   </div>
-                )
-              })
+                </div>
+              ))
             )}
           </>
         )}
@@ -206,4 +159,48 @@ const sectionHeadingStyle: React.CSSProperties = {
   textTransform: 'uppercase',
   color: 'var(--ink-soft)',
   marginBottom: 6,
+}
+
+function GrowthChart({ data }: { data: GrowthPoint[] }) {
+  const width = 800
+  const height = 220
+  const padding = { top: 16, right: 16, bottom: 28, left: 16 }
+  const plotW = width - padding.left - padding.right
+  const plotH = height - padding.top - padding.bottom
+
+  const maxVal = Math.max(1, ...data.map((d) => d.cumulative_connections))
+  const points = data.map((d, i) => {
+    const x = padding.left + (data.length === 1 ? plotW / 2 : (i / (data.length - 1)) * plotW)
+    const y = padding.top + plotH - (d.cumulative_connections / maxVal) * plotH
+    return { x, y, d }
+  })
+
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
+  const areaPath = `${linePath} L ${points[points.length - 1].x} ${padding.top + plotH} L ${points[0].x} ${padding.top + plotH} Z`
+
+  function formatBucket(iso: string) {
+    return new Date(iso).toLocaleString('en-US', { weekday: 'short', hour: 'numeric' })
+  }
+
+  return (
+    <div style={{ border: '1.5px solid var(--border)', borderRadius: 12, padding: '16px 8px', marginBottom: 32 }}>
+      <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="auto" style={{ display: 'block' }}>
+        <path d={areaPath} fill="var(--accent-light)" stroke="none" />
+        <path d={linePath} fill="none" stroke="var(--accent)" strokeWidth={2} />
+        {points.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r={3} fill="var(--accent)" />
+        ))}
+        {points.map((p, i) => (
+          (i === 0 || i === points.length - 1 || i === Math.floor(points.length / 2)) && (
+            <text key={`label-${i}`} x={p.x} y={height - 8} textAnchor="middle" fontSize={10} fill="#8a847d">
+              {formatBucket(p.d.bucket)}
+            </text>
+          )
+        ))}
+        <text x={points[points.length - 1].x} y={points[points.length - 1].y - 10} textAnchor="middle" fontSize={12} fontWeight={700} fill="var(--accent)">
+          {points[points.length - 1].d.cumulative_connections}
+        </text>
+      </svg>
+    </div>
+  )
 }
