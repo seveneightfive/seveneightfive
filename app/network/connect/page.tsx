@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { NETWORK_BASE_STYLES } from '../_styles'
+import ConnectionModal from '../_ConnectionModal'
 
 interface Attendee {
   person_id: string
@@ -14,31 +15,15 @@ interface Attendee {
   page_type: 'artist' | 'venue' | null
   page_slug: string | null
 }
-interface ConnectionTypeOption {
-  slug: string
-  label: string
-}
 
 export default function ConnectPage() {
   const [meId, setMeId] = useState<string | null | undefined>(undefined) // undefined = not checked yet
   const [attendees, setAttendees] = useState<Attendee[]>([])
-  const [connectionTypes, setConnectionTypes] = useState<ConnectionTypeOption[]>([])
   const [loading, setLoading] = useState(true)
   const [activeAttendee, setActiveAttendee] = useState<Attendee | null>(null)
 
   useEffect(() => {
     setMeId(localStorage.getItem('network_person_id'))
-  }, [])
-
-  useEffect(() => {
-    async function loadConnectionTypes() {
-      // Pulls every row from connection_types live, in the order you defined
-      // them (id ascending) — add or rename types in Supabase and this list
-      // updates automatically, no code change needed.
-      const { data } = await supabase.from('connection_types').select('slug, label').order('sort_order')
-      setConnectionTypes((data as ConnectionTypeOption[]) ?? [])
-    }
-    loadConnectionTypes()
   }, [])
 
   const loadAttendees = useCallback(async (id: string) => {
@@ -51,6 +36,11 @@ export default function ConnectPage() {
   useEffect(() => {
     if (meId) loadAttendees(meId)
   }, [meId, loadAttendees])
+
+  // Only show people you haven't connected with yet — once you have, they
+  // move to your My Music Connections list, where you can tap their name to
+  // edit or remove the connection. Keeps this list focused on "who's left."
+  const unconnected = attendees.filter((a) => !a.connected)
 
   return (
     <>
@@ -84,6 +74,8 @@ export default function ConnectPage() {
               <p>
                 Tap a name if you&apos;ve performed together, organized an event together, recorded together,
                 shared a bill, worked behind the scenes together, or collaborated in any music-related way.
+                Already connected with someone? Find them on{' '}
+                <a href="/network/me" style={{ color: 'var(--accent)' }}>My Music Connections</a> to edit it.
               </p>
             </div>
 
@@ -91,8 +83,12 @@ export default function ConnectPage() {
               <div className="loading-state">Loading tonight&apos;s attendees…</div>
             ) : attendees.length === 0 ? (
               <div className="empty-state">No one else has checked in yet — check back soon.</div>
+            ) : unconnected.length === 0 ? (
+              <div className="empty-state">
+                You&apos;re connected with everyone here so far — check back as more people check in.
+              </div>
             ) : (
-              attendees.map((a) => (
+              unconnected.map((a) => (
                 <div
                   key={a.person_id}
                   className="card"
@@ -119,15 +115,9 @@ export default function ConnectPage() {
                       </a>
                     )}
                   </div>
-                  {a.connected ? (
-                    <button className="btn-outline" onClick={() => setActiveAttendee(a)}>
-                      ✓ Connected ({a.connection_type_slugs.length})
-                    </button>
-                  ) : (
-                    <button className="btn-primary" onClick={() => setActiveAttendee(a)}>
-                      I&apos;m connected
-                    </button>
-                  )}
+                  <button className="btn-primary" onClick={() => setActiveAttendee(a)}>
+                    I&apos;m connected
+                  </button>
                 </div>
               ))
             )}
@@ -139,7 +129,6 @@ export default function ConnectPage() {
         <ConnectionModal
           attendee={activeAttendee}
           meId={meId}
-          connectionTypes={connectionTypes}
           onClose={() => setActiveAttendee(null)}
           onSaved={() => {
             setActiveAttendee(null)
@@ -148,88 +137,5 @@ export default function ConnectPage() {
         />
       )}
     </>
-  )
-}
-
-function ConnectionModal({
-  attendee,
-  meId,
-  connectionTypes,
-  onClose,
-  onSaved,
-}: {
-  attendee: Attendee
-  meId: string
-  connectionTypes: ConnectionTypeOption[]
-  onClose: () => void
-  onSaved: () => void
-}) {
-  const [selected, setSelected] = useState<string[]>(attendee.connection_type_slugs)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-
-  function toggle(slug: string) {
-    setSelected((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]))
-  }
-
-  async function handleSave() {
-    setSaving(true)
-    setError('')
-    const { error: err } = await supabase.rpc('set_connection', {
-      p_person_a: meId,
-      p_person_b: attendee.person_id,
-      p_type_slugs: selected,
-    })
-    setSaving(false)
-    if (err) {
-      setError(err.message)
-      return
-    }
-    onSaved()
-  }
-
-  async function handleNotConnected() {
-    setSaving(true)
-    const { error: err } = await supabase.rpc('set_connection', {
-      p_person_a: meId,
-      p_person_b: attendee.person_id,
-      p_type_slugs: [],
-    })
-    setSaving(false)
-    if (!err) onSaved()
-  }
-
-  return (
-    <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
-        <div className="modal-header">
-          <h2>You &amp; {attendee.name}</h2>
-          <button className="close-btn" onClick={onClose}>✕</button>
-        </div>
-        <div className="modal-body">
-          <p style={{ fontSize: 13, color: 'var(--ink-soft)', marginBottom: 14 }}>
-            Select everything that applies — you can pick more than one, and it&apos;ll show up on{' '}
-            {attendee.name.split(' ')[0]}&apos;s list too.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {connectionTypes.map((opt) => (
-              <label key={opt.slug} className={`checkbox-tile${selected.includes(opt.slug) ? ' checked' : ''}`}>
-                <input type="checkbox" checked={selected.includes(opt.slug)} onChange={() => toggle(opt.slug)} />
-                {opt.label}
-              </label>
-            ))}
-          </div>
-          {error && <p className="form-error">{error}</p>}
-          <div className="modal-footer">
-            <button className="btn-ghost" onClick={handleNotConnected} disabled={saving}>
-              Not connected
-            </button>
-            <button className="btn-primary" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
   )
 }
