@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { NETWORK_BASE_STYLES } from '../_styles'
+import ConnectionModal from '../_ConnectionModal'
 
 interface Attendee {
   person_id: string
@@ -52,6 +53,7 @@ export default function MyConnectionsPage() {
   const [myRoleIds, setMyRoleIds] = useState<number[]>([])
   const [myGenres, setMyGenres] = useState<string[]>([])
   const [editingRoles, setEditingRoles] = useState(false)
+  const [editingConnection, setEditingConnection] = useState<Attendee | null>(null)
 
   const [claimedPage, setClaimedPage] = useState<{ type: 'artist' | 'venue'; slug: string; name: string } | null>(null)
   const [claimModalOpen, setClaimModalOpen] = useState(false)
@@ -285,17 +287,23 @@ export default function MyConnectionsPage() {
                   ))}
                 </div>
                 {connectedTo.map((a) => (
-                  <div
+                  <button
                     key={a.person_id}
+                    type="button"
+                    onClick={() => setEditingConnection(a)}
                     className="card"
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px' }}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '10px 14px', width: '100%', textAlign: 'left', cursor: 'pointer',
+                      background: 'none', font: 'inherit', color: 'inherit',
+                    }}
                   >
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{a.name}</div>
                       <div style={{ fontSize: 12, color: 'var(--ink-faint)' }}>{a.role_labels.join(', ')}</div>
                     </div>
-                    <span className="chip">{a.connection_type_slugs.length}</span>
-                  </div>
+                    <span className="chip">{a.connection_type_slugs.length} · Edit</span>
+                  </button>
                 ))}
               </>
             )}
@@ -326,6 +334,18 @@ export default function MyConnectionsPage() {
           onSaved={() => {
             setClaimModalOpen(false)
             loadClaimedPage(meId)
+          }}
+        />
+      )}
+
+      {editingConnection && meId && (
+        <ConnectionModal
+          attendee={editingConnection}
+          meId={meId}
+          onClose={() => setEditingConnection(null)}
+          onSaved={() => {
+            setEditingConnection(null)
+            loadStats(meId)
           }}
         />
       )}
