@@ -207,8 +207,21 @@
   /* Body defaults to the warm 785 background + DM Sans. Dark-mode swap only
      fires when .dark is set on <html>, which the dashboard's ThemeProvider
      controls — public pages stay light. */
+  /* overflow-x: hidden here is the site-wide safety net against the
+     mobile "shifted right" bug — full-bleed sections on several pages
+     (event details hero band, sliders, etc.) use 100vw + negative
+     margins to break out of their container, and if any of those come
+     out even a hair wider than the real viewport, the whole page gains
+     horizontal scroll and drifts. Clipping at html/body catches every
+     page at once instead of patching each offending section one by one. */
+  html {
+    overflow-x: hidden;
+  }
+
   body {
     @apply relative font-normal font-sans z-1 bg-surface-light text-gray-800 dark:bg-surface-dark dark:text-gray-200;
+    overflow-x: hidden;
+    max-width: 100vw;
   }
 
   /* All headings default to Oswald with subtle tracking, matching the 785

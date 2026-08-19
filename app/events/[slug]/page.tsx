@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import EventCard from '@/app/components/EventCard'
+import EventListRow from '@/app/components/EventListRow'
 import ImageLightbox from './ImageLightbox'
 import TicketPurchaseButton from '@/app/components/TicketPurchaseButton'
 import FollowFavoriteButtons from '@/app/components/FollowFavoriteButtons'
@@ -556,7 +557,6 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         .venue-card-img { width: 110px; flex-shrink: 0; object-fit: contain; align-self: stretch; background: rgba(255,255,255,0.06); padding: 8px; box-sizing: border-box; }
         .venue-card-img-placeholder { width: 110px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 1.8rem; color: var(--gold); background: rgba(255,255,255,0.08); }
         .venue-card-body { padding: 16px 20px; display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 0; }
-        .venue-card-eyebrow { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.5); }
         .venue-card-name { font-family: var(--serif); font-size: 1.25rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; line-height: 1.15; color: white; }
         .venue-card-address { font-size: 0.85rem; color: white; opacity: 0.85; }
         .venue-card-neighborhood { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gold); margin-top: 2px; }
@@ -591,28 +591,32 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         .see-all-link:hover { opacity: 0.75; }
 
         .related-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .related-list { display: none; }
         @media (max-width: 780px) {
-          .related-grid { grid-template-columns: 1fr; }
+          /* Below 780px the 3-col grid cramps the date/text against the
+             card edges, so we swap to the existing EventListRow list
+             component instead of trying to keep squeezing the grid card. */
+          .related-grid { display: none; }
+          .related-list { display: flex; flex-direction: column; }
         }
 
 
-        /* BROWSE CTA */
-        .browse-cta { padding: 40px 0 8px; text-align: center; border-top: 1px solid var(--border); }
+        /* BROWSE CTA — the only footer on this page now; used to be
+           followed by a second "seveneightfive magazine" footer, which
+           was redundant, so it picks up a bit more bottom padding to
+           replace the breathing room that footer used to provide. */
+        .browse-cta { padding: 40px 0 48px; text-align: center; border-top: 1px solid var(--border); }
         .browse-cta-link { display: inline-flex; align-items: center; gap: 8px; font-family: var(--serif); font-size: 0.85rem; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-faint); text-decoration: none; transition: color 0.15s; }
         .browse-cta-link em { font-style: normal; color: var(--accent); font-weight: 600; }
         .browse-cta-link:hover { color: var(--ink); }
 
-        .event-footer { padding: 20px 32px 56px; text-align: center; max-width: 1240px; margin: 0 auto; }
-        .footer-brand { font-family: var(--serif); font-size: 0.76rem; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-faint); text-decoration: none; }
-        .footer-brand em { font-style: normal; color: var(--accent); font-weight: 600; }
-        .footer-brand:hover { color: var(--ink); }
-
         @media (max-width: 640px) {
           .page-wrap { padding: 28px 20px 0; }
-          .event-footer { padding: 16px 20px 48px; }
+          .browse-cta { padding: 32px 0 40px; }
           .btn-block { width: 100%; }
         }
       `}</style>
+
 
       <main className="page-wrap">
 
@@ -676,21 +680,40 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
               ) : 'Time TBA'}
             </div>
 
+            {/* Venue callout — black bg, full-height image like the artist card.
+                Sits right below the time so there's only one venue touchpoint
+                in this column instead of it also being duplicated in the info
+                card below. */}
+            {event.venue && (
+              <a
+                href={event.venue.slug ? `/venues/${event.venue.slug}` : event.venue.website || '#'}
+                target={event.venue.slug ? '_self' : '_blank'}
+                rel={event.venue.slug ? undefined : 'noopener noreferrer'}
+                className="venue-card"
+              >
+                {event.venue.logo || event.venue.image_url
+                  ? <img src={event.venue.logo ?? event.venue.image_url ?? ''} alt={event.venue.name} className="venue-card-img" />
+                  : <div className="venue-card-img-placeholder">{event.venue.name[0]}</div>
+                }
+                <div className="venue-card-body">
+                  <div className="venue-card-name">{event.venue.name}</div>
+                  {event.venue.address && (
+                    <div className="venue-card-address">{event.venue.address}</div>
+                  )}
+                  {event.venue.neighborhood && (
+                    <div className="venue-card-neighborhood">{event.venue.neighborhood}</div>
+                  )}
+                </div>
+                <div className="card-arrow"><ArrowIcon /></div>
+              </a>
+            )}
+
             {/* Info card */}
             <div className="info-card">
               <div className="info-grid">
 
-                {event.venue && (
-                  <div className="info-cell">
-                    <div className="info-label">Venue</div>
-                    <div className="info-value">
-                      <strong>{event.venue.name}</strong>
-                    </div>
-                  </div>
-                )}
-
                 {event.capacity && (
-                  <div className="info-cell">
+                  <div className="info-cell full">
                     <div className="info-label">Capacity</div>
                     <div className="info-value">{event.capacity.toLocaleString()} guests</div>
                   </div>
@@ -747,38 +770,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
                 title={event.title}
                 description={event.description}
               />
-              {/* NOTE: couldn't fetch AddToCalendar.tsx to check its internal
-                  button markup — GitHub's API was returning 503s while
-                  building this. It's dropped in here as-is; if its default
-                  size/shape doesn't sit well next to Share, send a
-                  screenshot and I'll true up the sizing. */}
             </div>
-
-            {/* Venue callout — black bg, full-height image like the artist card */}
-            {event.venue && (
-              <a
-                href={event.venue.slug ? `/venues/${event.venue.slug}` : event.venue.website || '#'}
-                target={event.venue.slug ? '_self' : '_blank'}
-                rel={event.venue.slug ? undefined : 'noopener noreferrer'}
-                className="venue-card"
-              >
-                {event.venue.logo || event.venue.image_url
-                  ? <img src={event.venue.logo ?? event.venue.image_url ?? ''} alt={event.venue.name} className="venue-card-img" />
-                  : <div className="venue-card-img-placeholder">{event.venue.name[0]}</div>
-                }
-                <div className="venue-card-body">
-                  <div className="venue-card-eyebrow">Venue</div>
-                  <div className="venue-card-name">{event.venue.name}</div>
-                  {event.venue.address && (
-                    <div className="venue-card-address">{event.venue.address}</div>
-                  )}
-                  {event.venue.neighborhood && (
-                    <div className="venue-card-neighborhood">{event.venue.neighborhood}</div>
-                  )}
-                </div>
-                <div className="card-arrow"><ArrowIcon /></div>
-              </a>
-            )}
 
             {/* Meet The Artist callout(s) */}
             {event.artists.map((artist) => (
@@ -829,6 +821,11 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
                 <EventCard key={rel.id} event={rel} />
               ))}
             </div>
+            <div className="related-list">
+              {categoryEvents.map((rel) => (
+                <EventListRow key={rel.id} event={rel} />
+              ))}
+            </div>
           </div>
         )}
 
@@ -844,6 +841,11 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
                 <EventCard key={rel.id} event={rel} />
               ))}
             </div>
+            <div className="related-list">
+              {alsoLikeEvents.map((rel) => (
+                <EventListRow key={rel.id} event={rel} />
+              ))}
+            </div>
           </div>
         )}
 
@@ -855,12 +857,6 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         </div>
 
       </main>
-
-      <footer className="event-footer">
-        <a href="/events" className="footer-brand">
-          <em>seveneightfive</em> magazine
-        </a>
-      </footer>
     </>
   )
 }

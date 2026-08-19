@@ -43,7 +43,7 @@ function isImmersive(pathname: string) {
 
 export default function SiteNav() {
   const pathname = usePathname()
-  const { logoSuffix, rightText } = useNavState()
+  const { rightText } = useNavState()
 
   if (isImmersive(pathname)) return null
 
@@ -57,8 +57,12 @@ export default function SiteNav() {
     <>
       {!hideDesktopTopnav && (
         <header className={styles.topnav}>
-          <Link href="/" className={styles.logo}>
-            785<span>{logoSuffix}</span>
+          <Link href="/" className={styles.logoLink} aria-label="seveneightfive home">
+            <img
+              src="https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785logo_web_Proxy.png"
+              alt="seveneightfive"
+              className={styles.logoImg}
+            />
           </Link>
           <nav>
             <Link href="/events"    className={`${styles.navLink} ${isActive('/events')    ? styles.activeNav : ''}`}>Events</Link>
@@ -72,8 +76,12 @@ export default function SiteNav() {
 
       {!hideMobileHeader && (
         <header className={styles.mobileHeader}>
-          <Link href="/" className={styles.logo}>
-            785<span>{logoSuffix}</span>
+          <Link href="/" className={styles.logoLink} aria-label="seveneightfive home">
+            <img
+              src="https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785logo_web_Proxy.png"
+              alt="seveneightfive"
+              className={styles.logoImgMobile}
+            />
           </Link>
           <span className={styles.date}>
             {rightText || date}
