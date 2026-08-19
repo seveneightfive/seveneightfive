@@ -1,115 +1,190 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabaseServerAuth'
 import { createClient as createAdmin } from '@/lib/supabaseServer'
+import { sendAttendeeTicketEmail } from '@/app/lib/email'
 
 /**
  * POST /api/tickets/rsvp
  *
- * Creates a free ticket (RSVP) without Stripe. Supports BOTH logged-in
- * users and guest RSVPs.
+ * Free ticket cart with full per-attendee data — mirrors the paid
+ * checkout flow's attendee model, but writes tickets + responses
+ * immediately since there's no Stripe round-trip to wait on.
+ *
+ * All items here must be free (price === 0); a cart containing any
+ * paid tier should go through /api/tickets/checkout instead.
  *
  * Body: {
- *   tierId: string,
  *   eventId: string,
- *   quantity?: number,
+ *   items: { tierId: string, quantity: number }[],
  *   guest?: { name: string, email: string, phone: string | null },
- *   responses?: { field_id: string, value: string }[]
+ *   attendees: {
+ *     tierId: string,
+ *     name: string,
+ *     responses: { field_id: string, value: string }[]
+ *   }[]   // flat list, length === sum(items[].quantity), grouped by
+ *         // tier in the same order as `items`
  * }
- *
- * responses are answers to the event's custom buyer questions
- * (event_form_fields). Since a free RSVP mints tickets immediately —
- * no async webhook step like the paid flow — responses are written
- * directly here, one row per (ticket, field) pair. If quantity > 1,
- * the same answers are recorded against every ticket in the order
- * (questions are asked once per order, not once per attendee).
  */
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
 
-    const { tierId, eventId, quantity = 1, guest, responses } = await request.json()
+    const body = await request.json()
+    const { eventId, guest } = body
 
-    if (!tierId || !eventId) {
-      return NextResponse.json(
-        { error: 'tierId and eventId are required' },
-        { status: 400 }
-      )
+    const items: { tierId: string; quantity: number }[] = Array.isArray(body.items)
+      ? body.items.filter((it: any) => it?.tierId && Number(it.quantity) > 0)
+      : []
+    const attendees: { tierId: string; name: string; email?: string | null; responses: { field_id: string; value: string }[] }[] =
+      Array.isArray(body.attendees) ? body.attendees : []
+
+    if (!eventId || items.length === 0) {
+      return NextResponse.json({ error: 'eventId and at least one item are required' }, { status: 400 })
     }
-
     if (!user && !guest) {
-      return NextResponse.json(
-        { error: 'Buyer information is required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Buyer information is required' }, { status: 400 })
     }
-
     if (!user && guest && (!guest.name?.trim() || !guest.email?.trim())) {
-      return NextResponse.json(
-        { error: 'Name and email are required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Name and email are required' }, { status: 400 })
     }
 
-    const admin = createAdmin()
+    // Notify any attendee who has their own email that isn't the
+    // purchaser's — free RSVPs mint immediately, so this happens now
+    // rather than in a webhook.
+    if (inserted?.length) {
+      const buyerEmailLower = buyerEmail.toLowerCase()
+      const attendeesNeedingEmail = inserted
+        .map((t, i) => ({ ticket: t, attendee: attendees[i] }))
+        .filter(({ ticket }) => ticket.attendee_email && ticket.attendee_email.toLowerCase() !== buyerEmailLower)
 
-    // Verify the tier exists, is active, and is genuinely free
-    const { data: tier, error: tierError } = await admin
-      .from('ticket_tiers')
-      .select('id, name, price, quantity, quantity_sold, is_active, event_id')
-      .eq('id', tierId)
-      .eq('event_id', eventId)
-      .single()
+      if (attendeesNeedingEmail.length > 0) {
+        try {
+          const tierIds2 = [...new Set(attendeesNeedingEmail.map((a) => a.ticket.ticket_tier_id))]
+          const { data: tierRows2 } = await admin.from('ticket_tiers').select('id, name').in('id', tierIds2)
+          const tierNameById = new Map((tierRows2 || []).map((t) => [t.id, t.name]))
 
-    if (tierError || !tier) {
-      return NextResponse.json({ error: 'Ticket tier not found' }, { status: 404 })
-    }
+          const { data: ev } = await admin
+            .from('events')
+            .select(`
+              title, slug, image_url, event_date, event_start_time, event_end_time, auth_user_id,
+              venues ( name, address ),
+              profiles!events_auth_user_id_profile_fkey ( full_name, email )
+            `)
+            .eq('id', eventId)
+            .single()
 
-    if (!tier.is_active) {
-      return NextResponse.json(
-        { error: 'This ticket tier is not currently available' },
-        { status: 400 }
-      )
-    }
+          if (ev) {
+            const venue = Array.isArray(ev.venues) ? ev.venues[0] : ev.venues
+            const creatorProfile = Array.isArray(ev.profiles) ? ev.profiles[0] : ev.profiles
+            const eventDetails = {
+              title: ev.title, slug: ev.slug, date: ev.event_date, startTime: ev.event_start_time,
+              endTime: ev.event_end_time, image_url: ev.image_url,
+              venueName: venue?.name || null, venueAddress: venue?.address || null, venueCityState: null,
+            }
 
-    if (Number(tier.price) !== 0) {
-      return NextResponse.json(
-        { error: 'This tier requires payment — use the checkout flow' },
-        { status: 400 }
-      )
-    }
-
-    if (tier.quantity !== null) {
-      const remaining = tier.quantity - tier.quantity_sold
-      if (remaining < quantity) {
-        return NextResponse.json(
-          { error: `Only ${remaining} spot(s) remaining` },
-          { status: 400 }
-        )
+            for (const { ticket, attendee } of attendeesNeedingEmail) {
+              try {
+                await sendAttendeeTicketEmail({
+                  to: ticket.attendee_email!,
+                  attendeeName: attendee?.name || null,
+                  purchaserName: buyerName,
+                  event: eventDetails,
+                  ticket: { qr_token: ticket.qr_token, ticket_tier_name: tierNameById.get(ticket.ticket_tier_id) || 'Ticket' },
+                  amountPaid: 0,
+                  organizerName: creatorProfile?.full_name || null,
+                  organizerEmail: creatorProfile?.email || null,
+                })
+              } catch (attendeeEmailErr) {
+                console.error('[tickets/rsvp] attendee notification send failed (non-fatal):', attendeeEmailErr)
+              }
+            }
+          }
+        } catch (lookupErr) {
+          console.error('[tickets/rsvp] attendee notification lookup failed (non-fatal):', lookupErr)
+        }
       }
     }
 
-    // Validate that any required questions for this tier were answered.
-    // (The client already enforces this — this is the server-side backstop.)
+    const totalQuantity = items.reduce((sum, it) => sum + it.quantity, 0)
+    if (attendees.length !== totalQuantity) {
+      return NextResponse.json({ error: 'Attendee details are missing for one or more tickets' }, { status: 400 })
+    }
+    for (const a of attendees) {
+      if (!a.name?.trim()) {
+        return NextResponse.json({ error: 'Every ticket needs an attendee name' }, { status: 400 })
+      }
+      if (a.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email.trim())) {
+        return NextResponse.json({ error: `"${a.email}" doesn't look like a valid email.` }, { status: 400 })
+      }
+    }
+    for (const it of items) {
+      const count = attendees.filter((a) => a.tierId === it.tierId).length
+      if (count !== it.quantity) {
+        return NextResponse.json({ error: 'Attendee details don\'t match the cart quantities' }, { status: 400 })
+      }
+    }
+
+    const admin = createAdmin()
+    const tierIds = items.map((it) => it.tierId)
+
+    const { data: tierRows, error: tierError } = await admin
+      .from('ticket_tiers')
+      .select('id, name, price, quantity, quantity_sold, is_active, event_id')
+      .in('id', tierIds)
+      .eq('event_id', eventId)
+
+    if (tierError || !tierRows || tierRows.length !== tierIds.length) {
+      return NextResponse.json({ error: 'One or more ticket tiers were not found' }, { status: 404 })
+    }
+
+    const tierById = new Map(tierRows.map((t) => [t.id, t]))
+
+    for (const it of items) {
+      const tier = tierById.get(it.tierId)!
+      if (Number(tier.price) !== 0) {
+        return NextResponse.json(
+          { error: `"${tier.name}" requires payment — free and paid tickets can't be RSVP'd together. Please use checkout.` },
+          { status: 400 }
+        )
+      }
+      if (!tier.is_active) {
+        return NextResponse.json({ error: `"${tier.name}" is not currently available` }, { status: 400 })
+      }
+      if (tier.quantity !== null) {
+        const remaining = tier.quantity - tier.quantity_sold
+        if (remaining < it.quantity) {
+          return NextResponse.json({ error: `Only ${remaining} spot(s) remaining for "${tier.name}"` }, { status: 400 })
+        }
+      }
+    }
+
+    // Required custom questions — validated per attendee, per their tier.
     const { data: applicableFields } = await admin
       .from('event_form_fields')
       .select('id, label, is_required, ticket_tier_id')
       .eq('event_id', eventId)
-      .or(`ticket_tier_id.is.null,ticket_tier_id.eq.${tierId}`)
+      .or(`ticket_tier_id.is.null,ticket_tier_id.in.(${tierIds.join(',')})`)
 
-    const responseMap = new Map<string, string>(
-      (Array.isArray(responses) ? responses : []).map((r: any) => [r.field_id, String(r.value ?? '').trim()])
-    )
-
+    const eventLevelRequired = (applicableFields || []).filter((f) => f.is_required && !f.ticket_tier_id)
+    const tierRequiredMap: Record<string, typeof applicableFields> = {}
     for (const f of applicableFields || []) {
-      if (f.is_required && !(responseMap.get(f.id) || '').length) {
-        return NextResponse.json({ error: `"${f.label}" is required.` }, { status: 400 })
+      if (f.is_required && f.ticket_tier_id) {
+        tierRequiredMap[f.ticket_tier_id] = tierRequiredMap[f.ticket_tier_id] || []
+        tierRequiredMap[f.ticket_tier_id]!.push(f)
+      }
+    }
+    for (const a of attendees) {
+      const responseMap = new Map(a.responses.map((r) => [r.field_id, (r.value || '').trim()]))
+      const required = [...eventLevelRequired, ...(tierRequiredMap[a.tierId] || [])]
+      for (const f of required) {
+        if (!(responseMap.get(f.id) || '').length) {
+          return NextResponse.json({ error: `"${f.label}" is required for ${a.name}.` }, { status: 400 })
+        }
       }
     }
 
-    // Resolve buyer info
+    // Purchaser identity (billing/contact — separate from attendees)
     let buyerEmail: string
     let buyerName: string | null
     let buyerPhone: string | null
@@ -121,7 +196,6 @@ export async function POST(request: NextRequest) {
         .select('email, full_name, phone_number')
         .eq('id', user.id)
         .single()
-
       buyerEmail = profile?.email || user.email || ''
       buyerName = profile?.full_name || null
       buyerPhone = profile?.phone_number || null
@@ -133,8 +207,8 @@ export async function POST(request: NextRequest) {
       buyerUserId = null
     }
 
-    // Dedupe — same email can't RSVP twice for the same event.
-    // We match on buyer_user_id when logged in, buyer_email when guest.
+    // Dedupe — one RSVP per person per event, regardless of how many
+    // tiers/attendees it covers.
     const dedupeQuery = admin
       .from('tickets')
       .select('id')
@@ -146,19 +220,17 @@ export async function POST(request: NextRequest) {
       : await dedupeQuery.ilike('buyer_email', buyerEmail).maybeSingle()
 
     if (existing) {
-      return NextResponse.json(
-        { error: 'An RSVP already exists for this email at this event' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'An RSVP already exists for this email at this event' }, { status: 400 })
     }
 
-    const tickets = Array.from({ length: quantity }, () => ({
-      ticket_tier_id: tierId,
+    const ticketRows = attendees.map((a) => ({
+      ticket_tier_id: a.tierId,
       event_id: eventId,
       buyer_user_id: buyerUserId,
       buyer_email: buyerEmail,
-      buyer_name: buyerName,
+      buyer_name: a.name.trim(),
       buyer_phone: buyerPhone,
+      attendee_email: a.email?.trim().toLowerCase() || null,
       payment_status: 'paid' as const,
       amount_paid: 0,
       platform_fee: 0,
@@ -167,44 +239,33 @@ export async function POST(request: NextRequest) {
 
     const { data: inserted, error: insertError } = await admin
       .from('tickets')
-      .insert(tickets)
-      .select('id, qr_token')
+      .insert(ticketRows)
+      .select('id, qr_token, ticket_tier_id, attendee_email')
 
-    if (insertError) {
+    if (insertError || !inserted) {
       console.error('[tickets/rsvp] insert error:', insertError)
       return NextResponse.json({ error: 'Failed to save your RSVP' }, { status: 500 })
     }
 
-    // Persist question responses against every ticket in this order.
-    if (responseMap.size > 0 && inserted?.length) {
-      const responseRows: Record<string, any>[] = []
-      for (const t of inserted) {
-        for (const [fieldId, value] of responseMap.entries()) {
-          if (!value) continue
-          responseRows.push({
-            event_id: eventId,
-            ticket_id: t.id,
-            field_id: fieldId,
-            response: value,
-          })
-        }
+    // Save each attendee's answers against their own ticket. Insert
+    // order matches attendees order (single multi-row INSERT ...
+    // RETURNING preserves input order in Postgres).
+    const responseRows: Record<string, any>[] = []
+    inserted.forEach((t, i) => {
+      for (const r of attendees[i]?.responses || []) {
+        if (!r.field_id || !r.value?.trim()) continue
+        responseRows.push({ event_id: eventId, ticket_id: t.id, field_id: r.field_id, response: r.value.trim() })
       }
-      if (responseRows.length > 0) {
-        const { error: responseErr } = await admin
-          .from('event_registration_responses')
-          .insert(responseRows)
-        if (responseErr) {
-          // Non-fatal — the RSVP itself already succeeded. Log and move on
-          // rather than making the buyer think their spot wasn't saved.
-          console.error('[tickets/rsvp] failed to save responses:', responseErr)
-        }
-      }
+    })
+    if (responseRows.length > 0) {
+      const { error: responseErr } = await admin.from('event_registration_responses').insert(responseRows)
+      if (responseErr) console.error('[tickets/rsvp] failed to save responses:', responseErr)
     }
 
     return NextResponse.json({
       ok: true,
       tickets: inserted,
-      message: `RSVP confirmed for ${quantity} guest${quantity > 1 ? 's' : ''}`,
+      message: `RSVP confirmed for ${totalQuantity} guest${totalQuantity > 1 ? 's' : ''}`,
     })
   } catch (err: any) {
     console.error('[tickets/rsvp] error:', err)
