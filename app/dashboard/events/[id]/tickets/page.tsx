@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabaseBrowser'
 import EventMarketingTab from '@/app/components/EventMarketingTab'
 import TicketTiersEditor from '@/app/components/TicketTiersEditor'
+import EventQuestionsEditor from '@/app/components/EventQuestionsEditor'
 import {
   Ticket,
   CheckCircle2,
@@ -13,13 +14,14 @@ import {
   Percent,
   AlertCircle,
   ArrowUpRight,
+  Download,
 } from 'lucide-react'
 
 /**
  * /dashboard/events/[id]/tickets
  *
  * Per-event ticket management surface. Two tabs:
- * - Ticketing: Tier editor, tier performance, attendee list, door check-in
+ * - Ticketing: Tier editor, buyer questions, tier performance, attendee list, door check-in
  * - Marketing: Event URL, QR code, social shares, traffic analytics
  */
 
@@ -36,8 +38,10 @@ export default function EventTicketsPage() {
   const [profile, setProfile] = useState<any>(null)
   const [tiers, setTiers] = useState<any[]>([])
   const [tickets, setTickets] = useState<any[]>([])
+  const [responsesByTicket, setResponsesByTicket] = useState<Record<string, { label: string; value: string }[]>>({})
   const [activeTab, setActiveTab] = useState<'ticketing' | 'marketing'>('ticketing')
   const [checkInCopied, setCheckInCopied] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   const supabase = createClient()
 
@@ -123,6 +127,28 @@ export default function EventTicketsPage() {
 
         setTiers(tiersData || [])
         setTickets(ticketsData || [])
+
+        // Load custom question responses for these tickets, if any
+        // questions exist for this event at all.
+        const ticketIds = (ticketsData || []).map((t) => t.id)
+        if (ticketIds.length > 0) {
+          const { data: responses } = await supabase
+            .from('event_registration_responses')
+            .select('ticket_id, response, event_form_fields(label)')
+            .in('ticket_id', ticketIds)
+
+          const grouped: Record<string, { label: string; value: string }[]> = {}
+          for (const r of responses || []) {
+            const label = Array.isArray(r.event_form_fields)
+              ? r.event_form_fields[0]?.label
+              : (r.event_form_fields as any)?.label
+            if (!label) continue
+            grouped[r.ticket_id] = grouped[r.ticket_id] || []
+            grouped[r.ticket_id].push({ label, value: r.response })
+          }
+          setResponsesByTicket(grouped)
+        }
+
         setLoading(false)
       } catch (err) {
         console.error('Error loading event:', err)
@@ -165,6 +191,27 @@ export default function EventTicketsPage() {
     navigator.clipboard.writeText(checkInUrl)
     setCheckInCopied(true)
     setTimeout(() => setCheckInCopied(false), 2000)
+  }
+
+  async function handleExportCsv() {
+    setExporting(true)
+    try {
+      const res = await fetch(`/api/events/${eventId}/tickets/export`)
+      if (!res.ok) throw new Error('Export failed')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${event.slug || 'event'}-attendees.csv`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('CSV export failed:', err)
+    } finally {
+      setExporting(false)
+    }
   }
 
   const formatDate = (d: string) =>
@@ -308,6 +355,15 @@ export default function EventTicketsPage() {
             />
           </Card>
 
+          {/* Buyer questions */}
+          <Card>
+            <h2 className={sectionHeadingCls}>Ticket Buyer Questions</h2>
+            <EventQuestionsEditor
+              eventId={eventId}
+              tiers={eventTiers.map((t) => ({ id: t.id, name: t.name }))}
+            />
+          </Card>
+
           {/* Tier performance */}
           {eventTiers.length > 0 && (
             <Card>
@@ -398,11 +454,23 @@ export default function EventTicketsPage() {
               <h2 className="font-display text-xl font-bold uppercase tracking-wide text-gray-900 dark:text-white">
                 Attendees
               </h2>
-              {totalSold > 0 && (
-                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                  {totalSold} total
-                </span>
-              )}
+              <div className="flex items-center gap-3">
+                {totalSold > 0 && (
+                  <button
+                    onClick={handleExportCsv}
+                    disabled={exporting}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.08]"
+                  >
+                    <Download className="h-3 w-3" />
+                    {exporting ? 'Exporting…' : 'Export CSV'}
+                  </button>
+                )}
+                {totalSold > 0 && (
+                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                    {totalSold} total
+                  </span>
+                )}
+              </div>
             </div>
 
             {eventTickets.length === 0 ? (
@@ -415,35 +483,54 @@ export default function EventTicketsPage() {
                   const tierName = Array.isArray(t.ticket_tiers)
                     ? t.ticket_tiers[0]?.name
                     : (t.ticket_tiers as any)?.name
+                  const responses = responsesByTicket[t.id]
                   return (
                     <div
                       key={t.id}
-                      className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-white/[0.03]"
+                      className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-white/[0.03]"
                     >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-sm font-semibold text-gray-900 dark:text-white">
-                            {t.buyer_name || 'Guest'}
-                          </span>
-                          <StatusPill status={t.status} />
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                              {t.buyer_name || 'Guest'}
+                            </span>
+                            <StatusPill status={t.status} />
+                          </div>
+                          <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
+                            {t.buyer_email}
+                          </div>
                         </div>
-                        <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
-                          {t.buyer_email}
+                        <div className="shrink-0 text-right">
+                          <div className="font-display text-sm font-bold text-success-700 dark:text-success-400">
+                            {t.amount_paid
+                              ? `$${parseFloat(t.amount_paid as any).toFixed(2)}`
+                              : 'Free'}
+                          </div>
+                          <div className="mt-0.5 text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                            {tierName}
+                          </div>
+                          <div className="text-[10px] text-gray-400 dark:text-gray-500">
+                            {formatTime(t.created_at)}
+                          </div>
                         </div>
                       </div>
-                      <div className="shrink-0 text-right">
-                        <div className="font-display text-sm font-bold text-success-700 dark:text-success-400">
-                          {t.amount_paid
-                            ? `$${parseFloat(t.amount_paid as any).toFixed(2)}`
-                            : 'Free'}
+
+                      {responses && responses.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 border-t border-gray-100 pt-2 dark:border-gray-800/60">
+                          {responses.map((r, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-[11px] text-gray-600 dark:bg-white/[0.06] dark:text-gray-400"
+                            >
+                              <span className="font-semibold text-gray-800 dark:text-gray-300">
+                                {r.label}:
+                              </span>
+                              <span className="ml-1">{r.value}</span>
+                            </span>
+                          ))}
                         </div>
-                        <div className="mt-0.5 text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                          {tierName}
-                        </div>
-                        <div className="text-[10px] text-gray-400 dark:text-gray-500">
-                          {formatTime(t.created_at)}
-                        </div>
-                      </div>
+                      )}
                     </div>
                   )
                 })}
