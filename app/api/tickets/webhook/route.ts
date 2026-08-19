@@ -32,6 +32,13 @@ import { sendTicketEmail } from '@/app/lib/email'
  *   2. Fallback: lookup profile by buyer_user_id (legacy code path)
  *   3. Last resort: pull from Stripe's session.customer_details
  *
+ * Custom question responses (metadata.custom_responses): a compact
+ * JSON array of {i: field_id, v: value}, packed by /api/tickets/checkout.
+ * Same answers get written against every ticket minted in the order —
+ * questions are asked once per order, not once per attendee. Failures
+ * writing responses are logged but non-fatal; the ticket itself is the
+ * thing that must not be lost.
+ *
  * Email sending: errors during email send are caught and logged but
  * do NOT fail the webhook. If we returned 500, Stripe would retry and
  * we'd double-mint tickets. The user can re-trigger the email from
@@ -174,6 +181,8 @@ export async function POST(request: NextRequest) {
           `[webhook] minted ${inserted.length} ticket(s) for event ${eventId} (guest=${!buyerUserId})`
         )
 
+        await saveCustomResponses({ admin, eventId, ticketIds: inserted.map((t) => t.id), metadata: meta })
+
         // Fire-and-log email send. Failures must not bubble up — they
         // would cause Stripe to retry and double-mint tickets.
         try {
@@ -255,6 +264,13 @@ export async function POST(request: NextRequest) {
           break
         }
 
+        await saveCustomResponses({
+          admin,
+          eventId: meta.event_id,
+          ticketIds: insertedFallback.map((t) => t.id),
+          metadata: meta,
+        })
+
         try {
           await sendTicketConfirmation({
             admin,
@@ -311,6 +327,47 @@ export async function POST(request: NextRequest) {
   } catch (err: any) {
     console.error('[webhook] handler error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+/**
+ * Parses metadata.custom_responses (packed by /api/tickets/checkout as
+ * compact {i,v} JSON) and writes one event_registration_responses row
+ * per (ticket, field) pair, across every ticket minted in this order.
+ * Failures here are logged but never thrown — the ticket already
+ * exists and must not be rolled back over an optional side-table write.
+ */
+async function saveCustomResponses(args: {
+  admin: ReturnType<typeof createClient>
+  eventId: string
+  ticketIds: string[]
+  metadata: Record<string, string>
+}) {
+  const { admin, eventId, ticketIds, metadata } = args
+  const raw = metadata.custom_responses
+  if (!raw || !ticketIds.length) return
+
+  let parsed: { i: string; v: string }[]
+  try {
+    parsed = JSON.parse(raw)
+  } catch (err) {
+    console.error('[webhook] failed to parse custom_responses metadata:', err)
+    return
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0) return
+
+  const rows: Record<string, any>[] = []
+  for (const ticketId of ticketIds) {
+    for (const r of parsed) {
+      if (!r?.i || !r?.v) continue
+      rows.push({ event_id: eventId, ticket_id: ticketId, field_id: r.i, response: r.v })
+    }
+  }
+  if (!rows.length) return
+
+  const { error } = await admin.from('event_registration_responses').insert(rows)
+  if (error) {
+    console.error('[webhook] failed to save custom_responses:', error)
   }
 }
 
