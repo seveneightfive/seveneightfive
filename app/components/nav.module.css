@@ -27,6 +27,24 @@
   color: #C80650;
 }
 
+.logoLink {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.logoImg {
+  height: 34px;
+  width: auto;
+  display: block;
+}
+
+.logoImgMobile {
+  height: 30px;
+  width: auto;
+  display: block;
+}
+
 .topnav nav {
   display: flex;
   gap: 4px;
