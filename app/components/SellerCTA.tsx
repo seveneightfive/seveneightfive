@@ -76,7 +76,7 @@ export default function SellerCTA({
   if (variant === 'banner') {
     return (
       <Link
-        href="/dashboard/settings/payouts"
+        href="/dashboard/payouts"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -127,7 +127,7 @@ export default function SellerCTA({
         {copy.body}
       </div>
       <Link
-        href="/dashboard/settings/payouts"
+        href="/dashboard/payouts"
         style={{
           display: 'inline-block',
           padding: '10px 16px',
