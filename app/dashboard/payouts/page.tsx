@@ -11,6 +11,8 @@ import {
   CheckCircle,
   AlertTriangle,
   RefreshCw,
+  Copy,
+  Globe,
 } from 'lucide-react'
 
 /**
@@ -23,6 +25,13 @@ import {
  * a separate backend task, not included in this pass. Everything else
  * here (connect flow, status card, seller details form, "what you can
  * do" list) is the same logic as before, restyled.
+ *
+ * ADDED: a "Your public seller page" card once Stripe is enabled and
+ * seller_slug exists. seller_slug is generated automatically by
+ * lib/stripeSync.ts the moment the account first becomes enabled — see
+ * that file for the generation logic. This card is the only place in
+ * the app that currently surfaces the /sellers/[slug] URL to the seller
+ * themselves.
  */
 
 type Profile = {
@@ -32,10 +41,13 @@ type Profile = {
   stripe_account_id: string | null
   stripe_account_status: 'pending' | 'restricted' | 'enabled' | null
   is_seller: boolean
+  seller_slug: string | null
   seller_business_name: string | null
   seller_support_email: string | null
   seller_activated_at: string | null
 }
+
+const SITE_URL = 'https://seveneightfive.com'
 
 export default function PayoutsPage() {
   return (
@@ -64,6 +76,7 @@ function PayoutsPageInner() {
   const [syncing, setSyncing] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [error, setError] = useState('')
+  const [copied, setCopied] = useState(false)
 
   const [businessName, setBusinessName] = useState('')
   const [supportEmail, setSupportEmail] = useState('')
@@ -74,6 +87,10 @@ function PayoutsPageInner() {
   const stripeError = searchParams.get('stripe_error')
   const stripeRefresh = searchParams.get('stripe_refresh') === '1'
 
+  const PROFILE_SELECT = `id, full_name, email,
+          stripe_account_id, stripe_account_status,
+          is_seller, seller_slug, seller_business_name, seller_support_email, seller_activated_at`
+
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -83,11 +100,7 @@ function PayoutsPageInner() {
       }
       const { data } = await supabase
         .from('profiles')
-        .select(
-          `id, full_name, email,
-          stripe_account_id, stripe_account_status,
-          is_seller, seller_business_name, seller_support_email, seller_activated_at`
-        )
+        .select(PROFILE_SELECT)
         .eq('id', user.id)
         .single()
 
@@ -101,6 +114,31 @@ function PayoutsPageInner() {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router])
+
+  // If we just landed back from Stripe as "enabled" but the profile we
+  // loaded before the redirect doesn't have a seller_slug yet, re-fetch
+  // once — sync runs server-side in the return route just before this
+  // page renders, so the slug is normally already there, but this
+  // covers any timing edge case.
+  useEffect(() => {
+    if (!stripeConnected || !profile) return
+    if (profile.stripe_account_status === 'enabled' && profile.seller_slug) return
+
+    let cancelled = false
+    ;(async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase
+        .from('profiles')
+        .select(PROFILE_SELECT)
+        .eq('id', user.id)
+        .single()
+      if (!cancelled && data) setProfile(data as Profile)
+    })()
+
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stripeConnected, profile?.stripe_account_status, profile?.seller_slug])
 
   useEffect(() => {
     if (!profile?.stripe_account_id) return
@@ -162,11 +200,7 @@ function PayoutsPageInner() {
       if (user) {
         const { data } = await supabase
           .from('profiles')
-          .select(
-            `id, full_name, email,
-            stripe_account_id, stripe_account_status,
-            is_seller, seller_business_name, seller_support_email, seller_activated_at`
-          )
+          .select(PROFILE_SELECT)
           .eq('id', user.id)
           .single()
         if (data) setProfile(data as Profile)
@@ -210,6 +244,13 @@ function PayoutsPageInner() {
     }
   }
 
+  function handleCopyLink(url: string) {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
   if (loading) return <LoadingState />
 
   const status = profile?.stripe_account_status
@@ -217,6 +258,8 @@ function PayoutsPageInner() {
   const isEnabled = status === 'enabled'
   const isRestricted = status === 'restricted'
   const isPending = status === 'pending'
+
+  const publicUrl = profile?.seller_slug ? `${SITE_URL}/sellers/${profile.seller_slug}` : null
 
   const statusLabel = isEnabled
     ? 'Active'
@@ -246,6 +289,52 @@ function PayoutsPageInner() {
         <div className="flex gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400">
           <AlertCircle className="h-4 w-4 shrink-0" />
           Something went wrong returning from Stripe. Please try connecting again.
+        </div>
+      )}
+
+      {/* ── Public seller page — shown as soon as Stripe is enabled ── */}
+      {isEnabled && (
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+          <div className="mb-3 flex items-center gap-2">
+            <Globe className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+            <h2 className="font-display text-lg font-bold uppercase tracking-wide text-gray-900 dark:text-white">
+              Your Public Seller Page
+            </h2>
+          </div>
+          {publicUrl ? (
+            <>
+              <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+                This is your live ticketing page — share it directly, or link to it from your
+                own website. It lists your upcoming events, past events, and refund policy.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <code className="flex-1 min-w-[220px] truncate rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-300">
+                  {publicUrl.replace('https://', '')}
+                </code>
+                <button
+                  onClick={() => handleCopyLink(publicUrl)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
+                >
+                  <Copy className="h-4 w-4" />
+                  {copied ? 'Copied!' : 'Copy link'}
+                </button>
+                <a
+                  href={publicUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-lg bg-gray-950 px-4 py-2.5 font-semibold text-white transition hover:bg-gray-800"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  View page
+                </a>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Setting up your page — refresh in a moment if this doesn't update.
+            </div>
+          )}
         </div>
       )}
 
@@ -388,6 +477,13 @@ function PayoutsPageInner() {
                 disabled={savingProfile}
                 className="w-full rounded-lg border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 disabled:opacity-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90 dark:focus:border-brand-500 placeholder:text-gray-400 dark:placeholder:text-gray-500"
               />
+              {isEnabled && (
+                <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  This updates the name shown on your public page, but not its URL —{' '}
+                  {publicUrl ? publicUrl.replace('https://', '') : 'your link'} stays the same so
+                  any link you've already shared keeps working.
+                </p>
+              )}
             </div>
 
             <div>
