@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabaseBrowser'
 
 type Tier = {
@@ -22,6 +22,13 @@ type QuestionField = {
   placeholder: string | null
   options: string[] | null
   is_required: boolean
+}
+
+type AttendeeSlot = {
+  key: string       // stable per (tierId, index) — used for state + React keys
+  tierId: string
+  tierName: string
+  index: number      // 0-based position within this tier's quantity
 }
 
 type Props = {
@@ -57,16 +64,12 @@ function serviceFeeCentsForPreview(priceInCents: number): number {
   return Math.ceil(est / 10) * 10
 }
 
-// Custom answers ride in the Stripe session metadata for paid tickets
-// (metadata values cap at 500 chars total), so free-text answers are
-// capped tighter here to keep 3 answers safely under that limit even
-// combined with the field id and JSON overhead.
-const MAX_TEXT_ANSWER_LEN = 80
+const MAX_ANSWER_LEN = 120
+const MAX_NAME_LEN = 60
 
 export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
   const [tiers, setTiers] = useState<Tier[]>([])
-  const [selectedTier, setSelectedTier] = useState<string | null>(null)
-  const [quantity, setQuantity] = useState(1)
+  const [cart, setCart] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [purchasing, setPurchasing] = useState(false)
   const [rsvpDone, setRsvpDone] = useState(false)
@@ -75,21 +78,35 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
 
   const [userId, setUserId] = useState<string | null>(null)
   const [sessionChecked, setSessionChecked] = useState(false)
+  const [profileFullName, setProfileFullName] = useState('')
 
   const [guestName, setGuestName] = useState('')
   const [guestEmail, setGuestEmail] = useState('')
   const [guestPhone, setGuestPhone] = useState('')
 
-  // Custom buyer questions
+  // Custom buyer questions, per event / per tier
   const [eventLevelFields, setEventLevelFields] = useState<QuestionField[]>([])
   const [tierFields, setTierFields] = useState<Record<string, QuestionField[]>>({})
-  const [answers, setAnswers] = useState<Record<string, string>>({})
+
+  // Per-attendee data — keyed by AttendeeSlot.key
+  const [attendeeNames, setAttendeeNames] = useState<Record<string, string>>({})
+  const [attendeeEmails, setAttendeeEmails] = useState<Record<string, string>>({})
+  const [attendeeAnswers, setAttendeeAnswers] = useState<Record<string, Record<string, string>>>({})
+  const [manuallyEditedNames, setManuallyEditedNames] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       setUserId(user?.id ?? null)
       setSessionChecked(true)
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .maybeSingle()
+        setProfileFullName(profile?.full_name || '')
+      }
     })
     supabase
       .from('ticket_tiers')
@@ -108,7 +125,6 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
           return true
         })
         setTiers(available)
-        if (available.length === 1) setSelectedTier(available[0].id)
         setLoading(false)
       })
 
@@ -122,42 +138,122 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
   }, [eventId])
 
   const isFreeEvent = tiers.length > 0 && tiers.every((t) => t.price === 0)
-  const tier = tiers.find((t) => t.id === selectedTier) || tiers[0]
-  const isFree = tier?.price === 0
+
+  const cartEntries = useMemo(
+    () =>
+      Object.entries(cart)
+        .filter(([, qty]) => qty > 0)
+        .map(([tierId, qty]) => ({ tier: tiers.find((t) => t.id === tierId)!, qty }))
+        .filter((e) => e.tier),
+    [cart, tiers]
+  )
+
+  const totalQuantity = cartEntries.reduce((sum, e) => sum + e.qty, 0)
+  const cartHasPaid = cartEntries.some((e) => e.tier.price > 0)
+  const cartHasFree = cartEntries.some((e) => e.tier.price === 0)
   const isGuest = sessionChecked && !userId
 
-  const activeQuestions: QuestionField[] = selectedTier
-    ? [...eventLevelFields, ...(tierFields[selectedTier] || [])]
-    : eventLevelFields
+  // One slot per ticket unit, in tier-list order — this exact order
+  // is what gets sent to the server and must match how tickets get
+  // minted (see checkout/rsvp routes).
+  const attendeeSlots: AttendeeSlot[] = useMemo(() => {
+    const slots: AttendeeSlot[] = []
+    for (const e of cartEntries) {
+      for (let i = 0; i < e.qty; i++) {
+        slots.push({ key: `${e.tier.id}__${i}`, tierId: e.tier.id, tierName: e.tier.name, index: i })
+      }
+    }
+    return slots
+  }, [cartEntries])
 
-  function setAnswer(fieldId: string, value: string) {
-    setAnswers((a) => ({ ...a, [fieldId]: value }))
+  // Prefill the very first attendee's name from the purchaser's own
+  // name, purely as a convenience for the common single-ticket case —
+  // stops as soon as they've typed something themselves.
+  useEffect(() => {
+    const firstSlot = attendeeSlots[0]
+    if (!firstSlot) return
+    if (manuallyEditedNames.has(firstSlot.key)) return
+    const source = isGuest ? guestName : profileFullName
+    if (source) {
+      setAttendeeNames((n) => ({ ...n, [firstSlot.key]: source }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attendeeSlots[0]?.key, isGuest, guestName, profileFullName])
+
+  function setQty(tierId: string, qty: number) {
+    setCart((c) => ({ ...c, [tierId]: Math.max(0, qty) }))
+    if (error) setError('')
+  }
+
+  function maxQtyFor(tier: Tier): number {
+    const remaining = tier.quantity !== null ? tier.quantity - tier.quantity_sold : null
+    return Math.min(remaining ?? 10, 10)
+  }
+
+  // Once a paid tier has qty > 0, free tiers are locked (and vice
+  // versa) — free and paid can't be purchased in one transaction.
+  function tierIsLocked(tier: Tier): boolean {
+    if (tier.price > 0) return cartHasFree
+    return cartHasPaid
+  }
+
+  function questionsForTier(tierId: string): QuestionField[] {
+    return [...eventLevelFields, ...(tierFields[tierId] || [])]
+  }
+
+  function setAttendeeName(slotKey: string, value: string) {
+    setManuallyEditedNames((s) => new Set(s).add(slotKey))
+    setAttendeeNames((n) => ({ ...n, [slotKey]: value }))
+    if (error) setError('')
+  }
+
+  function setAttendeeEmail(slotKey: string, value: string) {
+    setAttendeeEmails((e) => ({ ...e, [slotKey]: value }))
+    if (error) setError('')
+  }
+
+  function setAttendeeAnswer(slotKey: string, fieldId: string, value: string) {
+    setAttendeeAnswers((a) => ({ ...a, [slotKey]: { ...(a[slotKey] || {}), [fieldId]: value } }))
     if (error) setError('')
   }
 
   const validateGuest = (): string | null => {
-    if (!guestName.trim()) return 'Name is required.'
+    if (!guestName.trim()) return 'Your name is required.'
     if (!isEmailish(guestEmail)) return 'Please enter a valid email.'
-    if (!isFree) {
+    if (cartHasPaid) {
       const normalized = normalizePhone(guestPhone)
       if (!normalized) return 'Please enter a valid phone number.'
     }
     return null
   }
 
-  const validateQuestions = (): string | null => {
-    for (const q of activeQuestions) {
-      const val = (answers[q.id] || '').trim()
-      if (q.is_required && !val) {
-        return `"${q.label}" is required.`
+  const validateAttendees = (): string | null => {
+    for (let i = 0; i < attendeeSlots.length; i++) {
+      const slot = attendeeSlots[i]
+      const name = (attendeeNames[slot.key] || '').trim()
+      const label = attendeeSlots.length > 1 ? `Attendee ${i + 1}'s` : "Attendee's"
+      if (!name) return `${label} name is required.`
+      const email = (attendeeEmails[slot.key] || '').trim()
+      if (email && !isEmailish(email)) {
+        return `${attendeeSlots.length > 1 ? `Attendee ${i + 1}'s` : "Attendee's"} email doesn't look right.`
+      }
+      for (const q of questionsForTier(slot.tierId)) {
+        const val = (attendeeAnswers[slot.key]?.[q.id] || '').trim()
+        if (q.is_required && !val) {
+          return `"${q.label}" is required for ${attendeeSlots.length > 1 ? `Attendee ${i + 1}` : 'this ticket'}.`
+        }
       }
     }
     return null
   }
 
   const handleAction = async () => {
-    if (!selectedTier || !tier) return
     setError('')
+
+    if (totalQuantity === 0) {
+      setError('Add at least one ticket.')
+      return
+    }
 
     let guestPayload: { name: string; email: string; phone: string | null } | null = null
     if (isGuest) {
@@ -173,24 +269,30 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
       }
     }
 
-    const qErr = validateQuestions()
-    if (qErr) {
-      setError(qErr)
+    const aErr = validateAttendees()
+    if (aErr) {
+      setError(aErr)
       return
     }
 
-    const responses = activeQuestions
-      .map((q) => ({ field_id: q.id, label: q.label, value: (answers[q.id] || '').trim() }))
-      .filter((r) => r.value.length > 0)
+    const items = cartEntries.map((e) => ({ tierId: e.tier.id, quantity: e.qty }))
+    const attendees = attendeeSlots.map((slot) => ({
+      tierId: slot.tierId,
+      name: (attendeeNames[slot.key] || '').trim(),
+      email: (attendeeEmails[slot.key] || '').trim() || null,
+      responses: questionsForTier(slot.tierId)
+        .map((q) => ({ field_id: q.id, value: (attendeeAnswers[slot.key]?.[q.id] || '').trim() }))
+        .filter((r) => r.value.length > 0),
+    }))
 
     setPurchasing(true)
 
     try {
-      if (isFree) {
+      if (cartHasFree) {
         const res = await fetch('/api/tickets/rsvp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tierId: selectedTier, eventId, quantity, guest: guestPayload, responses }),
+          body: JSON.stringify({ eventId, items, guest: guestPayload, attendees }),
         })
         const json = await res.json()
         if (!res.ok) {
@@ -205,7 +307,7 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         const res = await fetch('/api/tickets/checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tierId: selectedTier, eventId, quantity, guest: guestPayload, responses }),
+          body: JSON.stringify({ eventId, items, guest: guestPayload, attendees }),
         })
         const json = await res.json()
         if (!res.ok) {
@@ -223,25 +325,32 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
 
   if (loading || tiers.length === 0) return null
 
-  const remaining = tier?.quantity !== null ? (tier?.quantity ?? 0) - tier.quantity_sold : null
-  const maxQty = Math.min(remaining ?? 10, 10)
-
   // Pricing breakdown (all in cents for precision)
-  const unitCents = Math.round((tier?.price ?? 0) * 100)
-  const serviceFeePerTicketCents = serviceFeeCentsForPreview(unitCents)
-  const subtotalCents = unitCents * quantity
-  const serviceFeeTotalCents = serviceFeePerTicketCents * quantity
+  const subtotalCents = cartEntries.reduce((sum, e) => sum + Math.round(e.tier.price * 100) * e.qty, 0)
+  const serviceFeeTotalCents = cartEntries.reduce(
+    (sum, e) => sum + serviceFeeCentsForPreview(Math.round(e.tier.price * 100)) * e.qty,
+    0
+  )
   const totalCents = subtotalCents + serviceFeeTotalCents
 
   const fmt = (cents: number) => `$${(cents / 100).toFixed(2)}`
-  const subtotalDisplay = fmt(subtotalCents)
   const serviceFeeDisplay = fmt(serviceFeeTotalCents)
   const totalDisplay = fmt(totalCents)
 
-  // No icon, no "785 Tickets" branding line — just a plain, quiet label.
+  const lowestPrice = Math.min(...tiers.map((t) => t.price))
   const headerLabel = isFreeEvent ? 'Free Event' : 'Tickets'
-  const headerPrice = isFree ? 'Free' : `$${tier.price.toFixed(2)}`
-  const ctaLabel = isFree ? 'RSVP' : 'Get Tickets'
+  const headerPrice = isFreeEvent ? 'Free' : `From $${lowestPrice.toFixed(2)}`
+  const ctaLabel = isFreeEvent ? 'RSVP' : 'Get Tickets'
+
+  const confirmLabel = purchasing
+    ? cartHasPaid
+      ? 'Redirecting to checkout…'
+      : 'Saving your RSVP…'
+    : totalQuantity === 0
+      ? 'Select tickets above'
+      : cartHasPaid
+        ? `Buy ${totalQuantity > 1 ? `${totalQuantity} Tickets` : 'Ticket'} · ${totalDisplay}`
+        : `RSVP — ${totalQuantity} Guest${totalQuantity > 1 ? 's' : ''}`
 
   return (
     <div style={{ margin: '24px 0' }}>
@@ -260,19 +369,20 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         .tpb-action-btn.free:hover { background: #235e23; }
         .tpb-expand { padding: 0 20px 20px; border-top: 1px solid #ece8e2; }
         .tpb-tiers { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
-        .tpb-tier { padding: 12px 14px; border-radius: 8px; border: 1.5px solid #ece8e2; background: #fff; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: space-between; }
-        .tpb-tier.selected { border-color: #C80650; background: rgba(200,6,80,0.04); }
+        .tpb-tier { padding: 12px 14px; border-radius: 8px; border: 1.5px solid #ece8e2; background: #fff; display: flex; align-items: center; justify-content: space-between; gap: 12px; transition: all 0.15s; }
+        .tpb-tier.in-cart { border-color: #C80650; background: rgba(200,6,80,0.04); }
+        .tpb-tier.locked { opacity: 0.45; }
         .tpb-tier-name { font-weight: 500; font-size: 0.9rem; color: #1a1814; }
         .tpb-tier-desc { font-size: 0.78rem; color: #6b6560; margin-top: 2px; }
-        .tpb-tier-price { font-family: 'Oswald', sans-serif; font-size: 1rem; font-weight: 600; color: #1a1814; flex-shrink: 0; margin-left: 12px; }
-        .tpb-qty-row { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
-        .tpb-qty-label { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #6b6560; }
+        .tpb-tier-price { font-family: 'Oswald', sans-serif; font-size: 0.95rem; font-weight: 600; color: #1a1814; flex-shrink: 0; }
+        .tpb-tier-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        .tpb-tier-note { font-size: 0.68rem; color: #a85a30; font-weight: 500; }
         .tpb-qty-ctrl { display: flex; align-items: center; border: 1.5px solid #ece8e2; border-radius: 8px; overflow: hidden; }
-        .tpb-qty-btn { width: 36px; height: 36px; border: none; background: #fff; font-size: 1.1rem; cursor: pointer; color: #1a1814; transition: background 0.1s; }
-        .tpb-qty-btn:hover { background: #f0ede8; }
-        .tpb-qty-btn:disabled { color: #b8b3ad; cursor: not-allowed; }
-        .tpb-qty-num { width: 36px; text-align: center; font-weight: 600; font-size: 0.95rem; background: #fff; border-left: 1.5px solid #ece8e2; border-right: 1.5px solid #ece8e2; height: 36px; display: flex; align-items: center; justify-content: center; }
-        .tpb-remaining { font-size: 0.72rem; color: #a85a30; font-weight: 500; }
+        .tpb-qty-btn { width: 30px; height: 30px; border: none; background: #fff; font-size: 1rem; cursor: pointer; color: #1a1814; transition: background 0.1s; }
+        .tpb-qty-btn:hover:not(:disabled) { background: #f0ede8; }
+        .tpb-qty-btn:disabled { color: #d8d3cd; cursor: not-allowed; }
+        .tpb-qty-num { width: 30px; text-align: center; font-weight: 600; font-size: 0.88rem; background: #fff; border-left: 1.5px solid #ece8e2; border-right: 1.5px solid #ece8e2; height: 30px; display: flex; align-items: center; justify-content: center; }
+        .tpb-lock-note { margin-top: 8px; font-size: 0.72rem; color: #a85a30; }
         .tpb-summary { margin-top: 16px; padding: 12px 14px; background: #fff; border: 1.5px solid #ece8e2; border-radius: 8px; }
         .tpb-summary-row { display: flex; align-items: baseline; justify-content: space-between; font-size: 0.85rem; color: #1a1814; }
         .tpb-summary-row + .tpb-summary-row { margin-top: 6px; }
@@ -287,15 +397,21 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         .tpb-guest-hint { font-size: 0.72rem; color: #8a8580; }
         .tpb-guest-signin { font-size: 0.78rem; color: #6b6560; margin-top: 4px; text-align: center; }
         .tpb-guest-signin a { color: #C80650; text-decoration: underline; font-weight: 500; }
-        .tpb-questions { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid #ece8e2; }
-        .tpb-questions-title { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #6b6560; }
+        .tpb-attendees { margin-top: 16px; padding-top: 14px; border-top: 1px solid #ece8e2; }
+        .tpb-attendees-title { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #6b6560; margin-bottom: 10px; display: block; }
+        .tpb-attendee-card { padding: 14px; border: 1.5px solid #ece8e2; border-radius: 8px; background: #fff; }
+        .tpb-attendee-card + .tpb-attendee-card { margin-top: 10px; }
+        .tpb-attendee-heading { font-size: 0.78rem; font-weight: 600; color: #1a1814; margin-bottom: 10px; }
+        .tpb-attendee-heading span { font-weight: 400; color: #6b6560; }
+        .tpb-attendee-fields { display: flex; flex-direction: column; gap: 8px; }
         .tpb-checkbox-row { display: flex; align-items: center; gap: 8px; }
         .tpb-checkbox-row input { width: 16px; height: 16px; }
         .tpb-confirm-btn { margin-top: 16px; width: 100%; padding: 14px; border: none; border-radius: 8px; font-family: 'Oswald', sans-serif; font-size: 0.9rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #fff; cursor: pointer; transition: all 0.15s; }
         .tpb-confirm-btn.paid { background: #C80650; }
-        .tpb-confirm-btn.paid:hover { background: #a8041f; }
+        .tpb-confirm-btn.paid:hover:not(:disabled) { background: #a8041f; }
         .tpb-confirm-btn.free { background: #2d7a2d; }
-        .tpb-confirm-btn.free:hover { background: #235e23; }
+        .tpb-confirm-btn.free:hover:not(:disabled) { background: #235e23; }
+        .tpb-confirm-btn.neutral { background: #b8b3ad; }
         .tpb-confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .tpb-rsvp-done { padding: 16px 20px; display: flex; align-items: center; gap: 10px; background: rgba(45,122,45,0.06); }
         .tpb-rsvp-check { font-size: 1.1rem; }
@@ -321,15 +437,15 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
             <div className="tpb-header" onClick={() => setExpanded((e) => !e)}>
               <div className="tpb-header-left">
                 <span className="tpb-eyebrow">{headerLabel}</span>
-                <span className={`tpb-price ${isFree ? 'tpb-price-free' : ''}`}>
+                <span className={`tpb-price ${isFreeEvent ? 'tpb-price-free' : ''}`}>
                   {headerPrice}
-                  {!isFree && <span className="tpb-price-note">+ service fee</span>}
-                  {tiers.length > 1 && <span className="tpb-price-note">· more options</span>}
+                  {!isFreeEvent && <span className="tpb-price-note">+ service fee</span>}
+                  {tiers.length > 1 && <span className="tpb-price-note">· {tiers.length} options</span>}
                 </span>
               </div>
               {!expanded && (
                 <button
-                  className={`tpb-action-btn ${isFree ? 'free' : 'paid'}`}
+                  className={`tpb-action-btn ${isFreeEvent ? 'free' : 'paid'}`}
                   onClick={(e) => {
                     e.stopPropagation()
                     setExpanded(true)
@@ -347,67 +463,68 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
 
             {expanded && (
               <div className="tpb-expand">
-                {tiers.length > 1 && (
-                  <div className="tpb-tiers">
-                    {tiers.map((t) => {
-                      const rem = t.quantity !== null ? t.quantity - t.quantity_sold : null
-                      const soldOut = rem !== null && rem <= 0
-                      return (
-                        <div
-                          key={t.id}
-                          className={`tpb-tier${selectedTier === t.id ? ' selected' : ''}`}
-                          onClick={() => !soldOut && setSelectedTier(t.id)}
-                          style={soldOut ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
-                        >
-                          <div>
-                            <div className="tpb-tier-name">{t.name}</div>
-                            {t.description && <div className="tpb-tier-desc">{t.description}</div>}
-                          </div>
+                <div className="tpb-tiers">
+                  {tiers.map((t) => {
+                    const remaining = t.quantity !== null ? t.quantity - t.quantity_sold : null
+                    const qty = cart[t.id] || 0
+                    const locked = tierIsLocked(t) && qty === 0
+                    const max = maxQtyFor(t)
+                    return (
+                      <div
+                        key={t.id}
+                        className={`tpb-tier${qty > 0 ? ' in-cart' : ''}${locked ? ' locked' : ''}`}
+                      >
+                        <div>
+                          <div className="tpb-tier-name">{t.name}</div>
+                          {t.description && <div className="tpb-tier-desc">{t.description}</div>}
+                          {remaining !== null && remaining <= 20 && (
+                            <div className="tpb-tier-note">{remaining} remaining</div>
+                          )}
+                        </div>
+                        <div className="tpb-tier-right">
                           <span className="tpb-tier-price">
                             {t.price === 0 ? 'Free' : `$${t.price.toFixed(2)}`}
                           </span>
+                          <div className="tpb-qty-ctrl">
+                            <button
+                              className="tpb-qty-btn"
+                              onClick={() => setQty(t.id, qty - 1)}
+                              disabled={locked || qty <= 0}
+                            >
+                              −
+                            </button>
+                            <span className="tpb-qty-num">{qty}</span>
+                            <button
+                              className="tpb-qty-btn"
+                              onClick={() => setQty(t.id, qty + 1)}
+                              disabled={locked || qty >= max}
+                            >
+                              +
+                            </button>
+                          </div>
                         </div>
-                      )
-                    })}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {(cartHasPaid || cartHasFree) && tiers.some((t) => tierIsLocked(t) && (cart[t.id] || 0) === 0) && (
+                  <div className="tpb-lock-note">
+                    Free and paid tickets can't be purchased together — checkout separately for the other.
                   </div>
                 )}
 
-                {!isFree && (
-                  <div className="tpb-qty-row">
-                    <span className="tpb-qty-label">Qty</span>
-                    <div className="tpb-qty-ctrl">
-                      <button
-                        className="tpb-qty-btn"
-                        onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                        disabled={quantity <= 1}
-                      >
-                        −
-                      </button>
-                      <span className="tpb-qty-num">{quantity}</span>
-                      <button
-                        className="tpb-qty-btn"
-                        onClick={() => setQuantity((q) => Math.min(maxQty, q + 1))}
-                        disabled={quantity >= maxQty}
-                      >
-                        +
-                      </button>
-                    </div>
-                    {remaining !== null && remaining <= 20 && (
-                      <span className="tpb-remaining">{remaining} remaining</span>
-                    )}
-                  </div>
-                )}
-
-                {/* Pricing summary (paid tickets only) */}
-                {!isFree && (
+                {/* Pricing summary (paid carts only) */}
+                {cartHasPaid && cartEntries.length > 0 && (
                   <div className="tpb-summary">
-                    <div className="tpb-summary-row">
-                      <span className="tpb-summary-label">
-                        {quantity > 1 ? `${quantity} × ` : ''}
-                        {tier.name}
-                      </span>
-                      <span>{subtotalDisplay}</span>
-                    </div>
+                    {cartEntries.map((e) => (
+                      <div className="tpb-summary-row" key={e.tier.id}>
+                        <span className="tpb-summary-label">
+                          {e.qty} × {e.tier.name}
+                        </span>
+                        <span>{fmt(Math.round(e.tier.price * 100) * e.qty)}</span>
+                      </div>
+                    ))}
                     <div className="tpb-summary-row">
                       <span className="tpb-summary-label">Service fee</span>
                       <span>{serviceFeeDisplay}</span>
@@ -419,11 +536,12 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
                   </div>
                 )}
 
-                {/* Guest form — only when not logged in */}
+                {/* Purchaser info — only when not logged in. This is the
+                    billing/contact identity, separate from attendees. */}
                 {isGuest && (
                   <div className="tpb-guest-form">
                     <div className="tpb-guest-row">
-                      <label className="tpb-guest-label">Your Name</label>
+                      <label className="tpb-guest-label">Your Name (purchaser)</label>
                       <input
                         type="text"
                         className="tpb-guest-input"
@@ -444,12 +562,12 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
                         autoComplete="email"
                       />
                       <span className="tpb-guest-hint">
-                        Your ticket will be sent to this email.
+                        Your order confirmation and all tickets will be sent to this email.
                       </span>
                     </div>
                     <div className="tpb-guest-row">
                       <label className="tpb-guest-label">
-                        Phone {isFree && '(optional)'}
+                        Phone {!cartHasPaid && '(optional)'}
                       </label>
                       <input
                         type="tel"
@@ -471,71 +589,111 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
                   </div>
                 )}
 
-                {/* Seller's custom questions for this tier */}
-                {activeQuestions.length > 0 && (
-                  <div className="tpb-questions">
-                    <span className="tpb-questions-title">A Few More Details</span>
-                    {activeQuestions.map((q) => (
-                      <div key={q.id} className="tpb-guest-row">
-                        <label className="tpb-guest-label">
-                          {q.label} {q.is_required ? '' : '(optional)'}
-                        </label>
+                {/* One block per ticket — its own name, its own answers */}
+                {attendeeSlots.length > 0 && (
+                  <div className="tpb-attendees">
+                    <span className="tpb-attendees-title">
+                      {attendeeSlots.length > 1 ? 'Attendee Details' : 'Attendee'}
+                    </span>
+                    {attendeeSlots.map((slot, i) => {
+                      const questions = questionsForTier(slot.tierId)
+                      return (
+                        <div key={slot.key} className="tpb-attendee-card">
+                          {attendeeSlots.length > 1 && (
+                            <div className="tpb-attendee-heading">
+                              Attendee {i + 1} <span>— {slot.tierName}</span>
+                            </div>
+                          )}
+                          <div className="tpb-attendee-fields">
+                            <div className="tpb-guest-row">
+                              <label className="tpb-guest-label">Name</label>
+                              <input
+                                type="text"
+                                className="tpb-guest-input"
+                                placeholder="First Last"
+                                maxLength={MAX_NAME_LEN}
+                                value={attendeeNames[slot.key] || ''}
+                                onChange={(e) => setAttendeeName(slot.key, e.target.value)}
+                              />
+                            </div>
 
-                        {q.field_type === 'text' && (
-                          <input
-                            type="text"
-                            className="tpb-guest-input"
-                            placeholder={q.placeholder || ''}
-                            maxLength={MAX_TEXT_ANSWER_LEN}
-                            value={answers[q.id] || ''}
-                            onChange={(e) => setAnswer(q.id, e.target.value)}
-                          />
-                        )}
+                            <div className="tpb-guest-row">
+                              <label className="tpb-guest-label">Email (optional)</label>
+                              <input
+                                type="email"
+                                className="tpb-guest-input"
+                                placeholder="attendee@example.com"
+                                value={attendeeEmails[slot.key] || ''}
+                                onChange={(e) => setAttendeeEmail(slot.key, e.target.value)}
+                                autoComplete="off"
+                              />
+                              <span className="tpb-guest-hint">
+                                If this ticket isn't for you, add their email and we'll send them
+                                a copy directly.
+                              </span>
+                            </div>
 
-                        {q.field_type === 'select' && (
-                          <select
-                            className="tpb-guest-input"
-                            value={answers[q.id] || ''}
-                            onChange={(e) => setAnswer(q.id, e.target.value)}
-                          >
-                            <option value="">Select…</option>
-                            {(q.options || []).map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
+                            {questions.map((q) => (
+                              <div key={q.id} className="tpb-guest-row">
+                                <label className="tpb-guest-label">
+                                  {q.label} {q.is_required ? '' : '(optional)'}
+                                </label>
+
+                                {q.field_type === 'text' && (
+                                  <input
+                                    type="text"
+                                    className="tpb-guest-input"
+                                    placeholder={q.placeholder || ''}
+                                    maxLength={MAX_ANSWER_LEN}
+                                    value={attendeeAnswers[slot.key]?.[q.id] || ''}
+                                    onChange={(e) => setAttendeeAnswer(slot.key, q.id, e.target.value)}
+                                  />
+                                )}
+
+                                {q.field_type === 'select' && (
+                                  <select
+                                    className="tpb-guest-input"
+                                    value={attendeeAnswers[slot.key]?.[q.id] || ''}
+                                    onChange={(e) => setAttendeeAnswer(slot.key, q.id, e.target.value)}
+                                  >
+                                    <option value="">Select…</option>
+                                    {(q.options || []).map((opt) => (
+                                      <option key={opt} value={opt}>
+                                        {opt}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+
+                                {q.field_type === 'checkbox' && (
+                                  <label className="tpb-checkbox-row">
+                                    <input
+                                      type="checkbox"
+                                      checked={attendeeAnswers[slot.key]?.[q.id] === 'Yes'}
+                                      onChange={(e) =>
+                                        setAttendeeAnswer(slot.key, q.id, e.target.checked ? 'Yes' : 'No')
+                                      }
+                                    />
+                                    <span style={{ fontSize: '0.85rem', color: '#1a1814' }}>Yes</span>
+                                  </label>
+                                )}
+                              </div>
                             ))}
-                          </select>
-                        )}
-
-                        {q.field_type === 'checkbox' && (
-                          <label className="tpb-checkbox-row">
-                            <input
-                              type="checkbox"
-                              checked={answers[q.id] === 'Yes'}
-                              onChange={(e) => setAnswer(q.id, e.target.checked ? 'Yes' : 'No')}
-                            />
-                            <span style={{ fontSize: '0.85rem', color: '#1a1814' }}>Yes</span>
-                          </label>
-                        )}
-                      </div>
-                    ))}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
 
                 {error && <div className="tpb-error">{error}</div>}
 
                 <button
-                  className={`tpb-confirm-btn ${isFree ? 'free' : 'paid'}`}
+                  className={`tpb-confirm-btn ${totalQuantity === 0 ? 'neutral' : cartHasPaid ? 'paid' : 'free'}`}
                   onClick={handleAction}
-                  disabled={purchasing || !selectedTier}
+                  disabled={purchasing || totalQuantity === 0}
                 >
-                  {purchasing
-                    ? isFree
-                      ? 'Saving your RSVP…'
-                      : 'Redirecting to checkout…'
-                    : isFree
-                      ? `RSVP — I'm Going!`
-                      : `Buy ${quantity > 1 ? `${quantity} Tickets` : 'Ticket'} · ${totalDisplay}`}
+                  {confirmLabel}
                 </button>
               </div>
             )}
