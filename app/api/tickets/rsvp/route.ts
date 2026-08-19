@@ -12,8 +12,16 @@ import { createClient as createAdmin } from '@/lib/supabaseServer'
  *   tierId: string,
  *   eventId: string,
  *   quantity?: number,
- *   guest?: { name: string, email: string, phone: string | null }
+ *   guest?: { name: string, email: string, phone: string | null },
+ *   responses?: { field_id: string, value: string }[]
  * }
+ *
+ * responses are answers to the event's custom buyer questions
+ * (event_form_fields). Since a free RSVP mints tickets immediately —
+ * no async webhook step like the paid flow — responses are written
+ * directly here, one row per (ticket, field) pair. If quantity > 1,
+ * the same answers are recorded against every ticket in the order
+ * (questions are asked once per order, not once per attendee).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -22,7 +30,7 @@ export async function POST(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
 
-    const { tierId, eventId, quantity = 1, guest } = await request.json()
+    const { tierId, eventId, quantity = 1, guest, responses } = await request.json()
 
     if (!tierId || !eventId) {
       return NextResponse.json(
@@ -80,6 +88,24 @@ export async function POST(request: NextRequest) {
           { error: `Only ${remaining} spot(s) remaining` },
           { status: 400 }
         )
+      }
+    }
+
+    // Validate that any required questions for this tier were answered.
+    // (The client already enforces this — this is the server-side backstop.)
+    const { data: applicableFields } = await admin
+      .from('event_form_fields')
+      .select('id, label, is_required, ticket_tier_id')
+      .eq('event_id', eventId)
+      .or(`ticket_tier_id.is.null,ticket_tier_id.eq.${tierId}`)
+
+    const responseMap = new Map<string, string>(
+      (Array.isArray(responses) ? responses : []).map((r: any) => [r.field_id, String(r.value ?? '').trim()])
+    )
+
+    for (const f of applicableFields || []) {
+      if (f.is_required && !(responseMap.get(f.id) || '').length) {
+        return NextResponse.json({ error: `"${f.label}" is required.` }, { status: 400 })
       }
     }
 
@@ -147,6 +173,32 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       console.error('[tickets/rsvp] insert error:', insertError)
       return NextResponse.json({ error: 'Failed to save your RSVP' }, { status: 500 })
+    }
+
+    // Persist question responses against every ticket in this order.
+    if (responseMap.size > 0 && inserted?.length) {
+      const responseRows: Record<string, any>[] = []
+      for (const t of inserted) {
+        for (const [fieldId, value] of responseMap.entries()) {
+          if (!value) continue
+          responseRows.push({
+            event_id: eventId,
+            ticket_id: t.id,
+            field_id: fieldId,
+            response: value,
+          })
+        }
+      }
+      if (responseRows.length > 0) {
+        const { error: responseErr } = await admin
+          .from('event_registration_responses')
+          .insert(responseRows)
+        if (responseErr) {
+          // Non-fatal — the RSVP itself already succeeded. Log and move on
+          // rather than making the buyer think their spot wasn't saved.
+          console.error('[tickets/rsvp] failed to save responses:', responseErr)
+        }
+      }
     }
 
     return NextResponse.json({
