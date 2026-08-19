@@ -15,6 +15,15 @@ type Tier = {
   is_active: boolean
 }
 
+type QuestionField = {
+  id: string
+  field_type: 'text' | 'select' | 'checkbox'
+  label: string
+  placeholder: string | null
+  options: string[] | null
+  is_required: boolean
+}
+
 type Props = {
   eventId: string
   eventSlug: string
@@ -48,6 +57,12 @@ function serviceFeeCentsForPreview(priceInCents: number): number {
   return Math.ceil(est / 10) * 10
 }
 
+// Custom answers ride in the Stripe session metadata for paid tickets
+// (metadata values cap at 500 chars total), so free-text answers are
+// capped tighter here to keep 3 answers safely under that limit even
+// combined with the field id and JSON overhead.
+const MAX_TEXT_ANSWER_LEN = 80
+
 export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
   const [tiers, setTiers] = useState<Tier[]>([])
   const [selectedTier, setSelectedTier] = useState<string | null>(null)
@@ -64,6 +79,11 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
   const [guestName, setGuestName] = useState('')
   const [guestEmail, setGuestEmail] = useState('')
   const [guestPhone, setGuestPhone] = useState('')
+
+  // Custom buyer questions
+  const [eventLevelFields, setEventLevelFields] = useState<QuestionField[]>([])
+  const [tierFields, setTierFields] = useState<Record<string, QuestionField[]>>({})
+  const [answers, setAnswers] = useState<Record<string, string>>({})
 
   useEffect(() => {
     const supabase = createClient()
@@ -91,6 +111,14 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         if (available.length === 1) setSelectedTier(available[0].id)
         setLoading(false)
       })
+
+    fetch(`/api/events/${eventId}/form-fields`)
+      .then((r) => r.json())
+      .then((json) => {
+        setEventLevelFields(json.eventLevel || [])
+        setTierFields(json.byTier || {})
+      })
+      .catch(() => { /* non-fatal — checkout still works without questions */ })
   }, [eventId])
 
   const isFreeEvent = tiers.length > 0 && tiers.every((t) => t.price === 0)
@@ -98,12 +126,31 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
   const isFree = tier?.price === 0
   const isGuest = sessionChecked && !userId
 
+  const activeQuestions: QuestionField[] = selectedTier
+    ? [...eventLevelFields, ...(tierFields[selectedTier] || [])]
+    : eventLevelFields
+
+  function setAnswer(fieldId: string, value: string) {
+    setAnswers((a) => ({ ...a, [fieldId]: value }))
+    if (error) setError('')
+  }
+
   const validateGuest = (): string | null => {
     if (!guestName.trim()) return 'Name is required.'
     if (!isEmailish(guestEmail)) return 'Please enter a valid email.'
     if (!isFree) {
       const normalized = normalizePhone(guestPhone)
       if (!normalized) return 'Please enter a valid phone number.'
+    }
+    return null
+  }
+
+  const validateQuestions = (): string | null => {
+    for (const q of activeQuestions) {
+      const val = (answers[q.id] || '').trim()
+      if (q.is_required && !val) {
+        return `"${q.label}" is required.`
+      }
     }
     return null
   }
@@ -126,6 +173,16 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
       }
     }
 
+    const qErr = validateQuestions()
+    if (qErr) {
+      setError(qErr)
+      return
+    }
+
+    const responses = activeQuestions
+      .map((q) => ({ field_id: q.id, label: q.label, value: (answers[q.id] || '').trim() }))
+      .filter((r) => r.value.length > 0)
+
     setPurchasing(true)
 
     try {
@@ -133,7 +190,7 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         const res = await fetch('/api/tickets/rsvp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tierId: selectedTier, eventId, quantity, guest: guestPayload }),
+          body: JSON.stringify({ tierId: selectedTier, eventId, quantity, guest: guestPayload, responses }),
         })
         const json = await res.json()
         if (!res.ok) {
@@ -148,7 +205,7 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         const res = await fetch('/api/tickets/checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tierId: selectedTier, eventId, quantity, guest: guestPayload }),
+          body: JSON.stringify({ tierId: selectedTier, eventId, quantity, guest: guestPayload, responses }),
         })
         const json = await res.json()
         if (!res.ok) {
@@ -230,6 +287,10 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         .tpb-guest-hint { font-size: 0.72rem; color: #8a8580; }
         .tpb-guest-signin { font-size: 0.78rem; color: #6b6560; margin-top: 4px; text-align: center; }
         .tpb-guest-signin a { color: #C80650; text-decoration: underline; font-weight: 500; }
+        .tpb-questions { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid #ece8e2; }
+        .tpb-questions-title { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #6b6560; }
+        .tpb-checkbox-row { display: flex; align-items: center; gap: 8px; }
+        .tpb-checkbox-row input { width: 16px; height: 16px; }
         .tpb-confirm-btn { margin-top: 16px; width: 100%; padding: 14px; border: none; border-radius: 8px; font-family: 'Oswald', sans-serif; font-size: 0.9rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #fff; cursor: pointer; transition: all 0.15s; }
         .tpb-confirm-btn.paid { background: #C80650; }
         .tpb-confirm-btn.paid:hover { background: #a8041f; }
@@ -407,6 +468,57 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
                       <a href={`/login?return=/events/${eventSlug}`}>Sign in</a> to use saved
                       details.
                     </p>
+                  </div>
+                )}
+
+                {/* Seller's custom questions for this tier */}
+                {activeQuestions.length > 0 && (
+                  <div className="tpb-questions">
+                    <span className="tpb-questions-title">A Few More Details</span>
+                    {activeQuestions.map((q) => (
+                      <div key={q.id} className="tpb-guest-row">
+                        <label className="tpb-guest-label">
+                          {q.label} {q.is_required ? '' : '(optional)'}
+                        </label>
+
+                        {q.field_type === 'text' && (
+                          <input
+                            type="text"
+                            className="tpb-guest-input"
+                            placeholder={q.placeholder || ''}
+                            maxLength={MAX_TEXT_ANSWER_LEN}
+                            value={answers[q.id] || ''}
+                            onChange={(e) => setAnswer(q.id, e.target.value)}
+                          />
+                        )}
+
+                        {q.field_type === 'select' && (
+                          <select
+                            className="tpb-guest-input"
+                            value={answers[q.id] || ''}
+                            onChange={(e) => setAnswer(q.id, e.target.value)}
+                          >
+                            <option value="">Select…</option>
+                            {(q.options || []).map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+
+                        {q.field_type === 'checkbox' && (
+                          <label className="tpb-checkbox-row">
+                            <input
+                              type="checkbox"
+                              checked={answers[q.id] === 'Yes'}
+                              onChange={(e) => setAnswer(q.id, e.target.checked ? 'Yes' : 'No')}
+                            />
+                            <span style={{ fontSize: '0.85rem', color: '#1a1814' }}>Yes</span>
+                          </label>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
 
