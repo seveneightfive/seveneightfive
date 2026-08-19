@@ -23,7 +23,7 @@ import { sendTicketEmail, sendAttendeeTicketEmail } from '@/app/lib/email'
  * original single-tier implementation. Two older metadata shapes are
  * still parsed as a fallback so any session already in flight when
  * this ships still completes correctly:
- *   1. cart_items_*/custom_responses_* (multi-tier, order-level Q&A)
+ *   1. cart_items_* and custom_responses_* (multi-tier, order-level Q&A)
  *   2. tier_id/quantity/custom_responses (original single-tier)
  *
  * Buyer info resolution order (the purchaser/billing identity, not
