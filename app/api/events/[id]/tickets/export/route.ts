@@ -63,8 +63,8 @@ export async function GET(
     const { data: tickets, error: ticketsErr } = await admin
       .from('tickets')
       .select(`
-        id, buyer_name, buyer_email, buyer_phone, amount_paid, status,
-        payment_status, created_at, ticket_tiers(name)
+        id, buyer_name, buyer_email, buyer_phone, attendee_email, amount_paid, status,
+        payment_status, created_at, source, notes, ticket_tiers(name)
       `)
       .eq('event_id', eventId)
       .eq('payment_status', 'paid')
@@ -104,7 +104,7 @@ export async function GET(
     }
 
     const headers = [
-      'Name', 'Email', 'Phone', 'Tier', 'Amount Paid', 'Status', 'Purchased At',
+      'Name', 'Email', 'Attendee Email', 'Phone', 'Tier', 'Amount Paid', 'Status', 'Source', 'Notes', 'Purchased At',
       ...questionLabels,
     ]
 
@@ -114,10 +114,13 @@ export async function GET(
       return [
         t.buyer_name || '',
         t.buyer_email || '',
+        t.attendee_email || '',
         t.buyer_phone || '',
         tierName || '',
         t.amount_paid != null ? Number(t.amount_paid).toFixed(2) : '0.00',
         t.status || '',
+        t.source || 'online',
+        t.notes || '',
         t.created_at ? new Date(t.created_at).toISOString() : '',
         ...questionLabels.map((label) => answers[label] || ''),
       ]
