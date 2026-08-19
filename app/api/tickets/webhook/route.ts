@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabaseServer'
 import { stripe } from '@/lib/stripe'
 import { syncStripeAccountToProfile } from '@/lib/stripeSync'
-import { sendTicketEmail } from '@/app/lib/email'
+import { sendTicketEmail, sendAttendeeTicketEmail } from '@/app/lib/email'
 
 /**
  * POST /api/tickets/webhook
@@ -13,70 +13,47 @@ import { sendTicketEmail } from '@/app/lib/email'
  *   - charge.refunded            → mark refunded
  *   - account.updated            → sync Connect status to profile
  *
- * Stripe Dashboard → Webhooks → Endpoint URL:
- *   https://yourdomain.com/api/tickets/webhook
+ * FULL PER-ATTENDEE DATA: /api/tickets/checkout packs the whole order
+ * (tier/quantity/price + every individual attendee's name and answers)
+ * as one JSON blob, chunked across order_data_0.._N metadata keys
+ * (a single 500-char metadata value can't reliably hold an order with
+ * several attendees, each with their own name and answers). Each
+ * attendee becomes its own ticket row with its own buyer_name — not
+ * a shared name duplicated across `quantity` identical rows like the
+ * original single-tier implementation. Two older metadata shapes are
+ * still parsed as a fallback so any session already in flight when
+ * this ships still completes correctly:
+ *   1. cart_items_*/custom_responses_* (multi-tier, order-level Q&A)
+ *   2. tier_id/quantity/custom_responses (original single-tier)
  *
- * MUST be subscribed to:
- *   checkout.session.completed
- *   payment_intent.succeeded
- *   charge.refunded
- *   account.updated
- *
- * Env: STRIPE_WEBHOOK_SECRET (whsec_...)
- *      RESEND_API_KEY (re_...)
- *      NEXT_PUBLIC_SITE_URL (https://...)
- *
- * Buyer info resolution order (per ticket):
+ * Buyer info resolution order (the purchaser/billing identity, not
+ * attendees):
  *   1. metadata.buyer_email + metadata.buyer_name + metadata.buyer_phone
- *      (set by the checkout API for BOTH logged-in and guest buyers)
  *   2. Fallback: lookup profile by buyer_user_id (legacy code path)
  *   3. Last resort: pull from Stripe's session.customer_details
  *
- * Custom question responses (metadata.custom_responses): a compact
- * JSON array of {i: field_id, v: value}, packed by /api/tickets/checkout.
- * Same answers get written against every ticket minted in the order —
- * questions are asked once per order, not once per attendee. Failures
- * writing responses are logged but non-fatal; the ticket itself is the
- * thing that must not be lost.
- *
  * Email sending: errors during email send are caught and logged but
  * do NOT fail the webhook. If we returned 500, Stripe would retry and
- * we'd double-mint tickets. The user can re-trigger the email from
- * their ticket page (or we re-send manually) if delivery fails.
+ * we'd double-mint tickets.
  */
 export async function POST(request: NextRequest) {
   const body = await request.text()
   const sig = request.headers.get('stripe-signature')
 
   if (!sig) {
-    return NextResponse.json(
-      { error: 'Missing stripe-signature header' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 })
   }
-
   if (!process.env.STRIPE_WEBHOOK_SECRET) {
     console.error('[webhook] STRIPE_WEBHOOK_SECRET not set')
-    return NextResponse.json(
-      { error: 'Webhook secret not configured' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 })
   }
 
   let event: import('stripe').Stripe.Event
-
   try {
-    event = stripe.webhooks.constructEvent(
-      body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    )
+    event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET)
   } catch (err: any) {
     console.error('[webhook] signature verification failed:', err.message)
-    return NextResponse.json(
-      { error: `Webhook error: ${err.message}` },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: `Webhook error: ${err.message}` }, { status: 400 })
   }
 
   const admin = createClient()
@@ -86,119 +63,53 @@ export async function POST(request: NextRequest) {
       // ── checkout.session.completed ───────────────────────────────────
       case 'checkout.session.completed': {
         const session = event.data.object as import('stripe').Stripe.Checkout.Session
-
         if (session.payment_status !== 'paid') break
 
         const meta = session.metadata || {}
 
-        // Advertisement (unchanged)
         if (meta.type === 'advertisement' && meta.ad_id) {
           const { error: adError } = await admin
             .from('advertisements')
             .update({ payment_status: 'paid', status: 'active' })
             .eq('id', meta.ad_id)
-
           if (adError) {
             console.error('[webhook] failed to activate advertisement:', adError)
-            return NextResponse.json(
-              { error: 'Failed to activate advertisement' },
-              { status: 500 }
-            )
+            return NextResponse.json({ error: 'Failed to activate advertisement' }, { status: 500 })
           }
-
           console.log(`[webhook] advertisement ${meta.ad_id} activated`)
           break
         }
 
-        // Ticket purchase
-        const tierId = meta.tier_id
         const eventId = meta.event_id
         const buyerUserId = meta.buyer_user_id || null
-        const quantity = parseInt(meta.quantity || '1', 10)
         const paymentIntentId =
-          typeof session.payment_intent === 'string'
-            ? session.payment_intent
-            : session.payment_intent?.id
+          typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id
 
-        if (!tierId || !eventId) {
-          console.error(
-            '[webhook] checkout.session.completed missing tier_id/event_id',
-            meta
-          )
+        const order = parseOrder(meta)
+        if (!eventId || order.items.length === 0) {
+          console.error('[webhook] checkout.session.completed missing event_id/order items', meta)
           break
         }
 
-        const buyerInfo = await resolveBuyerInfo({
-          metadata: meta,
-          buyerUserId,
-          session,
-          admin,
-        })
-
+        const buyerInfo = await resolveBuyerInfo({ metadata: meta, buyerUserId, session, admin })
         if (!buyerInfo.email) {
           console.error('[webhook] could not resolve buyer email', meta)
-          return NextResponse.json(
-            { error: 'Buyer email could not be resolved' },
-            { status: 500 }
-          )
+          return NextResponse.json({ error: 'Buyer email could not be resolved' }, { status: 500 })
         }
 
-        const amountTotal = session.amount_total ? session.amount_total / 100 : null
-        const platformFee = paymentIntentId
-          ? await getPlatformFee(paymentIntentId)
-          : null
+        const platformFee = paymentIntentId ? await getPlatformFee(paymentIntentId) : null
 
-        const ticketRows = Array.from({ length: quantity }, () => ({
-          ticket_tier_id: tierId,
-          event_id: eventId,
-          buyer_user_id: buyerUserId,
-          buyer_email: buyerInfo.email,
-          buyer_name: buyerInfo.name,
-          buyer_phone: buyerInfo.phone,
-          stripe_payment_intent_id: paymentIntentId || null,
-          stripe_checkout_session_id: session.id,
-          payment_status: 'paid' as const,
-          amount_paid: amountTotal ? amountTotal / quantity : null,
-          platform_fee: platformFee ? platformFee / quantity : null,
-          status: 'valid' as const,
-        }))
-
-        // Insert tickets and get back qr_tokens for the email
-        const { data: inserted, error: insertError } = await admin
-          .from('tickets')
-          .insert(ticketRows)
-          .select('id, qr_token')
-
-        if (insertError || !inserted) {
-          console.error('[webhook] failed to insert tickets:', insertError)
-          return NextResponse.json(
-            { error: 'Failed to create tickets' },
-            { status: 500 }
-          )
-        }
-
-        console.log(
-          `[webhook] minted ${inserted.length} ticket(s) for event ${eventId} (guest=${!buyerUserId})`
-        )
-
-        await saveCustomResponses({ admin, eventId, ticketIds: inserted.map((t) => t.id), metadata: meta })
-
-        // Fire-and-log email send. Failures must not bubble up — they
-        // would cause Stripe to retry and double-mint tickets.
-        try {
-          await sendTicketConfirmation({
-            admin,
-            buyerEmail: buyerInfo.email,
-            buyerName: buyerInfo.name,
-            eventId,
-            tierId,
-            ticketRows: inserted,
-            amountPaid: amountTotal,
-            orderRef: session.id,
-          })
-        } catch (emailErr) {
-          console.error('[webhook] ticket email send failed (non-fatal):', emailErr)
-        }
+        await mintOrderTickets({
+          admin,
+          eventId,
+          order,
+          buyerUserId,
+          buyerInfo,
+          paymentIntentId,
+          checkoutSessionId: session.id,
+          totalPlatformFeeCents: platformFee ? Math.round(platformFee * 100) : null,
+          orderRef: session.id,
+        })
         break
       }
 
@@ -207,7 +118,8 @@ export async function POST(request: NextRequest) {
         const pi = event.data.object as import('stripe').Stripe.PaymentIntent
         const meta = pi.metadata || {}
 
-        if (!meta.tier_id) break
+        const order = parseOrder(meta)
+        if (order.items.length === 0) break
 
         const { data: existing } = await admin
           .from('tickets')
@@ -215,101 +127,44 @@ export async function POST(request: NextRequest) {
           .eq('stripe_payment_intent_id', pi.id)
           .limit(1)
           .maybeSingle()
-
         if (existing) break // checkout.session.completed already minted
 
-        const quantity = parseInt(meta.quantity || '1', 10)
         const buyerUserId = meta.buyer_user_id || null
-
-        const buyerInfo = await resolveBuyerInfo({
-          metadata: meta,
-          buyerUserId,
-          session: null,
-          admin,
-        })
-
+        const buyerInfo = await resolveBuyerInfo({ metadata: meta, buyerUserId, session: null, admin })
         if (!buyerInfo.email) {
-          console.error(
-            '[webhook] payment_intent.succeeded could not resolve buyer email',
-            meta
-          )
+          console.error('[webhook] payment_intent.succeeded could not resolve buyer email', meta)
           break
         }
 
-        const fallbackRows = Array.from({ length: quantity }, () => ({
-          ticket_tier_id: meta.tier_id,
-          event_id: meta.event_id,
-          buyer_user_id: buyerUserId,
-          buyer_email: buyerInfo.email,
-          buyer_name: buyerInfo.name,
-          buyer_phone: buyerInfo.phone,
-          stripe_payment_intent_id: pi.id,
-          payment_status: 'paid' as const,
-          amount_paid: pi.amount_received
-            ? pi.amount_received / 100 / quantity
-            : null,
-          status: 'valid' as const,
-        }))
-
-        const { data: insertedFallback, error: fallbackError } = await admin
-          .from('tickets')
-          .insert(fallbackRows)
-          .select('id, qr_token')
-
-        if (fallbackError || !insertedFallback) {
-          console.error(
-            '[webhook] payment_intent.succeeded ticket insert failed:',
-            fallbackError
-          )
-          break
-        }
-
-        await saveCustomResponses({
+        await mintOrderTickets({
           admin,
           eventId: meta.event_id,
-          ticketIds: insertedFallback.map((t) => t.id),
-          metadata: meta,
+          order,
+          buyerUserId,
+          buyerInfo,
+          paymentIntentId: pi.id,
+          checkoutSessionId: null,
+          totalPlatformFeeCents: pi.application_fee_amount ?? null,
+          orderRef: pi.id,
         })
-
-        try {
-          await sendTicketConfirmation({
-            admin,
-            buyerEmail: buyerInfo.email,
-            buyerName: buyerInfo.name,
-            eventId: meta.event_id,
-            tierId: meta.tier_id,
-            ticketRows: insertedFallback,
-            amountPaid: pi.amount_received ? pi.amount_received / 100 : null,
-            orderRef: pi.id,
-          })
-        } catch (emailErr) {
-          console.error('[webhook] fallback ticket email send failed:', emailErr)
-        }
         break
       }
 
       // ── charge.refunded ──────────────────────────────────────────────
       case 'charge.refunded': {
         const charge = event.data.object as import('stripe').Stripe.Charge
-        const piId =
-          typeof charge.payment_intent === 'string'
-            ? charge.payment_intent
-            : charge.payment_intent?.id
-
+        const piId = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id
         if (!piId) break
-
         await admin
           .from('tickets')
           .update({ payment_status: 'refunded', status: 'refunded' })
           .eq('stripe_payment_intent_id', piId)
-
         break
       }
 
       // ── account.updated ──────────────────────────────────────────────
       case 'account.updated': {
         const account = event.data.object as import('stripe').Stripe.Account
-
         try {
           await syncStripeAccountToProfile(admin, account.id)
           console.log(`[webhook] synced Connect account ${account.id}`)
@@ -330,147 +185,279 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// ── Metadata parsing ────────────────────────────────────────────────
+
+type OrderItem = { tierId: string; quantity: number; unitAmountCents: number }
+type OrderAttendee = { tierId: string; name: string | null; email: string | null; responses: { fieldId: string; value: string }[] }
+type Order = { items: OrderItem[]; attendees: OrderAttendee[] }
+
+function readChunked(meta: Record<string, string>, prefix: string): string | null {
+  const countKey = `${prefix}_count`
+  if (!meta[countKey]) return null
+  const count = parseInt(meta[countKey], 10) || 0
+  let json = ''
+  for (let i = 0; i < count; i++) json += meta[`${prefix}_${i}`] || ''
+  return json
+}
+
 /**
- * Parses metadata.custom_responses (packed by /api/tickets/checkout as
- * compact {i,v} JSON) and writes one event_registration_responses row
- * per (ticket, field) pair, across every ticket minted in this order.
- * Failures here are logged but never thrown — the ticket already
- * exists and must not be rolled back over an optional side-table write.
+ * Parses the current order_data_* format (items + per-attendee name
+ * and answers). Falls back to the two older metadata shapes for any
+ * session already in flight when this shipped — see file header.
  */
-async function saveCustomResponses(args: {
-  admin: ReturnType<typeof createClient>
-  eventId: string
-  ticketIds: string[]
-  metadata: Record<string, string>
-}) {
-  const { admin, eventId, ticketIds, metadata } = args
-  const raw = metadata.custom_responses
-  if (!raw || !ticketIds.length) return
+function parseOrder(meta: Record<string, string>): Order {
+  const empty: Order = { items: [], attendees: [] }
 
-  let parsed: { i: string; v: string }[]
-  try {
-    parsed = JSON.parse(raw)
-  } catch (err) {
-    console.error('[webhook] failed to parse custom_responses metadata:', err)
-    return
-  }
-  if (!Array.isArray(parsed) || parsed.length === 0) return
-
-  const rows: Record<string, any>[] = []
-  for (const ticketId of ticketIds) {
-    for (const r of parsed) {
-      if (!r?.i || !r?.v) continue
-      rows.push({ event_id: eventId, ticket_id: ticketId, field_id: r.i, response: r.v })
+  // Current format
+  const orderJson = readChunked(meta, 'order_data')
+  if (orderJson) {
+    try {
+      const parsed = JSON.parse(orderJson) as {
+        items: { t: string; q: number; u: number }[]
+        attendees: { t: string; n: string; e: string | null; r: { i: string; v: string }[] }[]
+      }
+      return {
+        items: (parsed.items || []).filter((it) => it?.t && it.q > 0).map((it) => ({
+          tierId: it.t, quantity: it.q, unitAmountCents: it.u || 0,
+        })),
+        attendees: (parsed.attendees || []).map((a) => ({
+          tierId: a.t,
+          name: a.n || null,
+          email: a.e || null,
+          responses: (a.r || []).map((r) => ({ fieldId: r.i, value: r.v })),
+        })),
+      }
+    } catch (err) {
+      console.error('[webhook] failed to parse order_data metadata:', err)
+      return empty
     }
   }
-  if (!rows.length) return
 
-  const { error } = await admin.from('event_registration_responses').insert(rows)
-  if (error) {
-    console.error('[webhook] failed to save custom_responses:', error)
+  // Previous multi-tier format (order-level Q&A, no per-attendee names)
+  const cartJson = readChunked(meta, 'cart_items')
+  if (cartJson) {
+    try {
+      const items = (JSON.parse(cartJson) as { t: string; q: number; u: number }[])
+        .filter((it) => it?.t && it.q > 0)
+        .map((it) => ({ tierId: it.t, quantity: it.q, unitAmountCents: it.u || 0 }))
+
+      const responsesJson = readChunked(meta, 'custom_responses')
+      let eventResponses: { i: string; v: string }[] = []
+      let byTier: Record<string, { i: string; v: string }[]> = {}
+      if (responsesJson) {
+        try {
+          const parsed = JSON.parse(responsesJson)
+          eventResponses = parsed?.e || []
+          byTier = parsed?.t || {}
+        } catch { /* ignore */ }
+      }
+
+      // No per-attendee names in this legacy format — every ticket in
+      // a tier group shares the same (order-level) answers and a null
+      // name, which falls back to the purchaser's name at insert time.
+      const attendees: OrderAttendee[] = []
+      for (const it of items) {
+        const tierResponses = [...eventResponses, ...(byTier[it.tierId] || [])]
+          .map((r) => ({ fieldId: r.i, value: r.v }))
+        for (let i = 0; i < it.quantity; i++) {
+          attendees.push({ tierId: it.tierId, name: null, email: null, responses: tierResponses })
+        }
+      }
+      return { items, attendees }
+    } catch (err) {
+      console.error('[webhook] failed to parse legacy cart_items metadata:', err)
+      return empty
+    }
   }
+
+  // Original single-tier format
+  if (meta.tier_id) {
+    const quantity = parseInt(meta.quantity || '1', 10)
+    const unitAmountCents = parseInt(meta.ticket_unit_amount || '0', 10)
+    let eventResponses: { i: string; v: string }[] = []
+    if (meta.custom_responses) {
+      try { eventResponses = JSON.parse(meta.custom_responses) } catch { /* ignore */ }
+    }
+    const responses = eventResponses.map((r) => ({ fieldId: r.i, value: r.v }))
+    const attendees: OrderAttendee[] = Array.from({ length: quantity }, () => ({
+      tierId: meta.tier_id, name: null, email: null, responses,
+    }))
+    return { items: [{ tierId: meta.tier_id, quantity, unitAmountCents }], attendees }
+  }
+
+  return empty
 }
 
+// ── Ticket minting ──────────────────────────────────────────────────
+
 /**
- * Look up event + venue + tier names + organizer info and dispatch the
- * confirmation email via Resend.
+ * Mints one ticket row per attendee — each with its own buyer_name
+ * (falling back to the purchaser's name only for legacy orders that
+ * had no per-attendee name captured) — saves each attendee's answers
+ * against their specific ticket, and sends one confirmation email
+ * covering the whole order with per-ticket attendee names.
+ *
+ * Platform fee is split evenly across the total ticket count (same
+ * simplification as the original implementation — Stripe doesn't
+ * expose a clean per-tier fee breakdown on a single PaymentIntent).
  */
-async function sendTicketConfirmation(args: {
+async function mintOrderTickets(args: {
   admin: ReturnType<typeof createClient>
-  buyerEmail: string
-  buyerName: string | null
   eventId: string
-  tierId: string
-  ticketRows: { id: string; qr_token: string }[]
-  amountPaid: number | null
+  order: Order
+  buyerUserId: string | null
+  buyerInfo: { email: string; name: string | null; phone: string | null }
+  paymentIntentId: string | null
+  checkoutSessionId: string | null
+  totalPlatformFeeCents: number | null
   orderRef: string
 }) {
-  const { admin, buyerEmail, buyerName, eventId, tierId, ticketRows, amountPaid, orderRef } =
-    args
+  const {
+    admin, eventId, order, buyerUserId, buyerInfo, paymentIntentId,
+    checkoutSessionId, totalPlatformFeeCents, orderRef,
+  } = args
 
-  // Pull event + venue + organizer
-  const { data: ev, error: evErr } = await admin
-    .from('events')
-    .select(`
-      title,
-      slug,
-      image_url,
-      event_date,
-      event_start_time,
-      event_end_time,
-      description,
-      auth_user_id,
-      venues (
-        name,
-        address,
-        city,
-        state
-      ),
-      profiles!events_auth_user_id_profile_fkey (
-        full_name,
-        email
-      )
-    `)
-    .eq('id', eventId)
-    .single()
+  const unitAmountByTier = new Map(order.items.map((it) => [it.tierId, it.unitAmountCents]))
+  const totalQuantity = order.attendees.length
+  const platformFeePerTicketCents = totalPlatformFeeCents && totalQuantity ? totalPlatformFeeCents / totalQuantity : 0
 
-  if (evErr || !ev) {
-    console.error('[webhook] could not load event for email:', evErr)
-    return
+  // Insert order matches order.attendees order exactly — Postgres
+  // preserves row order for a single multi-row INSERT ... RETURNING,
+  // so we can zip the returned ids straight back to attendees below.
+  const ticketRows = order.attendees.map((a) => ({
+    ticket_tier_id: a.tierId,
+    event_id: eventId,
+    buyer_user_id: buyerUserId,
+    buyer_email: buyerInfo.email,
+    buyer_name: a.name || buyerInfo.name, // fallback covers legacy orders only
+    buyer_phone: buyerInfo.phone,
+    attendee_email: a.email,
+    stripe_payment_intent_id: paymentIntentId,
+    stripe_checkout_session_id: checkoutSessionId,
+    payment_status: 'paid' as const,
+    amount_paid: (unitAmountByTier.get(a.tierId) || 0) / 100,
+    platform_fee: platformFeePerTicketCents / 100,
+    status: 'valid' as const,
+  }))
+
+  const { data: inserted, error: insertError } = await admin
+    .from('tickets')
+    .insert(ticketRows)
+    .select('id, qr_token, ticket_tier_id, attendee_email')
+
+  if (insertError || !inserted) {
+    console.error('[webhook] failed to insert tickets:', insertError)
+    throw new Error('Failed to create tickets')
   }
 
-  const venue = Array.isArray(ev.venues) ? ev.venues[0] : ev.venues
-  const creatorProfile = Array.isArray(ev.profiles) ? ev.profiles[0] : ev.profiles
+  console.log(`[webhook] minted ${inserted.length} ticket(s) across ${order.items.length} tier(s) for event ${eventId} (guest=${!buyerUserId})`)
 
-  // Pull tier name
-  const { data: tier } = await admin
-    .from('ticket_tiers')
-    .select('name')
-    .eq('id', tierId)
-    .single()
-
-  const tierName = tier?.name || 'Ticket'
-
-  await sendTicketEmail({
-    to: buyerEmail,
-    buyerName,
-    event: {
-      title: ev.title,
-      slug: ev.slug,
-      date: ev.event_date,
-      startTime: ev.event_start_time,
-      endTime: ev.event_end_time,
-      image_url: ev.image_url,
-      venueName: venue?.name || null,
-      venueAddress: venue?.address || null,
-      // Don't include city/state — it's already in the address
-      venueCityState: null,
-    },
-    tickets: ticketRows.map((t) => ({
-      qr_token: t.qr_token,
-      ticket_tier_name: tierName,
-    })),
-    amountPaid,
-    orderRef,
-    // Organizer contact info
-    organizerName: creatorProfile?.full_name || null,
-    organizerEmail: creatorProfile?.email || null,
+  // Save each attendee's answers against their own ticket.
+  const responseRows: Record<string, any>[] = []
+  inserted.forEach((t, i) => {
+    const attendee = order.attendees[i]
+    for (const r of attendee?.responses || []) {
+      if (!r.fieldId || !r.value) continue
+      responseRows.push({ event_id: eventId, ticket_id: t.id, field_id: r.fieldId, response: r.value })
+    }
   })
+  if (responseRows.length > 0) {
+    const { error: responseErr } = await admin.from('event_registration_responses').insert(responseRows)
+    if (responseErr) console.error('[webhook] failed to save attendee responses:', responseErr)
+  }
+
+  // Email — one confirmation covering every ticket, each with its own
+  // correct tier name and attendee name.
+  let eventDetails: {
+    title: string; slug: string; date: string | null; startTime: string | null; endTime: string | null
+    image_url: string | null; venueName: string | null; venueAddress: string | null
+  } | null = null
+  let organizerName: string | null = null
+  let organizerEmail: string | null = null
+
+  try {
+    const tierIds = [...new Set(order.items.map((it) => it.tierId))]
+    const { data: tierRows } = await admin.from('ticket_tiers').select('id, name').in('id', tierIds)
+    const tierNameById = new Map((tierRows || []).map((t) => [t.id, t.name]))
+
+    const { data: ev } = await admin
+      .from('events')
+      .select(`
+        title, slug, image_url, event_date, event_start_time, event_end_time, auth_user_id,
+        venues ( name, address ),
+        profiles!events_auth_user_id_profile_fkey ( full_name, email )
+      `)
+      .eq('id', eventId)
+      .single()
+
+    if (ev) {
+      const venue = Array.isArray(ev.venues) ? ev.venues[0] : ev.venues
+      const creatorProfile = Array.isArray(ev.profiles) ? ev.profiles[0] : ev.profiles
+      eventDetails = {
+        title: ev.title, slug: ev.slug, date: ev.event_date, startTime: ev.event_start_time,
+        endTime: ev.event_end_time, image_url: ev.image_url,
+        venueName: venue?.name || null, venueAddress: venue?.address || null,
+      }
+      organizerName = creatorProfile?.full_name || null
+      organizerEmail = creatorProfile?.email || null
+    }
+
+    if (eventDetails) {
+      await sendTicketEmail({
+        to: buyerInfo.email,
+        buyerName: buyerInfo.name,
+        event: { ...eventDetails, venueCityState: null },
+        tickets: inserted.map((t, i) => ({
+          qr_token: t.qr_token,
+          ticket_tier_name: tierNameById.get(t.ticket_tier_id) || 'Ticket',
+          attendee_name: order.attendees[i]?.name || null,
+        })),
+        amountPaid: ticketRows.reduce((sum, r) => sum + (r.amount_paid || 0), 0),
+        orderRef,
+        organizerName,
+        organizerEmail,
+      })
+    }
+  } catch (emailErr) {
+    console.error('[webhook] ticket email send failed (non-fatal):', emailErr)
+  }
+
+  // Notify any attendee who has their own email that isn't the
+  // purchaser's — one small email per attendee, just their ticket.
+  if (eventDetails) {
+    const buyerEmailLower = buyerInfo.email.toLowerCase()
+    for (let i = 0; i < inserted.length; i++) {
+      const t = inserted[i]
+      const attendee = order.attendees[i]
+      const attendeeEmail = t.attendee_email || attendee?.email
+      if (!attendeeEmail || attendeeEmail.toLowerCase() === buyerEmailLower) continue
+
+      const tierIds2 = [...new Set(order.items.map((it) => it.tierId))]
+      try {
+        const { data: tierRow } = await admin.from('ticket_tiers').select('name').eq('id', t.ticket_tier_id).single()
+        await sendAttendeeTicketEmail({
+          to: attendeeEmail,
+          attendeeName: attendee?.name || null,
+          purchaserName: buyerInfo.name,
+          event: { ...eventDetails, venueCityState: null },
+          ticket: { qr_token: t.qr_token, ticket_tier_name: tierRow?.name || 'Ticket' },
+          amountPaid: null,
+          organizerName,
+          organizerEmail,
+        })
+      } catch (attendeeEmailErr) {
+        console.error('[webhook] attendee notification send failed (non-fatal):', attendeeEmailErr)
+      }
+    }
+  }
 }
 
-/**
- * Resolve buyer name / email / phone from whatever sources are available.
- * Metadata is the source of truth (we wrote it deliberately at checkout).
- * For legacy logged-in tickets that have a buyer_user_id but missing
- * metadata fields, fall back to the profile. As a last resort, use
- * Stripe's own customer_details on the session.
- */
 async function resolveBuyerInfo(args: {
   metadata: Record<string, string>
   buyerUserId: string | null
   session: import('stripe').Stripe.Checkout.Session | null
   admin: ReturnType<typeof createClient>
-}): Promise<{ email: string | null; name: string | null; phone: string | null }> {
+}): Promise<{ email: string; name: string | null; phone: string | null }> {
   const { metadata, buyerUserId, session, admin } = args
 
   let email = metadata.buyer_email || null
@@ -494,15 +481,12 @@ async function resolveBuyerInfo(args: {
     phone = phone || session.customer_details.phone || null
   }
 
-  return { email, name, phone }
+  return { email: email || '', name, phone }
 }
 
 async function getPlatformFee(paymentIntentId: string): Promise<number | null> {
   try {
-    const charges = await stripe.charges.list({
-      payment_intent: paymentIntentId,
-      limit: 1,
-    })
+    const charges = await stripe.charges.list({ payment_intent: paymentIntentId, limit: 1 })
     const fee = charges.data[0]?.application_fee_amount
     return fee ? fee / 100 : null
   } catch {
