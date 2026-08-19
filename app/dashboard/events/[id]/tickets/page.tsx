@@ -41,9 +41,39 @@ export default function EventTicketsPage() {
   const [responsesByTicket, setResponsesByTicket] = useState<Record<string, { label: string; value: string }[]>>({})
   const [activeTab, setActiveTab] = useState<'ticketing' | 'marketing'>('ticketing')
   const [checkInCopied, setCheckInCopied] = useState(false)
+  const [checkInUrl, setCheckInUrl] = useState('')
+  const [checkInUrlLoading, setCheckInUrlLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
 
+  // Inline edit of a ticket's attendee name/email
+  const [editingTicketId, setEditingTicketId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState('')
+
+  // Manually add a ticket (cash / offline sale)
+  const [showAddTicket, setShowAddTicket] = useState(false)
+  const [addTierId, setAddTierId] = useState('')
+  const [addName, setAddName] = useState('')
+  const [addEmail, setAddEmail] = useState('')
+  const [addAmount, setAddAmount] = useState('')
+  const [addNotes, setAddNotes] = useState('')
+  const [addSendConfirmation, setAddSendConfirmation] = useState(true)
+  const [addSaving, setAddSaving] = useState(false)
+  const [addError, setAddError] = useState('')
+
   const supabase = createClient()
+
+  useEffect(() => {
+    if (!eventId) return
+    setCheckInUrlLoading(true)
+    fetch(`/api/events/${eventId}/scanner-link`)
+      .then((r) => r.json())
+      .then((json) => setCheckInUrl(json.url || ''))
+      .catch(() => { /* card shows a retry-friendly empty state below */ })
+      .finally(() => setCheckInUrlLoading(false))
+  }, [eventId])
 
   useEffect(() => {
     async function loadData() {
@@ -116,8 +146,8 @@ export default function EventTicketsPage() {
           supabase
             .from('tickets')
             .select(`
-              id, buyer_name, buyer_email, amount_paid, status, payment_status,
-              created_at, ticket_tier_id,
+              id, buyer_name, buyer_email, attendee_email, amount_paid, status, payment_status,
+              created_at, ticket_tier_id, source, notes,
               ticket_tiers(name)
             `)
             .eq('event_id', eventId)
@@ -183,14 +213,122 @@ export default function EventTicketsPage() {
 
   const stripeReady = profile?.stripe_account_status === 'enabled'
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://seveneightfive.com'
-  const checkInUrl = event.slug ? `${siteUrl}/events/${event.slug}/checkin` : ''
+
 
   const copyCheckInUrl = () => {
     if (!checkInUrl) return
     navigator.clipboard.writeText(checkInUrl)
     setCheckInCopied(true)
     setTimeout(() => setCheckInCopied(false), 2000)
+  }
+
+  async function refreshTickets() {
+    const [{ data: tiersData }, { data: ticketsData }] = await Promise.all([
+      supabase
+        .from('ticket_tiers')
+        .select('id, name, price, quantity, quantity_sold, is_active')
+        .eq('event_id', eventId)
+        .order('sort_order'),
+      supabase
+        .from('tickets')
+        .select(`
+          id, buyer_name, buyer_email, attendee_email, amount_paid, status, payment_status,
+          created_at, ticket_tier_id, source, notes,
+          ticket_tiers(name)
+        `)
+        .eq('event_id', eventId)
+        .eq('payment_status', 'paid')
+        .order('created_at', { ascending: false }),
+    ])
+    setTiers(tiersData || [])
+    setTickets(ticketsData || [])
+
+    const ticketIds = (ticketsData || []).map((t) => t.id)
+    if (ticketIds.length > 0) {
+      const { data: responses } = await supabase
+        .from('event_registration_responses')
+        .select('ticket_id, response, event_form_fields(label)')
+        .in('ticket_id', ticketIds)
+      const grouped: Record<string, { label: string; value: string }[]> = {}
+      for (const r of responses || []) {
+        const label = Array.isArray(r.event_form_fields) ? r.event_form_fields[0]?.label : (r.event_form_fields as any)?.label
+        if (!label) continue
+        grouped[r.ticket_id] = grouped[r.ticket_id] || []
+        grouped[r.ticket_id].push({ label, value: r.response })
+      }
+      setResponsesByTicket(grouped)
+    }
+  }
+
+  function startEditingTicket(t: any) {
+    setEditingTicketId(t.id)
+    setEditName(t.buyer_name || '')
+    setEditEmail(t.attendee_email || '')
+    setEditError('')
+  }
+
+  function cancelEditingTicket() {
+    setEditingTicketId(null)
+    setEditError('')
+  }
+
+  async function saveTicketEdit(ticketId: string) {
+    setEditSaving(true)
+    setEditError('')
+    try {
+      const res = await fetch(`/api/tickets/${ticketId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ buyer_name: editName.trim(), attendee_email: editEmail.trim() || null }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Failed to update ticket')
+      await refreshTickets()
+      setEditingTicketId(null)
+    } catch (err: any) {
+      setEditError(err?.message || 'Failed to update ticket')
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  function openAddTicket() {
+    setShowAddTicket(true)
+    setAddTierId(tiers.find((t) => t.is_active)?.id || tiers[0]?.id || '')
+    setAddName('')
+    setAddEmail('')
+    setAddAmount('')
+    setAddNotes('')
+    setAddSendConfirmation(true)
+    setAddError('')
+  }
+
+  async function submitAddTicket(e: React.FormEvent) {
+    e.preventDefault()
+    setAddSaving(true)
+    setAddError('')
+    try {
+      const res = await fetch(`/api/events/${eventId}/tickets/manual`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tierId: addTierId,
+          attendeeName: addName.trim(),
+          attendeeEmail: addEmail.trim() || null,
+          amountPaid: addAmount.trim() === '' ? undefined : Number(addAmount),
+          notes: addNotes.trim() || null,
+          sendConfirmation: addSendConfirmation,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Failed to add ticket')
+      await refreshTickets()
+      setShowAddTicket(false)
+    } catch (err: any) {
+      setAddError(err?.message || 'Failed to add ticket')
+    } finally {
+      setAddSaving(false)
+    }
   }
 
   async function handleExportCsv() {
@@ -430,22 +568,28 @@ export default function EventTicketsPage() {
           <Card>
             <h2 className={sectionHeadingCls}>Door Check-In</h2>
             <p className="mb-2 -mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Share this link with staff to check in attendees at the door. No app download needed:
+              Share this link with staff to check in attendees at the door — no account needed,
+              the link itself is what grants access:
             </p>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={checkInUrl}
-                readOnly
-                className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-300"
-              />
-              <button
-                onClick={copyCheckInUrl}
-                className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
-              >
-                {checkInCopied ? 'Copied' : 'Copy'}
-              </button>
-            </div>
+            {checkInUrlLoading ? (
+              <div className="text-sm text-gray-500 dark:text-gray-400">Setting up your check-in link…</div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={checkInUrl}
+                  readOnly
+                  className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-300"
+                />
+                <button
+                  onClick={copyCheckInUrl}
+                  disabled={!checkInUrl}
+                  className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {checkInCopied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            )}
           </Card>
 
           {/* Attendees */}
@@ -455,6 +599,12 @@ export default function EventTicketsPage() {
                 Attendees
               </h2>
               <div className="flex items-center gap-3">
+                <button
+                  onClick={openAddTicket}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-600 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-400 dark:hover:bg-white/[0.08]"
+                >
+                  + Add Ticket
+                </button>
                 {totalSold > 0 && (
                   <button
                     onClick={handleExportCsv}
@@ -473,6 +623,128 @@ export default function EventTicketsPage() {
               </div>
             </div>
 
+            {showAddTicket && (
+              <form
+                onSubmit={submitAddTicket}
+                className="mb-4 space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]"
+              >
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                  Add a ticket sold outside 785 Tickets
+                </div>
+                <p className="-mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  For cash at the door, Venmo, comps, etc. — it'll show up here and in your CSV
+                  export just like an online sale, and counts against the tier's inventory.
+                </p>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
+                      Tier
+                    </label>
+                    <select
+                      value={addTierId}
+                      onChange={(e) => setAddTierId(e.target.value)}
+                      required
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90"
+                    >
+                      <option value="" disabled>Select a tier…</option>
+                      {tiers.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name} — {Number(t.price) === 0 ? 'Free' : `$${Number(t.price).toFixed(2)}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
+                      Amount actually paid
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={addAmount}
+                      onChange={(e) => setAddAmount(e.target.value)}
+                      placeholder="Defaults to tier price"
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
+                      Attendee name
+                    </label>
+                    <input
+                      type="text"
+                      value={addName}
+                      onChange={(e) => setAddName(e.target.value)}
+                      required
+                      placeholder="First Last"
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
+                      Email (optional)
+                    </label>
+                    <input
+                      type="email"
+                      value={addEmail}
+                      onChange={(e) => setAddEmail(e.target.value)}
+                      placeholder="attendee@example.com"
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
+                    Note (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={addNotes}
+                    onChange={(e) => setAddNotes(e.target.value)}
+                    placeholder="e.g. Cash at door"
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90"
+                  />
+                </div>
+
+                <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                  <input
+                    type="checkbox"
+                    checked={addSendConfirmation}
+                    onChange={(e) => setAddSendConfirmation(e.target.checked)}
+                    disabled={!addEmail.trim()}
+                    className="rounded border-gray-300"
+                  />
+                  Email this attendee their QR code {!addEmail.trim() && '(add an email above to enable)'}
+                </label>
+
+                {addError && <p className="text-xs font-medium text-brand-600 dark:text-brand-400">{addError}</p>}
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="submit"
+                    disabled={addSaving || !addTierId || !addName.trim()}
+                    className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {addSaving ? 'Adding…' : 'Add ticket'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddTicket(false)}
+                    disabled={addSaving}
+                    className="rounded-lg px-3 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+
             {eventTickets.length === 0 ? (
               <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-white/[0.02] dark:text-gray-400">
                 No tickets sold yet.
@@ -484,6 +756,63 @@ export default function EventTicketsPage() {
                     ? t.ticket_tiers[0]?.name
                     : (t.ticket_tiers as any)?.name
                   const responses = responsesByTicket[t.id]
+                  const isEditing = editingTicketId === t.id
+
+                  if (isEditing) {
+                    return (
+                      <div
+                        key={t.id}
+                        className="rounded-lg border border-brand-300 bg-brand-50/40 p-3 dark:border-brand-500/40 dark:bg-brand-500/5"
+                      >
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <div>
+                            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
+                              Name
+                            </label>
+                            <input
+                              type="text"
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              autoFocus
+                              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-800 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
+                              Attendee email
+                            </label>
+                            <input
+                              type="email"
+                              value={editEmail}
+                              onChange={(e) => setEditEmail(e.target.value)}
+                              placeholder="—"
+                              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-800 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90"
+                            />
+                          </div>
+                        </div>
+                        {editError && (
+                          <p className="mt-2 text-xs font-medium text-brand-600 dark:text-brand-400">{editError}</p>
+                        )}
+                        <div className="mt-2 flex items-center gap-2">
+                          <button
+                            onClick={() => saveTicketEdit(t.id)}
+                            disabled={editSaving || !editName.trim()}
+                            className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {editSaving ? 'Saving…' : 'Save'}
+                          </button>
+                          <button
+                            onClick={cancelEditingTicket}
+                            disabled={editSaving}
+                            className="rounded-lg px-3 py-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  }
+
                   return (
                     <div
                       key={t.id}
@@ -496,10 +825,26 @@ export default function EventTicketsPage() {
                               {t.buyer_name || 'Guest'}
                             </span>
                             <StatusPill status={t.status} />
+                            {t.source === 'manual' && (
+                              <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+                                Manual
+                              </span>
+                            )}
+                            <button
+                              onClick={() => startEditingTicket(t)}
+                              className="text-[10px] font-semibold text-gray-400 underline decoration-dotted underline-offset-2 hover:text-gray-700 dark:hover:text-gray-200"
+                            >
+                              Edit
+                            </button>
                           </div>
                           <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
-                            {t.buyer_email}
+                            {t.attendee_email || t.buyer_email || '—'}
                           </div>
+                          {t.notes && (
+                            <div className="mt-0.5 truncate text-xs italic text-gray-400 dark:text-gray-500">
+                              {t.notes}
+                            </div>
+                          )}
                         </div>
                         <div className="shrink-0 text-right">
                           <div className="font-display text-sm font-bold text-success-700 dark:text-success-400">
