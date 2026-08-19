@@ -7,6 +7,30 @@ import {
   applicationFeeAmount,
 } from '@/lib/stripe'
 
+// Stripe metadata values cap at 500 chars each. Custom question answers
+// are packed as compact JSON (short keys: i=field id, v=value) under a
+// single metadata key. The UI already caps free-text answers at 80
+// chars and the question count at 3, but this is a hard backstop —
+// if packed responses would exceed the limit, we drop from the end
+// rather than fail the whole checkout over an optional field.
+const METADATA_VALUE_LIMIT = 480
+
+function packResponsesForMetadata(
+  responses: { field_id: string; value: string }[] | undefined
+): string {
+  if (!Array.isArray(responses) || responses.length === 0) return ''
+  const packed = responses
+    .filter((r) => r?.field_id && r?.value)
+    .map((r) => ({ i: r.field_id, v: String(r.value).slice(0, 200) }))
+
+  let json = JSON.stringify(packed)
+  while (json.length > METADATA_VALUE_LIMIT && packed.length > 0) {
+    packed.pop()
+    json = JSON.stringify(packed)
+  }
+  return json
+}
+
 /**
  * POST /api/tickets/checkout
  */
@@ -20,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    const { tierId, eventId, quantity = 1, guest } = body
+    const { tierId, eventId, quantity = 1, guest, responses } = body
 
     if (!tierId || !eventId) {
       return NextResponse.json(
@@ -131,6 +155,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Validate required custom questions were answered (server-side
+    // backstop — the client already enforces this).
+    const { data: applicableFields } = await admin
+      .from('event_form_fields')
+      .select('id, label, is_required')
+      .eq('event_id', eventId)
+      .or(`ticket_tier_id.is.null,ticket_tier_id.eq.${tierId}`)
+
+    const responseMap = new Map<string, string>(
+      (Array.isArray(responses) ? responses : []).map((r: any) => [r.field_id, String(r.value ?? '').trim()])
+    )
+    for (const f of applicableFields || []) {
+      if (f.is_required && !(responseMap.get(f.id) || '').length) {
+        return NextResponse.json({ error: `"${f.label}" is required.` }, { status: 400 })
+      }
+    }
+
     /**
      * Validate organizer Stripe setup
      */
@@ -218,6 +259,8 @@ export async function POST(request: NextRequest) {
     /**
      * Metadata for webhook + reporting
      */
+    const packedResponses = packResponsesForMetadata(responses)
+
     const sessionMetadata: Record<string, string> = {
       tier_id: tierId,
       event_id: eventId,
@@ -230,6 +273,7 @@ export async function POST(request: NextRequest) {
       application_fee_per_ticket: String(appFeePerTicket),
     }
     if (buyerUserId) sessionMetadata.buyer_user_id = buyerUserId
+    if (packedResponses) sessionMetadata.custom_responses = packedResponses
 
     /**
      * Build line items so buyer sees the fee broken out on Stripe's
