@@ -20,6 +20,7 @@ import { sendAttendeeTicketEmail } from '@/app/lib/email'
  *   attendees: {
  *     tierId: string,
  *     name: string,
+ *     email?: string | null,
  *     responses: { field_id: string, value: string }[]
  *   }[]   // flat list, length === sum(items[].quantity), grouped by
  *         // tier in the same order as `items`
@@ -47,63 +48,6 @@ export async function POST(request: NextRequest) {
     }
     if (!user && guest && (!guest.name?.trim() || !guest.email?.trim())) {
       return NextResponse.json({ error: 'Name and email are required' }, { status: 400 })
-    }
-
-    // Notify any attendee who has their own email that isn't the
-    // purchaser's — free RSVPs mint immediately, so this happens now
-    // rather than in a webhook.
-    if (inserted?.length) {
-      const buyerEmailLower = buyerEmail.toLowerCase()
-      const attendeesNeedingEmail = inserted
-        .map((t, i) => ({ ticket: t, attendee: attendees[i] }))
-        .filter(({ ticket }) => ticket.attendee_email && ticket.attendee_email.toLowerCase() !== buyerEmailLower)
-
-      if (attendeesNeedingEmail.length > 0) {
-        try {
-          const tierIds2 = [...new Set(attendeesNeedingEmail.map((a) => a.ticket.ticket_tier_id))]
-          const { data: tierRows2 } = await admin.from('ticket_tiers').select('id, name').in('id', tierIds2)
-          const tierNameById = new Map((tierRows2 || []).map((t) => [t.id, t.name]))
-
-          const { data: ev } = await admin
-            .from('events')
-            .select(`
-              title, slug, image_url, event_date, event_start_time, event_end_time, auth_user_id,
-              venues ( name, address ),
-              profiles!events_auth_user_id_profile_fkey ( full_name, email )
-            `)
-            .eq('id', eventId)
-            .single()
-
-          if (ev) {
-            const venue = Array.isArray(ev.venues) ? ev.venues[0] : ev.venues
-            const creatorProfile = Array.isArray(ev.profiles) ? ev.profiles[0] : ev.profiles
-            const eventDetails = {
-              title: ev.title, slug: ev.slug, date: ev.event_date, startTime: ev.event_start_time,
-              endTime: ev.event_end_time, image_url: ev.image_url,
-              venueName: venue?.name || null, venueAddress: venue?.address || null, venueCityState: null,
-            }
-
-            for (const { ticket, attendee } of attendeesNeedingEmail) {
-              try {
-                await sendAttendeeTicketEmail({
-                  to: ticket.attendee_email!,
-                  attendeeName: attendee?.name || null,
-                  purchaserName: buyerName,
-                  event: eventDetails,
-                  ticket: { qr_token: ticket.qr_token, ticket_tier_name: tierNameById.get(ticket.ticket_tier_id) || 'Ticket' },
-                  amountPaid: 0,
-                  organizerName: creatorProfile?.full_name || null,
-                  organizerEmail: creatorProfile?.email || null,
-                })
-              } catch (attendeeEmailErr) {
-                console.error('[tickets/rsvp] attendee notification send failed (non-fatal):', attendeeEmailErr)
-              }
-            }
-          }
-        } catch (lookupErr) {
-          console.error('[tickets/rsvp] attendee notification lookup failed (non-fatal):', lookupErr)
-        }
-      }
     }
 
     const totalQuantity = items.reduce((sum, it) => sum + it.quantity, 0)
@@ -260,6 +204,61 @@ export async function POST(request: NextRequest) {
     if (responseRows.length > 0) {
       const { error: responseErr } = await admin.from('event_registration_responses').insert(responseRows)
       if (responseErr) console.error('[tickets/rsvp] failed to save responses:', responseErr)
+    }
+
+    // Notify any attendee who has their own email that isn't the
+    // purchaser's — free RSVPs mint immediately, so this happens now
+    // rather than in a webhook. Must run AFTER `inserted` exists.
+    const buyerEmailLower = buyerEmail.toLowerCase()
+    const attendeesNeedingEmail = inserted
+      .map((t, i) => ({ ticket: t, attendee: attendees[i] }))
+      .filter(({ ticket }) => ticket.attendee_email && ticket.attendee_email.toLowerCase() !== buyerEmailLower)
+
+    if (attendeesNeedingEmail.length > 0) {
+      try {
+        const tierIdsForEmail = [...new Set(attendeesNeedingEmail.map((a) => a.ticket.ticket_tier_id))]
+        const { data: tierRowsForEmail } = await admin.from('ticket_tiers').select('id, name').in('id', tierIdsForEmail)
+        const tierNameById = new Map((tierRowsForEmail || []).map((t) => [t.id, t.name]))
+
+        const { data: ev } = await admin
+          .from('events')
+          .select(`
+            title, slug, image_url, event_date, event_start_time, event_end_time, auth_user_id,
+            venues ( name, address ),
+            profiles!events_auth_user_id_profile_fkey ( full_name, email )
+          `)
+          .eq('id', eventId)
+          .single()
+
+        if (ev) {
+          const venue = Array.isArray(ev.venues) ? ev.venues[0] : ev.venues
+          const creatorProfile = Array.isArray(ev.profiles) ? ev.profiles[0] : ev.profiles
+          const eventDetails = {
+            title: ev.title, slug: ev.slug, date: ev.event_date, startTime: ev.event_start_time,
+            endTime: ev.event_end_time, image_url: ev.image_url,
+            venueName: venue?.name || null, venueAddress: venue?.address || null, venueCityState: null,
+          }
+
+          for (const { ticket, attendee } of attendeesNeedingEmail) {
+            try {
+              await sendAttendeeTicketEmail({
+                to: ticket.attendee_email!,
+                attendeeName: attendee?.name || null,
+                purchaserName: buyerName,
+                event: eventDetails,
+                ticket: { qr_token: ticket.qr_token, ticket_tier_name: tierNameById.get(ticket.ticket_tier_id) || 'Ticket' },
+                amountPaid: 0,
+                organizerName: creatorProfile?.full_name || null,
+                organizerEmail: creatorProfile?.email || null,
+              })
+            } catch (attendeeEmailErr) {
+              console.error('[tickets/rsvp] attendee notification send failed (non-fatal):', attendeeEmailErr)
+            }
+          }
+        }
+      } catch (lookupErr) {
+        console.error('[tickets/rsvp] attendee notification lookup failed (non-fatal):', lookupErr)
+      }
     }
 
     return NextResponse.json({
