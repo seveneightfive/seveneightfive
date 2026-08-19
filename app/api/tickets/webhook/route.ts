@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
         const eventId = meta.event_id
         const buyerUserId = meta.buyer_user_id || null
         const paymentIntentId =
-          typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id
+          (typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id) ?? null
 
         const order = parseOrder(meta)
         if (!eventId || order.items.length === 0) {
