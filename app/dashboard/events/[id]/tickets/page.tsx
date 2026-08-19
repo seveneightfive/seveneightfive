@@ -276,7 +276,7 @@ export default function EventTicketsPage() {
     setEditSaving(true)
     setEditError('')
     try {
-      const res = await fetch(`/api/tickets/${ticketId}`, {
+      const res = await fetch(`/api/tickets/manage/${ticketId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ buyer_name: editName.trim(), attendee_email: editEmail.trim() || null }),
