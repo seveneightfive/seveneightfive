@@ -1,32 +1,44 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'next/navigation'
-import { createClient } from '@/lib/supabaseBrowser'
-import { Loader2 } from 'lucide-react'
+import { useEffect, useRef, useState, Suspense } from 'react'
+import { useParams, useSearchParams } from 'next/navigation'
+import { Loader2, AlertCircle } from 'lucide-react'
 import jsQR from 'jsqr'
 
-type TicketInfo = {
+/**
+ * /events/[slug]/checkin?token=...
+ *
+ * Volunteer-facing door check-in. No account needed — access is
+ * gated entirely by the ?token= scanner link (see event_scanner_links
+ * + /api/checkin/[token]), which the event owner shares from
+ * /dashboard/events/[id]/tickets. Without a valid token this page
+ * can't search or check in anyone; it shows an explanatory error
+ * instead of a broken/empty search box.
+ */
+
+type TicketResult = {
   id: string
   qr_token: string
   buyer_name: string | null
   buyer_email: string
+  attendee_email: string | null
   tier_name: string
   payment_status: string
   checked_in: boolean
   checked_in_at: string | null
+  match_type: 'qr' | 'id' | 'name' | 'email'
 }
 
-type SearchResult = TicketInfo & {
-  matchType: 'qr' | 'id' | 'name'
-}
-
-export default function CheckInPage() {
+function CheckInPageInner() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const slug = params.slug as string
+  const token = searchParams.get('token')
 
-  const [eventId, setEventId] = useState<string | null>(null)
-  const [eventTitle, setEventTitle] = useState<string>('')
+  const [tokenStatus, setTokenStatus] = useState<'checking' | 'valid' | 'invalid'>('checking')
+  const [tokenError, setTokenError] = useState('')
+  const [eventTitle, setEventTitle] = useState('')
+
   const [staffName, setStaffName] = useState('')
   const [staffNameSubmitted, setStaffNameSubmitted] = useState(false)
 
@@ -34,41 +46,51 @@ export default function CheckInPage() {
   const [cameraError, setCameraError] = useState('')
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [searchResults, setSearchResults] = useState<TicketResult[]>([])
   const [searching, setSearching] = useState(false)
 
-  const [lastScanned, setLastScanned] = useState<SearchResult | null>(null)
+  const [lastScanned, setLastScanned] = useState<TicketResult | null>(null)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'warning'; message: string } | null>(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  const supabase = createClient()
+  async function callApi(action: string, body: Record<string, any> = {}) {
+    if (!token) throw new Error('Missing check-in token')
+    const res = await fetch(`/api/checkin/${token}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ...body }),
+    })
+    const json = await res.json()
+    if (!res.ok) throw new Error(json?.error || 'Request failed')
+    return json
+  }
 
-  // Load event and restore staff name from localStorage
   useEffect(() => {
-    async function loadEvent() {
-      const { data: event } = await supabase
-        .from('events')
-        .select('id, title')
-        .eq('slug', slug)
-        .single()
-
-      if (event) {
-        setEventId(event.id)
-        setEventTitle(event.title)
-      }
-
-      const savedStaffName = localStorage.getItem('checkinStaffName')
-      if (savedStaffName) {
-        setStaffName(savedStaffName)
-        setStaffNameSubmitted(true)
-      }
+    if (!token) {
+      setTokenStatus('invalid')
+      setTokenError('This check-in link is missing its access token. Ask the event organizer for the correct link from their dashboard.')
+      return
     }
+    callApi('info')
+      .then((json) => {
+        setEventTitle(json.eventTitle)
+        setTokenStatus('valid')
+      })
+      .catch((err) => {
+        setTokenStatus('invalid')
+        setTokenError(err.message || 'This check-in link is invalid.')
+      })
 
-    loadEvent()
-  }, [slug, supabase])
+    const savedStaffName = localStorage.getItem('checkinStaffName')
+    if (savedStaffName) {
+      setStaffName(savedStaffName)
+      setStaffNameSubmitted(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token])
 
   const handleStaffNameSubmit = (name: string) => {
     if (!name.trim()) return
@@ -80,15 +102,12 @@ export default function CheckInPage() {
   const startCamera = async () => {
     try {
       setCameraError('')
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-      })
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         setScanning(true)
 
-        // Start QR scanning loop
         const intervalId = setInterval(() => {
           if (canvasRef.current && videoRef.current) {
             const context = canvasRef.current.getContext('2d')
@@ -96,17 +115,12 @@ export default function CheckInPage() {
               canvasRef.current.width = videoRef.current.videoWidth
               canvasRef.current.height = videoRef.current.videoHeight
               context.drawImage(videoRef.current, 0, 0)
-
               const imageData = context.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height)
               const code = jsQR(imageData.data, imageData.width, imageData.height)
-
-              if (code) {
-                handleScannedQR(code.data)
-              }
+              if (code) handleScannedQR(code.data)
             }
           }
         }, 200)
-
         scanIntervalRef.current = intervalId
       }
     } catch (err: any) {
@@ -118,7 +132,7 @@ export default function CheckInPage() {
   const stopCamera = () => {
     if (videoRef.current?.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream
-      stream.getTracks().forEach(track => track.stop())
+      stream.getTracks().forEach((track) => track.stop())
     }
     if (scanIntervalRef.current) clearInterval(scanIntervalRef.current)
     setScanning(false)
@@ -126,206 +140,76 @@ export default function CheckInPage() {
 
   const handleScannedQR = async (qrToken: string) => {
     stopCamera()
-    await checkInTicket(qrToken, 'qr')
+    setSearching(true)
+    try {
+      const json = await callApi('search', { query: qrToken })
+      if (json.results?.length === 1) {
+        await performCheckIn(json.results[0])
+      } else {
+        setFeedback({ type: 'error', message: 'Ticket not found' })
+      }
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err.message || 'Scan failed' })
+    } finally {
+      setSearching(false)
+    }
   }
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!eventId || !searchQuery.trim()) return
-
+    if (!searchQuery.trim()) return
     setSearching(true)
-    const query = searchQuery.toLowerCase().trim()
-
+    setFeedback(null)
     try {
-      // Try to find by QR token (exact match)
-      let { data: ticket } = await supabase
-        .from('tickets')
-        .select(`
-          id,
-          qr_token,
-          buyer_name,
-          buyer_email,
-          ticket_tiers(name),
-          payment_status,
-          check_ins(id)
-        `)
-        .eq('event_id', eventId)
-        .eq('qr_token', query)
-        .maybeSingle()
-
-      if (ticket) {
-        const result: SearchResult = {
-          id: ticket.id,
-          qr_token: ticket.qr_token,
-          buyer_name: ticket.buyer_name,
-          buyer_email: ticket.buyer_email,
-          tier_name: (ticket.ticket_tiers as any)?.name || 'Ticket',
-          payment_status: ticket.payment_status,
-          checked_in: (ticket.check_ins as any)?.length > 0,
-          checked_in_at: null,
-          matchType: 'qr',
-        }
-        setSearchResults([result])
-        setSearching(false)
-        return
+      const json = await callApi('search', { query: searchQuery.trim() })
+      setSearchResults(json.results || [])
+      if (!json.results?.length) {
+        setFeedback({ type: 'warning', message: 'No tickets found matching that search' })
       }
-
-      // Try to find by ticket ID (partial match)
-      const { data: ticketsById } = await supabase
-        .from('tickets')
-        .select(`
-          id,
-          qr_token,
-          buyer_name,
-          buyer_email,
-          ticket_tiers(name),
-          payment_status,
-          check_ins(id)
-        `)
-        .eq('event_id', eventId)
-        .ilike('id', `%${query}%`)
-        .limit(10)
-
-      if (ticketsById?.length) {
-        setSearchResults(
-          ticketsById.map(t => ({
-            id: t.id,
-            qr_token: t.qr_token,
-            buyer_name: t.buyer_name,
-            buyer_email: t.buyer_email,
-            tier_name: (t.ticket_tiers as any)?.name || 'Ticket',
-            payment_status: t.payment_status,
-            checked_in: (t.check_ins as any)?.length > 0,
-            checked_in_at: null,
-            matchType: 'id',
-          }))
-        )
-        setSearching(false)
-        return
-      }
-
-      // Try to find by last name
-      const { data: ticketsByName } = await supabase
-        .from('tickets')
-        .select(`
-          id,
-          qr_token,
-          buyer_name,
-          buyer_email,
-          ticket_tiers(name),
-          payment_status,
-          check_ins(id)
-        `)
-        .eq('event_id', eventId)
-        .ilike('buyer_name', `%${query}%`)
-        .limit(10)
-
-      if (ticketsByName?.length) {
-        setSearchResults(
-          ticketsByName.map(t => ({
-            id: t.id,
-            qr_token: t.qr_token,
-            buyer_name: t.buyer_name,
-            buyer_email: t.buyer_email,
-            tier_name: (t.ticket_tiers as any)?.name || 'Ticket',
-            payment_status: t.payment_status,
-            checked_in: (t.check_ins as any)?.length > 0,
-            checked_in_at: null,
-            matchType: 'name',
-          }))
-        )
-        setSearching(false)
-        return
-      }
-
-      setSearchResults([])
-      setFeedback({ type: 'warning', message: 'No tickets found matching that search' })
-    } catch (err) {
-      console.error('Search error:', err)
-      setFeedback({ type: 'error', message: 'Search failed' })
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err.message || 'Search failed' })
+    } finally {
+      setSearching(false)
     }
-
-    setSearching(false)
   }
 
-  const checkInTicket = async (qrTokenOrId: string, source: 'qr' | 'id' | 'name') => {
-    if (!eventId || !staffName) return
-
+  const performCheckIn = async (result: TicketResult) => {
+    if (!staffName) return
     try {
-      // Look up ticket
-      let query = supabase
-        .from('tickets')
-        .select(`
-          id,
-          qr_token,
-          buyer_name,
-          buyer_email,
-          ticket_tiers(name),
-          payment_status,
-          check_ins(id)
-        `)
-        .eq('event_id', eventId)
-
-      if (source === 'qr') {
-        query = query.eq('qr_token', qrTokenOrId)
-      } else if (source === 'id') {
-        query = query.eq('id', qrTokenOrId)
-      } else {
-        query = query.ilike('buyer_name', `%${qrTokenOrId}%`)
-      }
-
-      const { data: tickets } = await query.limit(1)
-
-      if (!tickets?.length) {
-        setFeedback({ type: 'error', message: 'Ticket not found' })
-        return
-      }
-
-      const ticket = tickets[0]
-      const isAlreadyCheckedIn = (ticket.check_ins as any)?.length > 0
-
-      if (isAlreadyCheckedIn) {
-        setFeedback({
-          type: 'warning',
-          message: `Already checked in: ${ticket.buyer_name || ticket.buyer_email}`,
-        })
-        return
-      }
-
-      // Create check-in record
-      const { error: checkInError } = await supabase.from('check_ins').insert([
-        {
-          ticket_id: ticket.id,
-          checked_in_by_name: staffName,
-        },
-      ])
-
-      if (checkInError) throw checkInError
-
-      const result: SearchResult = {
-        id: ticket.id,
-        qr_token: ticket.qr_token,
-        buyer_name: ticket.buyer_name,
-        buyer_email: ticket.buyer_email,
-        tier_name: (ticket.ticket_tiers as any)?.name || 'Ticket',
-        payment_status: ticket.payment_status,
-        checked_in: true,
-        checked_in_at: new Date().toISOString(),
-        matchType: source,
-      }
-
-      setLastScanned(result)
-      setFeedback({
-        type: 'success',
-        message: `Checked in: ${ticket.buyer_name || ticket.buyer_email}`,
-      })
-
-      // Clear feedback after 3 seconds
+      const json = await callApi('checkin', { ticketId: result.id, staffName })
+      const checkedInTicket: TicketResult = { ...result, checked_in: true, checked_in_at: new Date().toISOString() }
+      setLastScanned(checkedInTicket)
+      setSearchResults((rs) => rs.map((r) => (r.id === result.id ? checkedInTicket : r)))
+      setFeedback({ type: 'success', message: `Checked in: ${result.buyer_name || result.buyer_email}` })
       setTimeout(() => setFeedback(null), 3000)
-    } catch (err) {
-      console.error('Check-in error:', err)
-      setFeedback({ type: 'error', message: 'Check-in failed' })
+    } catch (err: any) {
+      if (err.message === 'Already checked in') {
+        setFeedback({ type: 'warning', message: `Already checked in: ${result.buyer_name || result.buyer_email}` })
+      } else {
+        setFeedback({ type: 'error', message: err.message || 'Check-in failed' })
+      }
     }
+  }
+
+  // ── Token invalid — explain why, don't show a broken search UI ──
+  if (tokenStatus === 'invalid') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 dark:bg-gray-900">
+        <div className="w-full max-w-md rounded-lg border border-red-200 bg-white p-8 text-center dark:border-red-500/30 dark:bg-gray-800">
+          <AlertCircle className="mx-auto mb-3 h-8 w-8 text-red-500" />
+          <h1 className="mb-2 text-lg font-bold text-gray-900 dark:text-white">Check-in link unavailable</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400">{tokenError}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (tokenStatus === 'checking') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+      </div>
+    )
   }
 
   if (!staffNameSubmitted) {
@@ -341,9 +225,7 @@ export default function CheckInPage() {
               handleStaffNameSubmit(staffName)
             }}
           >
-            <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Your Name
-            </label>
+            <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">Your Name</label>
             <input
               type="text"
               value={staffName}
@@ -368,7 +250,6 @@ export default function CheckInPage() {
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8 dark:bg-gray-900">
       <div className="mx-auto max-w-2xl">
-        {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{eventTitle}</h1>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
@@ -385,7 +266,6 @@ export default function CheckInPage() {
           </p>
         </div>
 
-        {/* Feedback Messages */}
         {feedback && (
           <div
             className={`mb-6 rounded-lg p-4 ${
@@ -400,7 +280,6 @@ export default function CheckInPage() {
           </div>
         )}
 
-        {/* Last Scanned Ticket */}
         {lastScanned && (
           <div className="mb-6 rounded-lg border-2 border-green-500 bg-green-50 p-4 dark:bg-green-500/10">
             <div className="text-sm text-green-700 dark:text-green-400">
@@ -410,21 +289,12 @@ export default function CheckInPage() {
           </div>
         )}
 
-        {/* Camera Scanner */}
         <div className="mb-6 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-800">
-          <h2 className="mb-4 font-semibold text-gray-900 dark:text-white">
-            Scan QR Code
-          </h2>
+          <h2 className="mb-4 font-semibold text-gray-900 dark:text-white">Scan QR Code</h2>
 
           {scanning ? (
             <div className="space-y-4">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                className="w-full rounded-lg bg-black"
-                style={{ maxHeight: '400px', objectFit: 'cover' }}
-              />
+              <video ref={videoRef} autoPlay playsInline className="w-full rounded-lg bg-black" style={{ maxHeight: '400px', objectFit: 'cover' }} />
               <canvas ref={canvasRef} className="hidden" />
               <button
                 onClick={stopCamera}
@@ -438,27 +308,21 @@ export default function CheckInPage() {
               <strong>Camera Error:</strong> {cameraError}
             </div>
           ) : (
-            <button
-              onClick={startCamera}
-              className="w-full rounded-lg bg-brand-600 px-4 py-3 font-semibold text-white transition hover:bg-brand-700"
-            >
+            <button onClick={startCamera} className="w-full rounded-lg bg-brand-600 px-4 py-3 font-semibold text-white transition hover:bg-brand-700">
               Start Camera
             </button>
           )}
         </div>
 
-        {/* Manual Search */}
         <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-800">
-          <h2 className="mb-4 font-semibold text-gray-900 dark:text-white">
-            Manual Lookup
-          </h2>
+          <h2 className="mb-4 font-semibold text-gray-900 dark:text-white">Manual Lookup</h2>
 
           <form onSubmit={handleSearch} className="space-y-4">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by ticket ID, QR token, or buyer name..."
+              placeholder="Search by ticket ID, QR token, name, or email..."
               className="w-full rounded-lg border border-gray-200 px-4 py-2 dark:border-gray-700 dark:bg-gray-700 dark:text-white"
             />
             <button
@@ -476,31 +340,25 @@ export default function CheckInPage() {
             </button>
           </form>
 
-          {/* Search Results */}
           {searchResults.length > 0 && (
             <div className="mt-4 space-y-3">
               {searchResults.map((result) => (
-                <div
-                  key={result.id}
-                  className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-700"
-                >
+                <div key={result.id} className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-700">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="font-semibold text-gray-900 dark:text-white">
                         {result.buyer_name || result.buyer_email}
                       </div>
                       <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                        {result.tier_name} | {result.matchType.toUpperCase()} match
+                        {result.tier_name} | {result.match_type.toUpperCase()} match
                       </div>
                       {result.checked_in && (
-                        <div className="mt-2 text-xs text-green-600 dark:text-green-400">
-                          Already checked in
-                        </div>
+                        <div className="mt-2 text-xs text-green-600 dark:text-green-400">Already checked in</div>
                       )}
                     </div>
                     {!result.checked_in && (
                       <button
-                        onClick={() => checkInTicket(result.id, 'id')}
+                        onClick={() => performCheckIn(result)}
                         className="rounded-lg bg-green-600 px-3 py-1 text-sm font-semibold text-white transition hover:bg-green-700"
                       >
                         Check In
@@ -514,5 +372,19 @@ export default function CheckInPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function CheckInPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
+          <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        </div>
+      }
+    >
+      <CheckInPageInner />
+    </Suspense>
   )
 }
