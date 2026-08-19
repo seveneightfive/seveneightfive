@@ -132,6 +132,36 @@ export default function EventMarketingTab({ eventId, eventSlug, eventTitle }: Pr
         </button>
       </div>
 
+      {/* Embed on Your Website */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+        <h3 className={sectionHeadingCls}>Embed on Your Website</h3>
+        <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          Sell tickets directly on your own site — buyers pick tiers, RSVP, and pay without ever
+          leaving your page. Paste this where you want the widget to appear:
+        </p>
+        <div className="relative">
+          <pre className="overflow-x-auto rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-800 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-300">
+{`<div data-785-event="${eventSlug}"></div>
+<script src="${siteUrl}/embed/tickets.js" async></script>`}
+          </pre>
+          <button
+            onClick={() =>
+              copyToClipboard(
+                `<div data-785-event="${eventSlug}"></div>\n<script src="${siteUrl}/embed/tickets.js" async></script>`
+              )
+            }
+            className="absolute right-2 top-2 inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700"
+          >
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        </div>
+        <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+          Works in Squarespace, Wix, WordPress, or any site with a "custom HTML" or "embed"
+          block. Free RSVPs happen entirely on your site. Paid tickets show a secure Stripe
+          payment form inline — no redirect for the vast majority of card payments.
+        </p>
+      </div>
+
       {/* Social Share Section */}
       <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
         <h3 className={sectionHeadingCls}>Share on Social</h3>
