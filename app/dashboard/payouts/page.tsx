@@ -42,6 +42,7 @@ type Profile = {
   stripe_account_status: 'pending' | 'restricted' | 'enabled' | null
   is_seller: boolean
   seller_slug: string | null
+  seller_slug_changed_at: string | null
   seller_business_name: string | null
   seller_support_email: string | null
   seller_activated_at: string | null
@@ -82,6 +83,13 @@ function PayoutsPageInner() {
   const [supportEmail, setSupportEmail] = useState('')
   const [profileSaved, setProfileSaved] = useState(false)
 
+  // Slug editing (one-time, with confirmation)
+  const [editingSlug, setEditingSlug] = useState(false)
+  const [slugDraft, setSlugDraft] = useState('')
+  const [confirmingSlug, setConfirmingSlug] = useState(false)
+  const [slugSaving, setSlugSaving] = useState(false)
+  const [slugError, setSlugError] = useState('')
+
   const stripeConnected = searchParams.get('stripe_connected') === '1'
   const stripePending = searchParams.get('stripe_pending') === '1'
   const stripeError = searchParams.get('stripe_error')
@@ -89,7 +97,7 @@ function PayoutsPageInner() {
 
   const PROFILE_SELECT = `id, full_name, email,
           stripe_account_id, stripe_account_status,
-          is_seller, seller_slug, seller_business_name, seller_support_email, seller_activated_at`
+          is_seller, seller_slug, seller_slug_changed_at, seller_business_name, seller_support_email, seller_activated_at`
 
   useEffect(() => {
     async function load() {
@@ -251,6 +259,78 @@ function PayoutsPageInner() {
     })
   }
 
+  // ── Slug editing (one-time) ───────────────────────────────────────
+  function startEditingSlug() {
+    setSlugDraft(profile?.seller_slug || '')
+    setSlugError('')
+    setConfirmingSlug(false)
+    setEditingSlug(true)
+  }
+
+  function cancelEditingSlug() {
+    setEditingSlug(false)
+    setConfirmingSlug(false)
+    setSlugError('')
+  }
+
+  function handleSlugDraftChange(raw: string) {
+    // Mirror the server's slugify rules live so what they see typing
+    // matches what will actually be saved.
+    const formatted = raw
+      .toLowerCase()
+      .replace(/[^a-z0-9-\s]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .slice(0, 60)
+    setSlugDraft(formatted)
+    if (slugError) setSlugError('')
+  }
+
+  function requestSlugChange(e: React.FormEvent) {
+    e.preventDefault()
+    setSlugError('')
+
+    const cleaned = slugDraft.replace(/^-+|-+$/g, '')
+    if (cleaned.length < 3) {
+      setSlugError('Your URL needs to be at least 3 characters.')
+      return
+    }
+    if (cleaned === profile?.seller_slug) {
+      setSlugError("That's already your current URL.")
+      return
+    }
+    // First submit just arms the confirmation step — the actual save
+    // happens in confirmSlugChange below.
+    setConfirmingSlug(true)
+  }
+
+  async function confirmSlugChange() {
+    setSlugSaving(true)
+    setSlugError('')
+    try {
+      const res = await fetch('/api/seller/slug', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: slugDraft }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Could not update your URL.')
+
+      setProfile((p) =>
+        p
+          ? { ...p, seller_slug: json.slug, seller_slug_changed_at: new Date().toISOString() }
+          : p
+      )
+      setEditingSlug(false)
+      setConfirmingSlug(false)
+    } catch (err: any) {
+      setSlugError(err?.message || 'Could not update your URL.')
+      setConfirmingSlug(false)
+    } finally {
+      setSlugSaving(false)
+    }
+  }
+
   if (loading) return <LoadingState />
 
   const status = profile?.stripe_account_status
@@ -307,27 +387,135 @@ function PayoutsPageInner() {
                 This is your live ticketing page — share it directly, or link to it from your
                 own website. It lists your upcoming events, past events, and refund policy.
               </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <code className="flex-1 min-w-[220px] truncate rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-300">
-                  {publicUrl.replace('https://', '')}
-                </code>
-                <button
-                  onClick={() => handleCopyLink(publicUrl)}
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
-                >
-                  <Copy className="h-4 w-4" />
-                  {copied ? 'Copied!' : 'Copy link'}
-                </button>
-                <a
-                  href={publicUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-lg bg-gray-950 px-4 py-2.5 font-semibold text-white transition hover:bg-gray-800"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  View page
-                </a>
-              </div>
+
+              {!editingSlug && (
+                <>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <code className="flex-1 min-w-[220px] truncate rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-300">
+                      {publicUrl.replace('https://', '')}
+                    </code>
+                    <button
+                      onClick={() => handleCopyLink(publicUrl)}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.08]"
+                    >
+                      <Copy className="h-4 w-4" />
+                      {copied ? 'Copied!' : 'Copy link'}
+                    </button>
+                    <a
+                      href={publicUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-lg bg-gray-950 px-4 py-2.5 font-semibold text-white transition hover:bg-gray-800"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      View page
+                    </a>
+                  </div>
+
+                  <div className="mt-3">
+                    {profile?.seller_slug_changed_at ? (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        You've already used your one-time URL change. Need it changed again?
+                        Email <a href="mailto:support@seveneightfive.com" className="underline">support@seveneightfive.com</a>.
+                      </p>
+                    ) : (
+                      <button
+                        onClick={startEditingSlug}
+                        className="text-xs font-semibold text-brand-600 underline decoration-dotted underline-offset-2 hover:text-brand-700 dark:text-brand-400"
+                      >
+                        Change your URL (one-time)
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {editingSlug && !confirmingSlug && (
+                <form onSubmit={requestSlugChange} className="space-y-2">
+                  <label className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-600 dark:text-gray-300">
+                    New URL
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-1 min-w-[220px] items-center rounded-lg border border-gray-200 bg-white pl-3.5 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/10 dark:border-gray-800 dark:bg-white/[0.03]">
+                      <span className="shrink-0 text-sm text-gray-400 dark:text-gray-500">
+                        seveneightfive.com/sellers/
+                      </span>
+                      <input
+                        autoFocus
+                        type="text"
+                        value={slugDraft}
+                        onChange={(e) => handleSlugDraftChange(e.target.value)}
+                        className="min-w-0 flex-1 bg-transparent py-2.5 pr-3.5 text-sm text-gray-800 outline-none dark:text-white/90"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="inline-flex items-center gap-2 rounded-lg bg-gray-950 px-4 py-2.5 font-semibold text-white transition hover:bg-gray-800"
+                    >
+                      Continue
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelEditingSlug}
+                      className="rounded-lg px-3 py-2.5 font-semibold text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {slugError && (
+                    <p className="text-xs font-medium text-brand-600 dark:text-brand-400">{slugError}</p>
+                  )}
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Lowercase letters, numbers, and dashes only. You can only do this once, so
+                    double-check it before continuing.
+                  </p>
+                </form>
+              )}
+
+              {editingSlug && confirmingSlug && (
+                <div className="rounded-lg border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10">
+                  <div className="mb-2 flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning-700 dark:text-warning-400" />
+                    <p className="text-sm font-semibold text-warning-900 dark:text-warning-300">
+                      This will break your current link
+                    </p>
+                  </div>
+                  <p className="mb-1 text-sm text-warning-800 dark:text-warning-300">
+                    <code className="rounded bg-white/60 px-1 dark:bg-black/20">
+                      /sellers/{profile?.seller_slug}
+                    </code>{' '}
+                    will stop working. Anything pointing to it — your website, a QR code, a
+                    text you've already sent — will 404.
+                  </p>
+                  <p className="mb-3 text-sm text-warning-800 dark:text-warning-300">
+                    Your new page will be{' '}
+                    <code className="rounded bg-white/60 px-1 dark:bg-black/20">
+                      /sellers/{slugDraft}
+                    </code>
+                    . This can't be undone without contacting support.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={confirmSlugChange}
+                      disabled={slugSaving}
+                      className="inline-flex items-center gap-2 rounded-lg bg-warning-600 px-4 py-2.5 font-semibold text-white transition hover:bg-warning-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {slugSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : ''}
+                      {slugSaving ? 'Updating…' : 'Yes, change my URL'}
+                    </button>
+                    <button
+                      onClick={() => setConfirmingSlug(false)}
+                      disabled={slugSaving}
+                      className="rounded-lg px-3 py-2.5 font-semibold text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    >
+                      Go back
+                    </button>
+                  </div>
+                  {slugError && (
+                    <p className="mt-2 text-xs font-medium text-brand-600 dark:text-brand-400">{slugError}</p>
+                  )}
+                </div>
+              )}
             </>
           ) : (
             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
@@ -479,9 +667,8 @@ function PayoutsPageInner() {
               />
               {isEnabled && (
                 <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                  This updates the name shown on your public page, but not its URL —{' '}
-                  {publicUrl ? publicUrl.replace('https://', '') : 'your link'} stays the same so
-                  any link you've already shared keeps working.
+                  This updates the name shown on your public page, not its URL. You can change
+                  your URL separately (one time) from the card above.
                 </p>
               )}
             </div>
