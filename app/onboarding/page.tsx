@@ -39,7 +39,6 @@ export default function OnboardingPage() {
   const [phone, setPhone] = useState('') // display format, e.g. "(785) 555-1234"
 
   // Seller step
-  const [wantsToSell, setWantsToSell] = useState<null | boolean>(null)
   const [connecting, setConnecting] = useState(false)
 
   const [error, setError] = useState('')
@@ -134,6 +133,9 @@ export default function OnboardingPage() {
   }
 
   // ── Step 2: finish (with or without Stripe) ──────────────────────
+  // Called directly from the Yes/No buttons below — no separate
+  // "Continue" click needed. next='stripe' takes the user straight
+  // into Stripe Connect onboarding; next='dashboard' skips it.
   const finishOnboarding = async (next: 'dashboard' | 'stripe') => {
     setSaving(true)
     setError('')
@@ -272,40 +274,39 @@ export default function OnboardingPage() {
         <div className="space-y-3">
           <button
             type="button"
-            onClick={() => setWantsToSell(true)}
-            className={`w-full p-4 rounded text-left border transition ${
-              wantsToSell === true
-                ? 'border-pink-500 bg-pink-600/10'
-                : 'border-zinc-700 bg-zinc-900 hover:border-zinc-500'
-            }`}
+            onClick={() => finishOnboarding('stripe')}
+            disabled={saving || connecting}
+            className="w-full p-4 rounded text-left border border-pink-500 bg-pink-600/10 hover:bg-pink-600/20 transition disabled:opacity-50"
           >
-            <div className="font-semibold">Yes — set me up to sell</div>
+            <div className="font-semibold">
+              {connecting ? 'Opening Stripe…' : saving ? 'Setting up…' : 'Yes — set me up to sell'}
+            </div>
             <div className="text-sm text-zinc-400 mt-1">
-              Connect Stripe (3–5 min). You'll need a U.S. bank account, your
-              legal name, date of birth, and last 4 of your SSN.
+              You'll be sent to Stripe next (3–5 min). You'll need a U.S.
+              bank account, your legal name, date of birth, and last 4 of
+              your SSN.
             </div>
           </button>
 
           <button
             type="button"
-            onClick={() => setWantsToSell(false)}
-            className={`w-full p-4 rounded text-left border transition ${
-              wantsToSell === false
-                ? 'border-zinc-400 bg-zinc-800'
-                : 'border-zinc-700 bg-zinc-900 hover:border-zinc-500'
-            }`}
+            onClick={() => finishOnboarding('dashboard')}
+            disabled={saving || connecting}
+            className="w-full p-4 rounded text-left border border-zinc-700 bg-zinc-900 hover:border-zinc-500 transition disabled:opacity-50"
           >
-            <div className="font-semibold">Not right now</div>
+            <div className="font-semibold">
+              {saving && !connecting ? 'Taking you to your dashboard…' : 'Not right now'}
+            </div>
             <div className="text-sm text-zinc-400 mt-1">
               I'm just here to attend events and follow artists. I can connect
-              Stripe later if I change my mind.
+              Stripe later from Settings if I change my mind.
             </div>
           </button>
         </div>
 
         {error && <div className="text-red-400">{error}</div>}
 
-        <div className="flex gap-3 pt-2">
+        <div className="pt-2">
           <button
             type="button"
             onClick={() => setStep('profile')}
@@ -314,32 +315,7 @@ export default function OnboardingPage() {
           >
             Back
           </button>
-          <button
-            type="button"
-            disabled={wantsToSell === null || saving || connecting}
-            onClick={() => finishOnboarding(wantsToSell ? 'stripe' : 'dashboard')}
-            className="flex-1 p-3 rounded bg-pink-600 disabled:opacity-50"
-          >
-            {connecting
-              ? 'Opening Stripe…'
-              : saving
-                ? 'Finishing up…'
-                : wantsToSell === true
-                  ? 'Continue to Stripe →'
-                  : wantsToSell === false
-                    ? 'Take me to my dashboard'
-                    : 'Choose an option'}
-          </button>
         </div>
-
-        <button
-          type="button"
-          onClick={() => finishOnboarding('dashboard')}
-          disabled={saving || connecting}
-          className="w-full text-sm text-zinc-500 hover:text-zinc-300 mt-2"
-        >
-          Skip for now
-        </button>
       </div>
     </div>
   )
