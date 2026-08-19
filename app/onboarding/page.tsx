@@ -8,6 +8,23 @@ const supabase = createClient()
 
 type Step = 'profile' | 'seller'
 
+// Formats raw digits into "(785) 555-1234" as the user types.
+// US-only — caps at 10 digits, no country code shown or typed.
+function formatPhoneDisplay(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 10)
+  if (digits.length <= 3) return digits
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
+}
+
+// Converts a 10-digit US number to E.164 for Supabase Auth / DB.
+// Returns null if it's not a complete 10-digit number.
+function toE164(displayValue: string): string | null {
+  const digits = displayValue.replace(/\D/g, '')
+  if (digits.length !== 10) return null
+  return `+1${digits}`
+}
+
 export default function OnboardingPage() {
   const router = useRouter()
 
@@ -19,7 +36,7 @@ export default function OnboardingPage() {
   const [fullName, setFullName] = useState('')
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
+  const [phone, setPhone] = useState('') // display format, e.g. "(785) 555-1234"
 
   // Seller step
   const [wantsToSell, setWantsToSell] = useState<null | boolean>(null)
@@ -52,24 +69,39 @@ export default function OnboardingPage() {
       setFullName(profile?.full_name || '')
       setUsername(profile?.username || '')
       setEmail(profile?.email || user.email || '')
-      setPhone(profile?.phone_number || user.phone || '')
+      // Existing stored numbers may already be E.164 ("+17855551234")
+      // or a raw 10-digit string — normalize either to the display format.
+      const existingPhone = profile?.phone_number || user.phone || ''
+      setPhone(formatPhoneDisplay(existingPhone))
       setLoading(false)
     }
     load()
   }, [router])
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhone(formatPhoneDisplay(e.target.value))
+    if (error) setError('')
+  }
+
   // ── Step 1: profile ──────────────────────────────────────────────
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSaving(true)
     setError('')
+
+    const normalizedPhone = toE164(phone)
+    if (!normalizedPhone) {
+      setError('Please enter a valid 10-digit phone number.')
+      return
+    }
+
+    setSaving(true)
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
     const { error: authError } = await supabase.auth.updateUser({
       email,
-      phone,
+      phone: normalizedPhone,
       data: { full_name: fullName },
     })
 
@@ -85,7 +117,7 @@ export default function OnboardingPage() {
         full_name: fullName,
         username,
         email,
-        phone_number: phone,
+        phone_number: normalizedPhone,
         // We don't mark onboarding_completed here — only after step 2
         updated_at: new Date().toISOString(),
       })
@@ -187,14 +219,24 @@ export default function OnboardingPage() {
             onChange={e => setEmail(e.target.value)}
             className="w-full p-4 rounded bg-zinc-900 border border-zinc-700"
           />
-          <input
-            required
-            type="tel"
-            placeholder="Phone Number"
-            value={phone}
-            onChange={e => setPhone(e.target.value)}
-            className="w-full p-4 rounded bg-zinc-900 border border-zinc-700"
-          />
+
+          <div>
+            <div className="flex gap-2">
+              <div className="flex items-center px-3 rounded bg-zinc-900 border border-zinc-700 text-zinc-400 text-sm font-medium">
+                🇺🇸 +1
+              </div>
+              <input
+                required
+                type="tel"
+                inputMode="numeric"
+                placeholder="(785) 000-0000"
+                value={phone}
+                onChange={handlePhoneChange}
+                className="flex-1 p-4 rounded bg-zinc-900 border border-zinc-700"
+              />
+            </div>
+            <p className="mt-1.5 text-xs text-zinc-500">U.S. numbers only — just enter the 10 digits.</p>
+          </div>
 
           {error && <div className="text-red-400">{error}</div>}
 
