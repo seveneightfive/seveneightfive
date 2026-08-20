@@ -103,14 +103,36 @@ export async function GET(
       questionLabels = Array.from(labelSet)
     }
 
+    let addonsByTicket: Record<string, Record<string, string>> = {}
+    let addonNames: string[] = []
+
+    if (ticketIds.length > 0) {
+      const { data: addonRows } = await admin
+        .from('ticket_addons')
+        .select('ticket_id, choice, event_addons(name)')
+        .in('ticket_id', ticketIds)
+
+      const nameSet = new Set<string>()
+      for (const r of addonRows || []) {
+        const name = Array.isArray(r.event_addons) ? r.event_addons[0]?.name : (r.event_addons as any)?.name
+        if (!name) continue
+        nameSet.add(name)
+        addonsByTicket[r.ticket_id] = addonsByTicket[r.ticket_id] || {}
+        addonsByTicket[r.ticket_id][name] = r.choice || 'Yes'
+      }
+      addonNames = Array.from(nameSet)
+    }
+
     const headers = [
       'Name', 'Email', 'Attendee Email', 'Phone', 'Tier', 'Amount Paid', 'Status', 'Source', 'Notes', 'Purchased At',
       ...questionLabels,
+      ...addonNames,
     ]
 
     const rows = (tickets || []).map((t) => {
       const tierName = Array.isArray(t.ticket_tiers) ? t.ticket_tiers[0]?.name : (t.ticket_tiers as any)?.name
       const answers = responsesByTicket[t.id] || {}
+      const addons = addonsByTicket[t.id] || {}
       return [
         t.buyer_name || '',
         t.buyer_email || '',
@@ -123,6 +145,7 @@ export async function GET(
         t.notes || '',
         t.created_at ? new Date(t.created_at).toISOString() : '',
         ...questionLabels.map((label) => answers[label] || ''),
+        ...addonNames.map((name) => addons[name] || ''),
       ]
     })
 
