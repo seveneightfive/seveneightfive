@@ -48,6 +48,7 @@ type Event = {
   ticket_url: string | null
   learnmore_link: string | null
   event_types: string[] | null
+  tags: string[] | null
   star: boolean | null
   slug: string | null
   capacity: number | null
@@ -64,7 +65,7 @@ async function getEvent(slug: string): Promise<Event | null> {
     .select(`
       id, title, description, event_date, event_start_time, event_end_time,
       start_date, end_date, image_url, ticket_price, ticket_url, learnmore_link,
-      event_types, star, slug, capacity, ticketing_enabled, venue_id,
+      event_types, tags, star, slug, capacity, ticketing_enabled, venue_id,
       venues (id, name, address, neighborhood, city, state, slug, website, image_url, logo),
       event_artists (
         display_order,
@@ -220,19 +221,31 @@ export async function generateMetadata(
 
 // ─── JSON-LD ──────────────────────────────────────────────────────────────────
 
-const SCHEMA_TYPE_MAP: Record<string, string> = {
-  'Live Music':           'MusicEvent',
-  'Art':                  'VisualArtsEvent',
-  'Exhibition':           'ExhibitionEvent',
-  'Comedy Night':         'ComedyEvent',
-  'Poetry Reading':       'LiteraryEvent',
-  'Open Mic':             'LiteraryEvent',
-  'Theater':              'TheaterEvent',
-  'Dance':                'DanceEvent',
-  'Film / Screening':     'ScreeningEvent',
-  'Workshop / Class':     'EducationEvent',
-  'Holiday':              'Festival',
-  'Party For A Cause':    'SocialEvent',
+// Broad EVENT_TYPES (see app/dashboard/events/edit/page.tsx) → schema.org
+// @type. This is the fallback used only when no tag-level match is found.
+const TYPE_SCHEMA_MAP: Record<string, string> = {
+  'Live Music':        'MusicEvent',
+  'Art':                'VisualArtsEvent',
+  'Party For A Cause':  'SocialEvent',
+}
+
+// Granular TAGS (see app/dashboard/events/edit/page.tsx) → schema.org @type.
+// Tags are more specific than event_types, so they're checked first when
+// picking the JSON-LD type — e.g. an event with types=["Entertainment"] and
+// tags=["Comedy Night"] should render as ComedyEvent, not fall through to
+// the generic Entertainment-level default. Keep this in sync with the TAGS
+// list on the edit form; anything not mapped here just has no schema.org
+// equivalent and is skipped (still shown in `keywords`, just not @type).
+const TAG_SCHEMA_MAP: Record<string, string> = {
+  'Theater':        'TheaterEvent',
+  'Dance':          'DanceEvent',
+  'Comedy Night':   'ComedyEvent',
+  'Literary':       'LiteraryEvent',
+  'Film Screening': 'ScreeningEvent',
+  'Class':          'EducationEvent',
+  'Exhibition':     'ExhibitionEvent',
+  'Holiday':        'Festival',
+  'Sports':         'SportsEvent',
 }
 
 function getJsonLd(event: Event) {
@@ -249,9 +262,12 @@ function getJsonLd(event: Event) {
   const endDate = event.end_date
     || (event.event_end_time ? `${event.event_date}T${event.event_end_time}` : undefined)
 
-  const schemaType = event.event_types
-    ?.map(t => SCHEMA_TYPE_MAP[t])
-    .find(t => !!t) || 'Event'
+  // Tags win over types (more specific classification); fall back to the
+  // broad type, then to the generic schema.org Event if neither matches.
+  const schemaType =
+    event.tags?.map(t => TAG_SCHEMA_MAP[t]).find(t => !!t)
+    || event.event_types?.map(t => TYPE_SCHEMA_MAP[t]).find(t => !!t)
+    || 'Event'
 
   return {
     '@context': 'https://schema.org',
@@ -262,8 +278,8 @@ function getJsonLd(event: Event) {
     startDate,
     ...(endDate && { endDate }),
     image: event.image_url,
-    ...(event.event_types && event.event_types.length > 0 && {
-      keywords: event.event_types.join(', '),
+    ...((event.event_types?.length || event.tags?.length) && {
+      keywords: [...(event.event_types || []), ...(event.tags || [])].join(', '),
     }),
     eventStatus: 'https://schema.org/EventScheduled',
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
@@ -881,5 +897,3 @@ function ArrowIcon() {
     </svg>
   )
 }
-
-
