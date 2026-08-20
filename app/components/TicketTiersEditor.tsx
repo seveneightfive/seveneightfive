@@ -15,6 +15,22 @@ type Tier = {
   sale_starts_at: string
   sale_ends_at: string
   quantity_sold?: number
+  is_group: boolean
+  seats_per_unit: string
+  _deleted?: boolean
+  _new?: boolean
+}
+
+type Addon = {
+  id?: string
+  ticket_tier_id?: string
+  name: string
+  price: string
+  has_choice: boolean
+  choice_label: string
+  choice_options: string // comma-separated in the UI, split on save
+  is_active: boolean
+  sort_order: number
   _deleted?: boolean
   _new?: boolean
 }
@@ -33,6 +49,19 @@ const EMPTY_TIER = (): Tier => ({
   is_active: true,
   sale_starts_at: '',
   sale_ends_at: '',
+  is_group: false,
+  seats_per_unit: '1',
+  _new: true,
+})
+
+const EMPTY_ADDON = (): Addon => ({
+  name: '',
+  price: '',
+  has_choice: false,
+  choice_label: '',
+  choice_options: '',
+  is_active: true,
+  sort_order: 0,
   _new: true,
 })
 
@@ -75,6 +104,7 @@ function formatSaleWindow(start: string, end: string): string | null {
 
 export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Props) {
   const [tiers, setTiers] = useState<Tier[]>([])
+  const [addonsByTier, setAddonsByTier] = useState<Record<number, Addon[]>>({}) // keyed by tier index
   const [enabled, setEnabled] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -94,7 +124,8 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
         supabase.from('ticket_tiers').select('*').eq('event_id', eventId).order('sort_order'),
       ])
       setEnabled(event?.ticketing_enabled || false)
-      setTiers(
+
+      const loadedTiers =
         existingTiers?.map((t) => ({
           ...t,
           price: String(t.price),
@@ -102,8 +133,39 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
           sale_starts_at: t.sale_starts_at ? t.sale_starts_at.slice(0, 16) : '',
           sale_ends_at: t.sale_ends_at ? t.sale_ends_at.slice(0, 16) : '',
           description: t.description || '',
+          is_group: !!t.is_group,
+          seats_per_unit: String(t.seats_per_unit || 1),
         })) || []
-      )
+      setTiers(loadedTiers)
+
+      const tierIds = loadedTiers.filter((t) => t.id).map((t) => t.id!) as string[]
+      if (tierIds.length > 0) {
+        const { data: existingAddons } = await supabase
+          .from('event_addons')
+          .select('*')
+          .in('ticket_tier_id', tierIds)
+          .order('sort_order')
+
+        const grouped: Record<number, Addon[]> = {}
+        for (const a of existingAddons || []) {
+          const tierIndex = loadedTiers.findIndex((t) => t.id === a.ticket_tier_id)
+          if (tierIndex === -1) continue
+          grouped[tierIndex] = grouped[tierIndex] || []
+          grouped[tierIndex].push({
+            id: a.id,
+            ticket_tier_id: a.ticket_tier_id,
+            name: a.name,
+            price: String(a.price),
+            has_choice: !!a.has_choice,
+            choice_label: a.choice_label || '',
+            choice_options: Array.isArray(a.choice_options) ? a.choice_options.join(', ') : '',
+            is_active: !!a.is_active,
+            sort_order: a.sort_order,
+          })
+        }
+        setAddonsByTier(grouped)
+      }
+
       setLoading(false)
     }
     load()
@@ -112,7 +174,6 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
   const addTier = () => {
     setTiers((prev) => {
       const next = [...prev, { ...EMPTY_TIER(), sort_order: prev.length }]
-      // Auto-open the newly added tier
       setOpenTiers((o) => ({ ...o, [next.length - 1]: true }))
       return next
     })
@@ -128,6 +189,28 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
 
   const toggleOpen = (index: number) => {
     setOpenTiers((prev) => ({ ...prev, [index]: !prev[index] }))
+  }
+
+  // ── Add-ons (scoped to a tier index) ──────────────────────────────
+  const addAddon = (tierIndex: number) => {
+    setAddonsByTier((prev) => ({
+      ...prev,
+      [tierIndex]: [...(prev[tierIndex] || []), { ...EMPTY_ADDON(), sort_order: (prev[tierIndex] || []).length }],
+    }))
+  }
+
+  const updateAddon = (tierIndex: number, addonIndex: number, field: keyof Addon, value: any) => {
+    setAddonsByTier((prev) => ({
+      ...prev,
+      [tierIndex]: (prev[tierIndex] || []).map((a, i) => (i === addonIndex ? { ...a, [field]: value } : a)),
+    }))
+  }
+
+  const deleteAddon = (tierIndex: number, addonIndex: number) => {
+    setAddonsByTier((prev) => ({
+      ...prev,
+      [tierIndex]: (prev[tierIndex] || []).map((a, i) => (i === addonIndex ? { ...a, _deleted: true } : a)),
+    }))
   }
 
   const handleSave = async () => {
@@ -152,8 +235,14 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
       }
 
       const updatedTiers = [...tiers]
+      // Map from original tier index -> resolved tier id, so we can
+      // save that tier's add-ons against the right id even for
+      // brand-new tiers that didn't have one until this save.
+      const resolvedTierIds: Record<number, string> = {}
+
       for (let i = 0; i < activeTiers.length; i++) {
         const t = activeTiers[i]
+        const originalIndex = tiers.indexOf(t)
         const payload = {
           event_id: eventId,
           name: t.name,
@@ -164,11 +253,14 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
           is_active: t.is_active,
           sale_starts_at: expandSaleTime(t.sale_starts_at, 'start'),
           sale_ends_at: expandSaleTime(t.sale_ends_at, 'end'),
+          is_group: t.is_group,
+          seats_per_unit: t.is_group ? Math.max(1, parseInt(t.seats_per_unit) || 1) : 1,
         }
 
         if (t.id) {
           const { error } = await supabase.from('ticket_tiers').update(payload).eq('id', t.id)
           if (error) throw error
+          resolvedTierIds[originalIndex] = t.id
         } else {
           const { data, error } = await supabase
             .from('ticket_tiers')
@@ -178,13 +270,84 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
           if (error) throw error
           const idx = updatedTiers.indexOf(t)
           if (idx >= 0) updatedTiers[idx] = { ...t, id: data.id, _new: false }
+          resolvedTierIds[originalIndex] = data.id
         }
       }
       setTiers(updatedTiers)
 
-      // Collapse all tiers after a successful save — clearer UX
-      setOpenTiers({})
+      // Save add-ons for each tier now that every tier has a real id.
+      for (const [tierIndexStr, addons] of Object.entries(addonsByTier)) {
+        const tierIndex = Number(tierIndexStr)
+        const tierId = resolvedTierIds[tierIndex]
+        if (!tierId) continue // tier was deleted this save
 
+        const activeAddons = addons.filter((a) => !a._deleted)
+        const deletedAddons = addons.filter((a) => a._deleted && a.id)
+
+        for (const a of deletedAddons) {
+          await supabase.from('event_addons').delete().eq('id', a.id!)
+        }
+
+        for (let i = 0; i < activeAddons.length; i++) {
+          const a = activeAddons[i]
+          if (!a.name.trim()) continue // skip blank rows silently
+
+          const options = a.has_choice
+            ? a.choice_options.split(',').map((s) => s.trim()).filter(Boolean)
+            : null
+
+          const addonPayload = {
+            event_id: eventId,
+            ticket_tier_id: tierId,
+            name: a.name.trim(),
+            price: parseFloat(a.price) || 0,
+            has_choice: a.has_choice,
+            choice_label: a.has_choice ? (a.choice_label.trim() || null) : null,
+            choice_options: options,
+            is_active: a.is_active,
+            sort_order: i,
+          }
+
+          if (a.id) {
+            const { error } = await supabase.from('event_addons').update(addonPayload).eq('id', a.id)
+            if (error) throw error
+          } else {
+            const { error } = await supabase.from('event_addons').insert(addonPayload)
+            if (error) throw error
+          }
+        }
+      }
+
+      // Reload add-ons fresh so ids/state are consistent after save.
+      const freshTierIds = updatedTiers.filter((t) => !t._deleted && t.id).map((t) => t.id!) as string[]
+      if (freshTierIds.length > 0) {
+        const { data: freshAddons } = await supabase
+          .from('event_addons')
+          .select('*')
+          .in('ticket_tier_id', freshTierIds)
+          .order('sort_order')
+
+        const grouped: Record<number, Addon[]> = {}
+        for (const a of freshAddons || []) {
+          const tierIndex = updatedTiers.findIndex((t) => t.id === a.ticket_tier_id)
+          if (tierIndex === -1) continue
+          grouped[tierIndex] = grouped[tierIndex] || []
+          grouped[tierIndex].push({
+            id: a.id,
+            ticket_tier_id: a.ticket_tier_id,
+            name: a.name,
+            price: String(a.price),
+            has_choice: !!a.has_choice,
+            choice_label: a.choice_label || '',
+            choice_options: Array.isArray(a.choice_options) ? a.choice_options.join(', ') : '',
+            is_active: !!a.is_active,
+            sort_order: a.sort_order,
+          })
+        }
+        setAddonsByTier(grouped)
+      }
+
+      setOpenTiers({})
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } catch (err: any) {
@@ -261,17 +424,21 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
             const realIndex = tiers.indexOf(tier)
             const isOpen = !!openTiers[realIndex]
             const isUnsaved = !tier.id
+            const tierAddons = (addonsByTier[realIndex] || []).filter((a) => !a._deleted)
 
-            // Card summary (collapsed view)
             const priceLabel =
               tier.price === '' || tier.price === '0' || tier.price === '0.00'
                 ? 'Free'
                 : `$${parseFloat(tier.price || '0').toFixed(2)}`
-            const qtyLabel = tier.quantity
-              ? `${tier.quantity_sold || 0}/${tier.quantity} sold`
-              : tier.quantity_sold
-                ? `${tier.quantity_sold} sold`
-                : 'Unlimited'
+            const qtyLabel = tier.is_group
+              ? tier.quantity
+                ? `${tier.quantity_sold ? Math.floor((tier.quantity_sold || 0) / (parseInt(tier.seats_per_unit) || 1)) : 0}/${tier.quantity} tables sold`
+                : 'Unlimited tables'
+              : tier.quantity
+                ? `${tier.quantity_sold || 0}/${tier.quantity} sold`
+                : tier.quantity_sold
+                  ? `${tier.quantity_sold} sold`
+                  : 'Unlimited'
             const saleWindow = formatSaleWindow(tier.sale_starts_at, tier.sale_ends_at)
 
             return (
@@ -290,6 +457,11 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
                       <span className="truncate text-sm font-semibold text-gray-900 dark:text-white">
                         {tier.name || 'Untitled tier'}
                       </span>
+                      {tier.is_group && (
+                        <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
+                          Table · {tier.seats_per_unit} seats
+                        </span>
+                      )}
                       {isUnsaved && (
                         <span className="shrink-0 rounded-full bg-yellow-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300">
                           Unsaved
@@ -305,6 +477,12 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
                       <span>{priceLabel}</span>
                       <span>·</span>
                       <span>{qtyLabel}</span>
+                      {tierAddons.length > 0 && (
+                        <>
+                          <span>·</span>
+                          <span>{tierAddons.length} add-on{tierAddons.length > 1 ? 's' : ''}</span>
+                        </>
+                      )}
                       {saleWindow && (
                         <>
                           <span>·</span>
@@ -360,7 +538,9 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
                         />
                       </div>
                       <div>
-                        <label className={fieldLabelCls}>Quantity</label>
+                        <label className={fieldLabelCls}>
+                          {tier.is_group ? 'Tables Available' : 'Quantity'}
+                        </label>
                         <input
                           type="number"
                           min="1"
@@ -382,6 +562,39 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
                         onChange={(e) => updateTier(realIndex, 'description', e.target.value)}
                         className={inputCls}
                       />
+                    </div>
+
+                    {/* Group/table ticket toggle */}
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-white/[0.02]">
+                      <label className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          checked={tier.is_group}
+                          onChange={(e) => updateTier(realIndex, 'is_group', e.target.checked)}
+                          className="mt-0.5 h-4 w-4 accent-brand-600"
+                        />
+                        <span>
+                          <span className="block text-xs font-semibold text-gray-800 dark:text-gray-200">
+                            This is a group / table ticket
+                          </span>
+                          <span className="mt-0.5 block text-[11px] text-gray-500 dark:text-gray-400">
+                            One purchase covers a table of seats (e.g. a sponsorship). The buyer
+                            only enters their own name — not one per seat.
+                          </span>
+                        </span>
+                      </label>
+                      {tier.is_group && (
+                        <div className="mt-3 max-w-[160px]">
+                          <label className={fieldLabelCls}>Seats per table</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={tier.seats_per_unit}
+                            onChange={(e) => updateTier(realIndex, 'seats_per_unit', e.target.value)}
+                            className={inputCls}
+                          />
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -407,7 +620,98 @@ export default function TicketTiersEditor({ eventId, stripeAccountStatus }: Prop
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 pt-1">
+                    {/* Add-ons for this tier */}
+                    <div className="border-t border-gray-100 pt-3 dark:border-gray-800">
+                      <label className={fieldLabelCls}>
+                        Add-ons {tier.is_group ? '(quantity chosen at the table level)' : '(optional, per attendee)'}
+                      </label>
+                      <div className="space-y-2">
+                        {tierAddons.map((addon) => {
+                          const addonIndex = (addonsByTier[realIndex] || []).indexOf(addon)
+                          return (
+                            <div
+                              key={addon.id || `new-addon-${addonIndex}`}
+                              className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-white/[0.02]"
+                            >
+                              <div className="flex flex-wrap items-start gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Meal"
+                                  value={addon.name}
+                                  onChange={(e) => updateAddon(realIndex, addonIndex, 'name', e.target.value)}
+                                  className={`${inputCls} min-w-[140px] flex-1`}
+                                />
+                                <div className="relative w-28">
+                                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    placeholder="20.00"
+                                    value={addon.price}
+                                    onChange={(e) => updateAddon(realIndex, addonIndex, 'price', e.target.value)}
+                                    className={`${inputCls} pl-6`}
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteAddon(realIndex, addonIndex)}
+                                  className="rounded-lg p-2 text-gray-400 transition hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10"
+                                  title="Remove add-on"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+
+                              <label className="mt-2 flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                                <input
+                                  type="checkbox"
+                                  checked={addon.has_choice}
+                                  onChange={(e) => updateAddon(realIndex, addonIndex, 'has_choice', e.target.checked)}
+                                  className="rounded border-gray-300"
+                                />
+                                Buyer picks from a dropdown (e.g. meal type)
+                              </label>
+
+                              {addon.has_choice && (
+                                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                  <div>
+                                    <label className={fieldLabelCls}>Question label</label>
+                                    <input
+                                      type="text"
+                                      placeholder="Meal Choice"
+                                      value={addon.choice_label}
+                                      onChange={(e) => updateAddon(realIndex, addonIndex, 'choice_label', e.target.value)}
+                                      className={inputCls}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className={fieldLabelCls}>Options (comma separated)</label>
+                                    <input
+                                      type="text"
+                                      placeholder="Chicken, Vegetarian, Vegan"
+                                      value={addon.choice_options}
+                                      onChange={(e) => updateAddon(realIndex, addonIndex, 'choice_options', e.target.value)}
+                                      className={inputCls}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                        <button
+                          type="button"
+                          onClick={() => addAddon(realIndex)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 transition hover:border-gray-400 hover:text-gray-900 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Add an add-on
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 border-t border-gray-100 pt-3 dark:border-gray-800">
                       <label className="flex items-center gap-2">
                         <input
                           type="checkbox"
