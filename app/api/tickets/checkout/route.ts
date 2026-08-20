@@ -1,51 +1,45 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabaseServerAuth'
 import { createClient as createAdminClient } from '@/lib/supabaseServer'
-import {
-  stripe,
-  serviceFeeAmount,
-  applicationFeeAmount,
-} from '@/lib/stripe'
+import { stripe, serviceFeeAmount, applicationFeeAmount } from '@/lib/stripe'
 
 /**
  * POST /api/tickets/checkout
  *
- * Cart checkout with full per-attendee data. A buyer can purchase
- * multiple DIFFERENT tiers in one transaction (e.g. 2 "Regular" + 1
- * "Artist"), and each individual ticket collects its own attendee
- * name and its own answers to that tier's questions — not one shared
- * name/answer set for the whole order.
- *
- * The "guest"/purchaser fields remain separate from attendee data:
- * they're the billing identity (who's charged, who gets the Stripe
- * customer record and the order confirmation email), not necessarily
- * who's attending. Attendee 1 is prefilled from the purchaser's name
- * client-side for convenience on single-ticket orders, but that's a
- * UI nicety — server-side, attendees are independent data.
- *
- * All items in one checkout call must be PAID tiers (price > 0). Free
- * tiers go through /api/tickets/rsvp — the two can't be mixed in one
- * transaction.
+ * Cart checkout supporting:
+ *   - Multiple tiers in one order (existing)
+ *   - Full per-attendee name/email/question data on INDIVIDUAL tiers (existing)
+ *   - GROUP/TABLE tiers (e.g. "VIP Sponsorship" = 1 table = 8 seats):
+ *     one purchase mints seats_per_unit ticket rows, but the buyer
+ *     only enters ONE set of info (the purchaser) per table, not one
+ *     per seat. items[].quantity for a group tier means TABLES, not
+ *     seats.
+ *   - Priced add-ons (e.g. "Meal — $20"), scoped to a specific tier:
+ *       - individual tiers: selected per attendee (their own ticket)
+ *       - group tiers: selected as an aggregate quantity + a choice
+ *         breakdown for the whole table, distributed across that
+ *         table's minted seats server-side (no per-seat identity
+ *         needed, matching how group tiers already work)
  *
  * Body: {
  *   eventId: string,
  *   items: { tierId: string, quantity: number }[],
  *   guest?: { name: string, email: string, phone: string | null },
- *   attendees: {
+ *   attendees: {                          // one per INDIVIDUAL-tier seat
+ *     tierId: string, name: string, email?: string | null,
+ *     responses: { field_id: string, value: string }[],
+ *     addons: { addon_id: string, choice?: string | null }[]
+ *   }[],
+ *   tables: {                             // one per GROUP-tier table
  *     tierId: string,
- *     name: string,
- *     responses: { field_id: string, value: string }[]
- *   }[]   // flat list, length === sum(items[].quantity), grouped by
- *         // tier in the same order as `items`
+ *     responses: { field_id: string, value: string }[],
+ *     addons: { addon_id: string, choice: string | null, quantity: number }[]
+ *   }[]
  * }
  */
 
-// Stripe metadata: 500 chars per value, 50 keys max. A full order
-// (tier/quantity/price + every attendee's name and answers) is packed
-// as one JSON blob, chunked across order_data_0.._N so it scales with
-// however many attendees/questions an order actually has.
 const METADATA_CHUNK_SIZE = 450
-const MAX_METADATA_CHUNKS = 40
+const MAX_METADATA_CHUNKS = 60
 const MAX_NAME_LEN = 60
 const MAX_ANSWER_LEN = 120
 
@@ -55,10 +49,13 @@ function chunkString(input: string, size: number): string[] {
   return chunks
 }
 
-type PackedItem = { t: string; q: number; u: number }
-type PackedAttendee = { t: string; n: string; e: string | null; r: { i: string; v: string }[] }
+type PackedItem = { t: string; q: number; u: number; g: boolean; s: number }
+type PackedAttendeeAddon = { i: string; c: string | null }
+type PackedAttendee = { t: string; n: string; e: string | null; r: { i: string; v: string }[]; a: PackedAttendeeAddon[] }
+type PackedTableAddon = { i: string; c: string | null; q: number; u: number }
+type PackedTable = { t: string; r: { i: string; v: string }[]; a: PackedTableAddon[] }
 
-function packOrderForMetadata(items: PackedItem[], attendees: PackedAttendee[]): Record<string, string> {
+function packOrderForMetadata(items: PackedItem[], attendees: PackedAttendee[], tables: PackedTable[]): Record<string, string> {
   const packed = {
     items,
     attendees: attendees.map((a) => ({
@@ -66,6 +63,12 @@ function packOrderForMetadata(items: PackedItem[], attendees: PackedAttendee[]):
       n: a.n.slice(0, MAX_NAME_LEN),
       e: a.e ? a.e.slice(0, 200) : null,
       r: a.r.map((r) => ({ i: r.i, v: r.v.slice(0, MAX_ANSWER_LEN) })),
+      a: a.a,
+    })),
+    tables: tables.map((tb) => ({
+      t: tb.t,
+      r: tb.r.map((r) => ({ i: r.i, v: r.v.slice(0, MAX_ANSWER_LEN) })),
+      a: tb.a,
     })),
   }
   const json = JSON.stringify(packed)
@@ -86,8 +89,16 @@ export async function POST(request: NextRequest) {
     const items: { tierId: string; quantity: number }[] = Array.isArray(body.items)
       ? body.items.filter((it: any) => it?.tierId && Number(it.quantity) > 0)
       : []
-    const attendees: { tierId: string; name: string; email?: string | null; responses: { field_id: string; value: string }[] }[] =
-      Array.isArray(body.attendees) ? body.attendees : []
+    const attendees: {
+      tierId: string; name: string; email?: string | null
+      responses: { field_id: string; value: string }[]
+      addons?: { addon_id: string; choice?: string | null }[]
+    }[] = Array.isArray(body.attendees) ? body.attendees : []
+    const tables: {
+      tierId: string
+      responses: { field_id: string; value: string }[]
+      addons?: { addon_id: string; choice: string | null; quantity: number }[]
+    }[] = Array.isArray(body.tables) ? body.tables : []
 
     if (!eventId || items.length === 0) {
       return NextResponse.json({ error: 'eventId and at least one cart item are required' }, { status: 400 })
@@ -99,26 +110,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Guest name and email are required' }, { status: 400 })
     }
 
-    const totalQuantity = items.reduce((sum, it) => sum + it.quantity, 0)
-    if (attendees.length !== totalQuantity) {
-      return NextResponse.json({ error: 'Attendee details are missing for one or more tickets' }, { status: 400 })
-    }
-    for (const a of attendees) {
-      if (!a.name?.trim()) {
-        return NextResponse.json({ error: 'Every ticket needs an attendee name' }, { status: 400 })
-      }
-      if (a.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email.trim())) {
-        return NextResponse.json({ error: `"${a.email}" doesn't look like a valid email.` }, { status: 400 })
-      }
-    }
-    // Attendee counts per tier must match the cart exactly.
-    for (const it of items) {
-      const count = attendees.filter((a) => a.tierId === it.tierId).length
-      if (count !== it.quantity) {
-        return NextResponse.json({ error: 'Attendee details don\'t match the cart quantities' }, { status: 400 })
-      }
-    }
-
     const admin = createAdminClient()
     const origin = request.nextUrl.origin
     const tierIds = items.map((it) => it.tierId)
@@ -127,7 +118,7 @@ export async function POST(request: NextRequest) {
       .from('ticket_tiers')
       .select(`
         id, name, description, price, quantity, quantity_sold, is_active,
-        sale_starts_at, sale_ends_at, event_id,
+        sale_starts_at, sale_ends_at, is_group, seats_per_unit, event_id,
 
         events!inner (
           id, title, slug, auth_user_id,
@@ -150,15 +141,26 @@ export async function POST(request: NextRequest) {
 
     for (const it of items) {
       const tier = tierById.get(it.tierId)!
-      if (Number(tier.price) === 0) {
+      const expectedCount = tier.is_group
+        ? tables.filter((tb) => tb.tierId === it.tierId).length
+        : attendees.filter((a) => a.tierId === it.tierId).length
+      if (expectedCount !== it.quantity) {
         return NextResponse.json(
-          { error: `"${tier.name}" is free — free and paid tickets can't be purchased together. Please check out separately.` },
+          { error: `${tier.is_group ? 'Table' : 'Attendee'} details don't match the cart quantities for "${tier.name}".` },
           { status: 400 }
         )
       }
-      if (!tier.is_active) {
-        return NextResponse.json({ error: `"${tier.name}" is not currently available` }, { status: 400 })
+    }
+    for (const a of attendees) {
+      if (!a.name?.trim()) return NextResponse.json({ error: 'Every ticket needs an attendee name' }, { status: 400 })
+      if (a.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a.email.trim())) {
+        return NextResponse.json({ error: `"${a.email}" doesn't look like a valid email.` }, { status: 400 })
       }
+    }
+
+    for (const it of items) {
+      const tier = tierById.get(it.tierId)!
+      if (!tier.is_active) return NextResponse.json({ error: `"${tier.name}" is not currently available` }, { status: 400 })
       if (tier.sale_starts_at && new Date(tier.sale_starts_at) > now) {
         return NextResponse.json({ error: `"${tier.name}" sales have not started yet` }, { status: 400 })
       }
@@ -166,14 +168,73 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: `"${tier.name}" sales have ended` }, { status: 400 })
       }
       if (tier.quantity !== null) {
-        const remaining = tier.quantity - tier.quantity_sold
-        if (remaining < it.quantity) {
-          return NextResponse.json({ error: `Only ${remaining} "${tier.name}" ticket(s) remaining` }, { status: 400 })
+        const seatsPerUnit = tier.is_group ? tier.seats_per_unit : 1
+        const unitsSold = Math.floor(tier.quantity_sold / seatsPerUnit)
+        const unitsRemaining = tier.quantity - unitsSold
+        if (unitsRemaining < it.quantity) {
+          return NextResponse.json(
+            { error: `Only ${unitsRemaining} ${tier.is_group ? 'table(s)' : 'ticket(s)'} remaining for "${tier.name}"` },
+            { status: 400 }
+          )
         }
       }
     }
 
-    // Required custom questions — validated per attendee, per their tier.
+    const addonIds = new Set<string>()
+    for (const a of attendees) for (const ad of a.addons || []) addonIds.add(ad.addon_id)
+    for (const tb of tables) for (const ad of tb.addons || []) addonIds.add(ad.addon_id)
+
+    const { data: addonRows } = addonIds.size
+      ? await admin.from('event_addons').select('id, ticket_tier_id, name, price, has_choice, choice_options, is_active').in('id', Array.from(addonIds))
+      : { data: [] as any[] }
+    const addonById = new Map((addonRows || []).map((a) => [a.id, a]))
+
+    for (const id of addonIds) {
+      const addon = addonById.get(id)
+      if (!addon || !addon.is_active) return NextResponse.json({ error: 'One of the selected add-ons is no longer available.' }, { status: 400 })
+    }
+
+    for (const a of attendees) {
+      for (const ad of a.addons || []) {
+        const addon = addonById.get(ad.addon_id)!
+        if (addon.ticket_tier_id !== a.tierId) {
+          return NextResponse.json({ error: `"${addon.name}" isn't available for this ticket type.` }, { status: 400 })
+        }
+        if (addon.has_choice) {
+          const opts: string[] = addon.choice_options || []
+          if (!ad.choice || !opts.includes(ad.choice)) {
+            return NextResponse.json({ error: `Please choose an option for "${addon.name}".` }, { status: 400 })
+          }
+        }
+      }
+    }
+
+    for (const tb of tables) {
+      const tier = tierById.get(tb.tierId)!
+      for (const ad of tb.addons || []) {
+        const addon = addonById.get(ad.addon_id)!
+        if (addon.ticket_tier_id !== tb.tierId) {
+          return NextResponse.json({ error: `"${addon.name}" isn't available for this ticket type.` }, { status: 400 })
+        }
+        if (ad.quantity < 0 || ad.quantity > tier.seats_per_unit) {
+          return NextResponse.json({ error: `"${addon.name}" quantity can't exceed the table's ${tier.seats_per_unit} seats.` }, { status: 400 })
+        }
+        if (addon.has_choice && ad.quantity > 0) {
+          const opts: string[] = addon.choice_options || []
+          if (!ad.choice || !opts.includes(ad.choice)) {
+            return NextResponse.json({ error: `Please choose an option for "${addon.name}".` }, { status: 400 })
+          }
+        }
+      }
+      const sumsByAddon: Record<string, number> = {}
+      for (const ad of tb.addons || []) sumsByAddon[ad.addon_id] = (sumsByAddon[ad.addon_id] || 0) + ad.quantity
+      for (const [addonId, sum] of Object.entries(sumsByAddon)) {
+        if (sum > tier.seats_per_unit) {
+          return NextResponse.json({ error: `"${addonById.get(addonId)?.name}" total can't exceed the table's ${tier.seats_per_unit} seats.` }, { status: 400 })
+        }
+      }
+    }
+
     const { data: applicableFields } = await admin
       .from('event_form_fields')
       .select('id, label, is_required, ticket_tier_id')
@@ -188,28 +249,26 @@ export async function POST(request: NextRequest) {
         tierRequiredMap[f.ticket_tier_id]!.push(f)
       }
     }
-
     for (const a of attendees) {
       const responseMap = new Map(a.responses.map((r) => [r.field_id, (r.value || '').trim()]))
       const required = [...eventLevelRequired, ...(tierRequiredMap[a.tierId] || [])]
       for (const f of required) {
-        if (!(responseMap.get(f.id) || '').length) {
-          return NextResponse.json({ error: `"${f.label}" is required for ${a.name}.` }, { status: 400 })
-        }
+        if (!(responseMap.get(f.id) || '').length) return NextResponse.json({ error: `"${f.label}" is required for ${a.name}.` }, { status: 400 })
+      }
+    }
+    for (const tb of tables) {
+      const responseMap = new Map(tb.responses.map((r) => [r.field_id, (r.value || '').trim()]))
+      const required = [...eventLevelRequired, ...(tierRequiredMap[tb.tierId] || [])]
+      for (const f of required) {
+        if (!(responseMap.get(f.id) || '').length) return NextResponse.json({ error: `"${f.label}" is required for the table.` }, { status: 400 })
       }
     }
 
-    // Organizer Stripe setup
     const stripeAccountId = creatorProfile?.stripe_account_id
     const stripeStatus = creatorProfile?.stripe_account_status
-    if (!stripeAccountId) {
-      return NextResponse.json({ error: 'Event creator has not connected Stripe' }, { status: 400 })
-    }
-    if (stripeStatus !== 'enabled') {
-      return NextResponse.json({ error: 'Event creator has not completed payment setup' }, { status: 400 })
-    }
+    if (!stripeAccountId) return NextResponse.json({ error: 'Event creator has not connected Stripe' }, { status: 400 })
+    if (stripeStatus !== 'enabled') return NextResponse.json({ error: 'Event creator has not completed payment setup' }, { status: 400 })
 
-    // Buyer / customer handling (purchaser identity — separate from attendees)
     let customerId: string
     let buyerEmail: string
     let buyerName: string | null
@@ -231,9 +290,7 @@ export async function POST(request: NextRequest) {
       let existingCustomerId = buyerProfile?.stripe_customer_id
       if (!existingCustomerId) {
         const customer = await stripe.customers.create({
-          email: buyerEmail,
-          name: buyerName || undefined,
-          phone: buyerPhone || undefined,
+          email: buyerEmail, name: buyerName || undefined, phone: buyerPhone || undefined,
           metadata: { supabase_user_id: user.id },
         })
         existingCustomerId = customer.id
@@ -247,15 +304,12 @@ export async function POST(request: NextRequest) {
       buyerUserId = null
 
       const customer = await stripe.customers.create({
-        email: buyerEmail,
-        name: buyerName || undefined,
-        phone: buyerPhone || undefined,
+        email: buyerEmail, name: buyerName || undefined, phone: buyerPhone || undefined,
         metadata: { guest_checkout: 'true' },
       })
       customerId = customer.id
     }
 
-    // Pricing — one line item per tier, plus one aggregated service fee line.
     const lineItems: import('stripe').Stripe.Checkout.SessionCreateParams.LineItem[] = []
     let totalServiceFeeCents = 0
     let totalApplicationFeeCents = 0
@@ -264,25 +318,87 @@ export async function POST(request: NextRequest) {
     for (const it of items) {
       const tier = tierById.get(it.tierId)!
       const unitAmount = Math.round(Number(tier.price) * 100)
-      const serviceFeePerTicket = serviceFeeAmount(unitAmount)
-      const appFeePerTicket = applicationFeeAmount(unitAmount)
+      const serviceFeePerUnit = serviceFeeAmount(unitAmount)
+      const appFeePerUnit = applicationFeeAmount(unitAmount)
 
-      totalServiceFeeCents += serviceFeePerTicket * it.quantity
-      totalApplicationFeeCents += appFeePerTicket * it.quantity
-      packedItems.push({ t: it.tierId, q: it.quantity, u: unitAmount })
+      totalServiceFeeCents += serviceFeePerUnit * it.quantity
+      totalApplicationFeeCents += appFeePerUnit * it.quantity
+      packedItems.push({ t: it.tierId, q: it.quantity, u: unitAmount, g: !!tier.is_group, s: tier.is_group ? tier.seats_per_unit : 1 })
 
-      lineItems.push({
-        price_data: {
-          currency: 'usd',
-          unit_amount: unitAmount,
-          product_data: {
-            name: `${tier.name} — ${event.title}`,
-            description: tier.description || undefined,
-            metadata: { tier_id: tier.id, event_id: eventId },
+      if (unitAmount > 0) {
+        lineItems.push({
+          price_data: {
+            currency: 'usd',
+            unit_amount: unitAmount,
+            product_data: {
+              name: `${tier.name}${tier.is_group ? ' (table)' : ''} — ${event.title}`,
+              description: tier.description || undefined,
+              metadata: { tier_id: tier.id, event_id: eventId },
+            },
           },
-        },
-        quantity: it.quantity,
-      })
+          quantity: it.quantity,
+        })
+      }
+    }
+
+    const addonLineTotals = new Map<string, { name: string; choice: string | null; unitAmount: number; quantity: number }>()
+    function addAddonQty(addonId: string, choice: string | null, qty: number) {
+      if (qty <= 0) return
+      const addon = addonById.get(addonId)!
+      const unitAmount = Math.round(Number(addon.price) * 100)
+      const key = addonId + '::' + (choice || '')
+      const existing = addonLineTotals.get(key)
+      if (existing) existing.quantity += qty
+      else addonLineTotals.set(key, { name: addon.name, choice, unitAmount, quantity: qty })
+    }
+
+    const packedAttendees: PackedAttendee[] = attendees.map((a) => {
+      for (const ad of a.addons || []) addAddonQty(ad.addon_id, ad.choice || null, 1)
+      return {
+        t: a.tierId,
+        n: a.name.trim(),
+        e: a.email?.trim().toLowerCase() || null,
+        r: a.responses.filter((r) => r.field_id && r.value).map((r) => ({ i: r.field_id, v: r.value })),
+        a: (a.addons || []).map((ad) => ({ i: ad.addon_id, c: ad.choice || null })),
+      }
+    })
+
+    const packedTables: PackedTable[] = tables.map((tb) => {
+      const packedAddons: PackedTableAddon[] = (tb.addons || [])
+        .filter((ad) => ad.quantity > 0)
+        .map((ad) => {
+          addAddonQty(ad.addon_id, ad.choice || null, ad.quantity)
+          const addon = addonById.get(ad.addon_id)!
+          return { i: ad.addon_id, c: ad.choice || null, q: ad.quantity, u: Math.round(Number(addon.price) * 100) }
+        })
+      return {
+        t: tb.tierId,
+        r: tb.responses.filter((r) => r.field_id && r.value).map((r) => ({ i: r.field_id, v: r.value })),
+        a: packedAddons,
+      }
+    })
+
+    for (const { name, choice, unitAmount, quantity } of addonLineTotals.values()) {
+      const serviceFeePerUnit = serviceFeeAmount(unitAmount)
+      const appFeePerUnit = applicationFeeAmount(unitAmount)
+      totalServiceFeeCents += serviceFeePerUnit * quantity
+      totalApplicationFeeCents += appFeePerUnit * quantity
+
+      if (unitAmount > 0) {
+        lineItems.push({
+          price_data: {
+            currency: 'usd',
+            unit_amount: unitAmount,
+            product_data: { name: choice ? `${name} — ${choice}` : name },
+          },
+          quantity,
+        })
+      }
+    }
+
+    const hasAnyCharge = lineItems.length > 0
+    if (!hasAnyCharge) {
+      return NextResponse.json({ error: 'This order has no charge — use the free RSVP flow instead.' }, { status: 400 })
     }
 
     if (totalServiceFeeCents > 0) {
@@ -296,12 +412,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const packedAttendees: PackedAttendee[] = attendees.map((a) => ({
-      t: a.tierId,
-      n: a.name.trim(),
-      e: a.email?.trim().toLowerCase() || null,
-      r: a.responses.filter((r) => r.field_id && r.value).map((r) => ({ i: r.field_id, v: r.value })),
-    }))
+    const totalQuantity = items.reduce((sum, it) => sum + it.quantity, 0)
 
     const sessionMetadata: Record<string, string> = {
       event_id: eventId,
@@ -309,13 +420,14 @@ export async function POST(request: NextRequest) {
       buyer_email: buyerEmail,
       buyer_name: buyerName || '',
       buyer_phone: buyerPhone || '',
-      ...packOrderForMetadata(packedItems, packedAttendees),
+      ...packOrderForMetadata(packedItems, packedAttendees, packedTables),
     }
     if (buyerUserId) sessionMetadata.buyer_user_id = buyerUserId
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       mode: 'payment',
+      customer: customerId,
       line_items: lineItems,
       payment_intent_data: {
         application_fee_amount: totalApplicationFeeCents,
