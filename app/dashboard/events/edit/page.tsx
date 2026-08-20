@@ -10,9 +10,7 @@ import { Loader2, AlertCircle, Check, X, Trash2, ChevronRight } from 'lucide-rea
 const EVENT_TYPES = [
   'Live Music', 'Art', 'Entertainment', 'Lifestyle',
   'Local Flavor', 'Community / Cultural', 'Party For A Cause',
-  'Shop Local', 'Holiday', 'Exhibition',
-  'Comedy Night', 'Open Mic', 'Poetry Reading', 'Trivia Night',
-  'Bingo', 'Workshop / Class', 'Film / Screening', 'Dance', 'Theater',
+  'Shop Local', 'Family',
 ]
 
 const ARTIST_TYPES = ['Musician', 'Visual', 'Performance', 'Literary'] as const
