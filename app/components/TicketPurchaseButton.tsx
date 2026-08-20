@@ -572,11 +572,15 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         .tpb-attendee-fields { display: flex; flex-direction: column; gap: 8px; }
         .tpb-checkbox-row { display: flex; align-items: center; gap: 8px; }
         .tpb-checkbox-row input { width: 16px; height: 16px; }
-        .tpb-addon-section { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ece8e2; }
-        .tpb-addon-row { padding: 8px 0; }
-        .tpb-addon-label-row { display: flex; align-items: center; justify-content: space-between; }
-        .tpb-addon-name { font-size: 0.85rem; color: #1a1814; font-weight: 500; }
-        .tpb-addon-price { font-size: 0.8rem; color: #6b6560; }
+        .tpb-addon-section { margin-top: 12px; padding: 10px; border-radius: 8px; background: #fff8ed; border: 1.5px solid #f0dfb8; }
+        .tpb-addon-heading { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #a8720f; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; }
+        .tpb-addon-row { padding: 10px; border-radius: 8px; border: 1.5px solid #ece0c4; background: #fff; cursor: pointer; transition: all 0.12s; }
+        .tpb-addon-row:hover { border-color: #d9b96a; }
+        .tpb-addon-row.selected { border-color: #C80650; background: rgba(200,6,80,0.04); }
+        .tpb-addon-row + .tpb-addon-row { margin-top: 8px; }
+        .tpb-addon-label-row { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+        .tpb-addon-name { font-size: 0.9rem; color: #1a1814; font-weight: 600; }
+        .tpb-addon-price { font-size: 0.88rem; color: #C80650; font-weight: 700; }
         .tpb-table-note { font-size: 0.75rem; color: #6b6560; margin-bottom: 10px; padding: 8px 10px; background: #f7f6f4; border-radius: 6px; }
         .tpb-table-addon-choice-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; gap: 10px; }
         .tpb-table-addon-choice-label { font-size: 0.82rem; color: #1a1814; flex: 1; }
@@ -762,10 +766,11 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
 
                           {addons.length > 0 && (
                             <div className="tpb-addon-section">
+                              <span className="tpb-addon-heading">✨ Add-Ons Available</span>
                               {addons.map((addon) => {
                                 const sel = attendeeAddons[slot.key]?.[addon.id]
                                 return (
-                                  <div key={addon.id} className="tpb-addon-row">
+                                  <div key={addon.id} className={`tpb-addon-row${sel?.selected ? ' selected' : ''}`}>
                                     <label className="tpb-addon-label-row">
                                       <span className="tpb-checkbox-row">
                                         <input type="checkbox" checked={!!sel?.selected} onChange={(e) => setAttendeeAddonSelected(slot.key, addon.id, e.target.checked)} />
@@ -776,7 +781,7 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
                                     {sel?.selected && addon.has_choice && (
                                       <select
                                         className="tpb-guest-input"
-                                        style={{ marginTop: '6px' }}
+                                        style={{ marginTop: '8px' }}
                                         value={sel.choice || ''}
                                         onChange={(e) => setAttendeeAddonChoice(slot.key, addon.id, e.target.value)}
                                       >
@@ -840,10 +845,11 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
 
                           {addons.length > 0 && (
                             <div className="tpb-addon-section">
+                              <span className="tpb-addon-heading">✨ Add-Ons Available</span>
                               {addons.map((addon) => {
                                 const total = tableAddonTotalQty(unit.key, addon.id)
                                 return (
-                                  <div key={addon.id} className="tpb-addon-row">
+                                  <div key={addon.id} className={`tpb-addon-row${total > 0 ? ' selected' : ''}`}>
                                     <div className="tpb-addon-label-row">
                                       <span className="tpb-addon-name">{addon.name}</span>
                                       <span className="tpb-addon-price">+${addon.price.toFixed(2)} each</span>
