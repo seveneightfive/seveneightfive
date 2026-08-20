@@ -572,10 +572,16 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         .tpb-attendee-fields { display: flex; flex-direction: column; gap: 8px; }
         .tpb-checkbox-row { display: flex; align-items: center; gap: 8px; }
         .tpb-checkbox-row input { width: 16px; height: 16px; }
-        .tpb-addon-section { margin-top: 12px; padding: 10px; border-radius: 8px; background: #fff8ed; border: 1.5px solid #f0dfb8; }
-        .tpb-addon-heading { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #a8720f; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; }
-        .tpb-addon-row { padding: 10px; border-radius: 8px; border: 1.5px solid #ece0c4; background: #fff; cursor: pointer; transition: all 0.12s; }
-        .tpb-addon-row:hover { border-color: #d9b96a; }
+        .tpb-checkout-section { margin-top: 16px; padding: 16px; border-radius: 10px; background: #17140f; }
+        .tpb-checkout-section .tpb-attendees-title { color: #c9c4bc; }
+        .tpb-guest-form .tpb-guest-label { color: #c9c4bc; }
+        .tpb-guest-form .tpb-guest-hint { color: #9a948c; }
+        .tpb-guest-form .tpb-guest-signin { color: #b8b3ad; }
+        .tpb-guest-form .tpb-guest-signin a { color: #ff9dbb; }
+        .tpb-addon-section { margin-top: 12px; padding: 10px; border-radius: 8px; background: #000; border: 1.5px solid #3a352e; }
+        .tpb-addon-heading { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #ffffff; margin-bottom: 6px; display: block; }
+        .tpb-addon-row { padding: 10px; border-radius: 8px; border: 1.5px solid #ece8e2; background: #fff; cursor: pointer; transition: all 0.12s; }
+        .tpb-addon-row:hover { border-color: #d8d3cc; }
         .tpb-addon-row.selected { border-color: #C80650; background: rgba(200,6,80,0.04); }
         .tpb-addon-row + .tpb-addon-row { margin-top: 8px; }
         .tpb-addon-label-row { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
@@ -693,6 +699,10 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
                   </div>
                 )}
 
+                {/* Everything from here down — purchaser info, attendee/table
+                    details, add-ons, confirm — sits in its own dark section so
+                    it reads as visually distinct from tier browsing above. */}
+                <div className="tpb-checkout-section">
                 {isGuest && (
                   <div className="tpb-guest-form">
                     <div className="tpb-guest-row">
@@ -766,7 +776,7 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
 
                           {addons.length > 0 && (
                             <div className="tpb-addon-section">
-                              <span className="tpb-addon-heading">✨ Add-Ons Available</span>
+                              <span className="tpb-addon-heading">AVAILABLE ADD-ONS</span>
                               {addons.map((addon) => {
                                 const sel = attendeeAddons[slot.key]?.[addon.id]
                                 return (
@@ -845,7 +855,7 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
 
                           {addons.length > 0 && (
                             <div className="tpb-addon-section">
-                              <span className="tpb-addon-heading">✨ Add-Ons Available</span>
+                              <span className="tpb-addon-heading">AVAILABLE ADD-ONS</span>
                               {addons.map((addon) => {
                                 const total = tableAddonTotalQty(unit.key, addon.id)
                                 return (
@@ -901,6 +911,7 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
                 >
                   {confirmLabel}
                 </button>
+                </div>
               </div>
             )}
           </>
