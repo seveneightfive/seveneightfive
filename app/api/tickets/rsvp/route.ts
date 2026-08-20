@@ -248,7 +248,7 @@ export async function POST(request: NextRequest) {
     const { data: inserted, error: insertError } = await admin
       .from('tickets')
       .insert(ticketRows)
-      .select('id, qr_token, ticket_tier_id, attendee_email')
+      .select('id, qr_token, ticket_tier_id, attendee_email, buyer_name')
 
     if (insertError || !inserted) {
       console.error('[tickets/rsvp] insert error:', insertError)
