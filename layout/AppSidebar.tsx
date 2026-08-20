@@ -29,6 +29,12 @@ import type { HeaderUser } from '@/app/dashboard/DashboardShell'
  *    unchanged from the previous pass.
  *  - No top AppHeader bar anymore (removed in DashboardShell) — the
  *    sidebar is now the only persistent chrome, matching the mockup.
+ *
+ * CHANGE (this pass): "My Pages" nav item removed and replaced with a
+ * "Dashboard" item that links back to /dashboard (the top-level
+ * dashboard overview page). Page management now happens from the
+ * "Manage your listing" card on that overview page instead of its own
+ * nav entry.
  */
 
 type NavItem = {
@@ -46,7 +52,7 @@ const AppSidebar: React.FC<{ headerUser: HeaderUser | null }> = ({ headerUser })
   const isGuest = !headerUser
 
   const navItems: NavItem[] = [
-    { name: 'My Pages', path: '/dashboard/pages' },
+    { name: 'Dashboard', path: '/dashboard' },
     { name: 'Save the Date', path: '/dashboard/save-the-date' },
     { name: 'Event Manager', path: '/dashboard/events' },
     { name: 'Advertising', path: '/dashboard/advertise' },
