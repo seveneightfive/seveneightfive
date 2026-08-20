@@ -13,36 +13,28 @@ import { sendTicketEmail, sendAttendeeTicketEmail } from '@/app/lib/email'
  *   - charge.refunded            → mark refunded
  *   - account.updated            → sync Connect status to profile
  *
- * FULL PER-ATTENDEE DATA: /api/tickets/checkout packs the whole order
- * (tier/quantity/price + every individual attendee's name and answers)
- * as one JSON blob, chunked across order_data_0.._N metadata keys
- * (a single 500-char metadata value can't reliably hold an order with
- * several attendees, each with their own name and answers). Each
- * attendee becomes its own ticket row with its own buyer_name — not
- * a shared name duplicated across `quantity` identical rows like the
- * original single-tier implementation. Two older metadata shapes are
- * still parsed as a fallback so any session already in flight when
- * this ships still completes correctly:
- *   1. cart_items_* and custom_responses_* (multi-tier, order-level Q&A)
- *   2. tier_id/quantity/custom_responses (original single-tier)
+ * GROUP/TABLE TIERS: an order_data item with g:true mints
+ * quantity * seats_per_unit ticket rows (not quantity rows) — one
+ * "table" purchase covers seats_per_unit seats, all under the
+ * purchaser's name since there's no per-seat identity collected.
  *
- * Buyer info resolution order (the purchaser/billing identity, not
- * attendees):
- *   1. metadata.buyer_email + metadata.buyer_name + metadata.buyer_phone
- *   2. Fallback: lookup profile by buyer_user_id (legacy code path)
- *   3. Last resort: pull from Stripe's session.customer_details
+ * ADD-ONS: attendee-level add-ons (individual tiers) attach directly
+ * to that attendee's ticket. Table-level add-ons (group tiers) are
+ * aggregate quantities + a choice breakdown for the whole table,
+ * distributed across that table's minted seat rows — order doesn't
+ * matter since none of those rows have a specific name attached.
  *
- * Email sending: errors during email send are caught and logged but
- * do NOT fail the webhook. If we returned 500, Stripe would retry and
- * we'd double-mint tickets.
+ * Metadata parsing supports three generations, oldest last:
+ *   1. order_data_* (current — items + attendees + tables, each with addons)
+ *   2. cart_items_* and custom_responses_* (multi-tier, no per-attendee names, no addons)
+ *   3. tier_id/quantity/custom_responses (original single-tier)
+ * Older sessions still in flight when this shipped complete correctly.
  */
 export async function POST(request: NextRequest) {
   const body = await request.text()
   const sig = request.headers.get('stripe-signature')
 
-  if (!sig) {
-    return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 })
-  }
+  if (!sig) return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 })
   if (!process.env.STRIPE_WEBHOOK_SECRET) {
     console.error('[webhook] STRIPE_WEBHOOK_SECRET not set')
     return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 })
@@ -60,7 +52,6 @@ export async function POST(request: NextRequest) {
 
   try {
     switch (event.type) {
-      // ── checkout.session.completed ───────────────────────────────────
       case 'checkout.session.completed': {
         const session = event.data.object as import('stripe').Stripe.Checkout.Session
         if (session.payment_status !== 'paid') break
@@ -100,20 +91,14 @@ export async function POST(request: NextRequest) {
         const platformFee = paymentIntentId ? await getPlatformFee(paymentIntentId) : null
 
         await mintOrderTickets({
-          admin,
-          eventId,
-          order,
-          buyerUserId,
-          buyerInfo,
-          paymentIntentId,
-          checkoutSessionId: session.id,
+          admin, eventId, order, buyerUserId, buyerInfo,
+          paymentIntentId, checkoutSessionId: session.id,
           totalPlatformFeeCents: platformFee ? Math.round(platformFee * 100) : null,
           orderRef: session.id,
         })
         break
       }
 
-      // ── payment_intent.succeeded (fallback) ──────────────────────────
       case 'payment_intent.succeeded': {
         const pi = event.data.object as import('stripe').Stripe.PaymentIntent
         const meta = pi.metadata || {}
@@ -127,7 +112,7 @@ export async function POST(request: NextRequest) {
           .eq('stripe_payment_intent_id', pi.id)
           .limit(1)
           .maybeSingle()
-        if (existing) break // checkout.session.completed already minted
+        if (existing) break
 
         const buyerUserId = meta.buyer_user_id || null
         const buyerInfo = await resolveBuyerInfo({ metadata: meta, buyerUserId, session: null, admin })
@@ -137,32 +122,22 @@ export async function POST(request: NextRequest) {
         }
 
         await mintOrderTickets({
-          admin,
-          eventId: meta.event_id,
-          order,
-          buyerUserId,
-          buyerInfo,
-          paymentIntentId: pi.id,
-          checkoutSessionId: null,
+          admin, eventId: meta.event_id, order, buyerUserId, buyerInfo,
+          paymentIntentId: pi.id, checkoutSessionId: null,
           totalPlatformFeeCents: pi.application_fee_amount ?? null,
           orderRef: pi.id,
         })
         break
       }
 
-      // ── charge.refunded ──────────────────────────────────────────────
       case 'charge.refunded': {
         const charge = event.data.object as import('stripe').Stripe.Charge
         const piId = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id
         if (!piId) break
-        await admin
-          .from('tickets')
-          .update({ payment_status: 'refunded', status: 'refunded' })
-          .eq('stripe_payment_intent_id', piId)
+        await admin.from('tickets').update({ payment_status: 'refunded', status: 'refunded' }).eq('stripe_payment_intent_id', piId)
         break
       }
 
-      // ── account.updated ──────────────────────────────────────────────
       case 'account.updated': {
         const account = event.data.object as import('stripe').Stripe.Account
         try {
@@ -187,9 +162,12 @@ export async function POST(request: NextRequest) {
 
 // ── Metadata parsing ────────────────────────────────────────────────
 
-type OrderItem = { tierId: string; quantity: number; unitAmountCents: number }
-type OrderAttendee = { tierId: string; name: string | null; email: string | null; responses: { fieldId: string; value: string }[] }
-type Order = { items: OrderItem[]; attendees: OrderAttendee[] }
+type OrderItem = { tierId: string; quantity: number; unitAmountCents: number; isGroup: boolean; seatsPerUnit: number }
+type OrderAttendeeAddon = { addonId: string; choice: string | null }
+type OrderAttendee = { tierId: string; name: string | null; email: string | null; responses: { fieldId: string; value: string }[]; addons: OrderAttendeeAddon[] }
+type OrderTableAddon = { addonId: string; choice: string | null; quantity: number; unitAmountCents: number }
+type OrderTable = { tierId: string; responses: { fieldId: string; value: string }[]; addons: OrderTableAddon[] }
+type Order = { items: OrderItem[]; attendees: OrderAttendee[]; tables: OrderTable[] }
 
 function readChunked(meta: Record<string, string>, prefix: string): string | null {
   const countKey = `${prefix}_count`
@@ -200,31 +178,32 @@ function readChunked(meta: Record<string, string>, prefix: string): string | nul
   return json
 }
 
-/**
- * Parses the current order_data_* format (items + per-attendee name
- * and answers). Falls back to the two older metadata shapes for any
- * session already in flight when this shipped — see file header.
- */
 function parseOrder(meta: Record<string, string>): Order {
-  const empty: Order = { items: [], attendees: [] }
+  const empty: Order = { items: [], attendees: [], tables: [] }
 
   // Current format
   const orderJson = readChunked(meta, 'order_data')
   if (orderJson) {
     try {
       const parsed = JSON.parse(orderJson) as {
-        items: { t: string; q: number; u: number }[]
-        attendees: { t: string; n: string; e: string | null; r: { i: string; v: string }[] }[]
+        items: { t: string; q: number; u: number; g?: boolean; s?: number }[]
+        attendees: { t: string; n: string; e: string | null; r: { i: string; v: string }[]; a?: { i: string; c: string | null }[] }[]
+        tables?: { t: string; r: { i: string; v: string }[]; a?: { i: string; c: string | null; q: number; u: number }[] }[]
       }
       return {
         items: (parsed.items || []).filter((it) => it?.t && it.q > 0).map((it) => ({
           tierId: it.t, quantity: it.q, unitAmountCents: it.u || 0,
+          isGroup: !!it.g, seatsPerUnit: it.s || 1,
         })),
         attendees: (parsed.attendees || []).map((a) => ({
-          tierId: a.t,
-          name: a.n || null,
-          email: a.e || null,
+          tierId: a.t, name: a.n || null, email: a.e || null,
           responses: (a.r || []).map((r) => ({ fieldId: r.i, value: r.v })),
+          addons: (a.a || []).map((ad) => ({ addonId: ad.i, choice: ad.c })),
+        })),
+        tables: (parsed.tables || []).map((tb) => ({
+          tierId: tb.t,
+          responses: (tb.r || []).map((r) => ({ fieldId: r.i, value: r.v })),
+          addons: (tb.a || []).map((ad) => ({ addonId: ad.i, choice: ad.c, quantity: ad.q, unitAmountCents: ad.u })),
         })),
       }
     } catch (err) {
@@ -233,13 +212,13 @@ function parseOrder(meta: Record<string, string>): Order {
     }
   }
 
-  // Previous multi-tier format (order-level Q&A, no per-attendee names)
+  // Previous multi-tier format (no per-attendee names, no addons, no group tiers)
   const cartJson = readChunked(meta, 'cart_items')
   if (cartJson) {
     try {
       const items = (JSON.parse(cartJson) as { t: string; q: number; u: number }[])
         .filter((it) => it?.t && it.q > 0)
-        .map((it) => ({ tierId: it.t, quantity: it.q, unitAmountCents: it.u || 0 }))
+        .map((it) => ({ tierId: it.t, quantity: it.q, unitAmountCents: it.u || 0, isGroup: false, seatsPerUnit: 1 }))
 
       const responsesJson = readChunked(meta, 'custom_responses')
       let eventResponses: { i: string; v: string }[] = []
@@ -252,18 +231,14 @@ function parseOrder(meta: Record<string, string>): Order {
         } catch { /* ignore */ }
       }
 
-      // No per-attendee names in this legacy format — every ticket in
-      // a tier group shares the same (order-level) answers and a null
-      // name, which falls back to the purchaser's name at insert time.
       const attendees: OrderAttendee[] = []
       for (const it of items) {
-        const tierResponses = [...eventResponses, ...(byTier[it.tierId] || [])]
-          .map((r) => ({ fieldId: r.i, value: r.v }))
+        const tierResponses = [...eventResponses, ...(byTier[it.tierId] || [])].map((r) => ({ fieldId: r.i, value: r.v }))
         for (let i = 0; i < it.quantity; i++) {
-          attendees.push({ tierId: it.tierId, name: null, email: null, responses: tierResponses })
+          attendees.push({ tierId: it.tierId, name: null, email: null, responses: tierResponses, addons: [] })
         }
       }
-      return { items, attendees }
+      return { items, attendees, tables: [] }
     } catch (err) {
       console.error('[webhook] failed to parse legacy cart_items metadata:', err)
       return empty
@@ -280,9 +255,9 @@ function parseOrder(meta: Record<string, string>): Order {
     }
     const responses = eventResponses.map((r) => ({ fieldId: r.i, value: r.v }))
     const attendees: OrderAttendee[] = Array.from({ length: quantity }, () => ({
-      tierId: meta.tier_id, name: null, email: null, responses,
+      tierId: meta.tier_id, name: null, email: null, responses, addons: [],
     }))
-    return { items: [{ tierId: meta.tier_id, quantity, unitAmountCents }], attendees }
+    return { items: [{ tierId: meta.tier_id, quantity, unitAmountCents, isGroup: false, seatsPerUnit: 1 }], attendees, tables: [] }
   }
 
   return empty
@@ -290,17 +265,6 @@ function parseOrder(meta: Record<string, string>): Order {
 
 // ── Ticket minting ──────────────────────────────────────────────────
 
-/**
- * Mints one ticket row per attendee — each with its own buyer_name
- * (falling back to the purchaser's name only for legacy orders that
- * had no per-attendee name captured) — saves each attendee's answers
- * against their specific ticket, and sends one confirmation email
- * covering the whole order with per-ticket attendee names.
- *
- * Platform fee is split evenly across the total ticket count (same
- * simplification as the original implementation — Stripe doesn't
- * expose a clean per-tier fee breakdown on a single PaymentIntent).
- */
 async function mintOrderTickets(args: {
   admin: ReturnType<typeof createClient>
   eventId: string
@@ -318,27 +282,55 @@ async function mintOrderTickets(args: {
   } = args
 
   const unitAmountByTier = new Map(order.items.map((it) => [it.tierId, it.unitAmountCents]))
-  const totalQuantity = order.attendees.length
+
+  // Build a flat "pending seat" list: one entry per ticket row about
+  // to be minted. Individual-tier attendees map 1:1. Group-tier
+  // tables expand into seatsPerUnit rows each, all under the
+  // purchaser's name.
+  type PendingSeat = {
+    tierId: string
+    buyerName: string | null
+    isTableRow: boolean
+    attendeeIndex?: number // index into order.attendees, for individual seats
+    tableIndex?: number    // index into order.tables, for table seats
+  }
+  const pending: PendingSeat[] = []
+
+  order.attendees.forEach((a, i) => {
+    pending.push({ tierId: a.tierId, buyerName: a.name, isTableRow: false, attendeeIndex: i })
+  })
+  order.tables.forEach((tb, tableIndex) => {
+    const item = order.items.find((it) => it.tierId === tb.tierId)
+    const seats = item?.seatsPerUnit || 1
+    // A single `tables` entry represents ONE table; if quantity > 1
+    // tables of the same tier were bought, each gets its own entry in
+    // order.tables (checkout route emits one table entry per unit).
+    for (let i = 0; i < seats; i++) {
+      pending.push({ tierId: tb.tierId, buyerName: buyerInfo.name, isTableRow: true, tableIndex })
+    }
+  })
+
+  const totalQuantity = pending.length
   const platformFeePerTicketCents = totalPlatformFeeCents && totalQuantity ? totalPlatformFeeCents / totalQuantity : 0
 
-  // Insert order matches order.attendees order exactly — Postgres
-  // preserves row order for a single multi-row INSERT ... RETURNING,
-  // so we can zip the returned ids straight back to attendees below.
-  const ticketRows = order.attendees.map((a) => ({
-    ticket_tier_id: a.tierId,
-    event_id: eventId,
-    buyer_user_id: buyerUserId,
-    buyer_email: buyerInfo.email,
-    buyer_name: a.name || buyerInfo.name, // fallback covers legacy orders only
-    buyer_phone: buyerInfo.phone,
-    attendee_email: a.email,
-    stripe_payment_intent_id: paymentIntentId,
-    stripe_checkout_session_id: checkoutSessionId,
-    payment_status: 'paid' as const,
-    amount_paid: (unitAmountByTier.get(a.tierId) || 0) / 100,
-    platform_fee: platformFeePerTicketCents / 100,
-    status: 'valid' as const,
-  }))
+  const ticketRows = pending.map((p) => {
+    const attendee = p.attendeeIndex !== undefined ? order.attendees[p.attendeeIndex] : null
+    return {
+      ticket_tier_id: p.tierId,
+      event_id: eventId,
+      buyer_user_id: buyerUserId,
+      buyer_email: buyerInfo.email,
+      buyer_name: p.buyerName || buyerInfo.name,
+      buyer_phone: buyerInfo.phone,
+      attendee_email: attendee?.email || null,
+      stripe_payment_intent_id: paymentIntentId,
+      stripe_checkout_session_id: checkoutSessionId,
+      payment_status: 'paid' as const,
+      amount_paid: (unitAmountByTier.get(p.tierId) || 0) / (p.isTableRow ? (order.items.find((it) => it.tierId === p.tierId)?.seatsPerUnit || 1) : 1) / 100,
+      platform_fee: platformFeePerTicketCents / 100,
+      status: 'valid' as const,
+    }
+  })
 
   const { data: inserted, error: insertError } = await admin
     .from('tickets')
@@ -352,22 +344,82 @@ async function mintOrderTickets(args: {
 
   console.log(`[webhook] minted ${inserted.length} ticket(s) across ${order.items.length} tier(s) for event ${eventId} (guest=${!buyerUserId})`)
 
-  // Save each attendee's answers against their own ticket.
+  // Custom question responses — individual attendees get their own
+  // answers; every seat of a table gets that table's answers
+  // duplicated (keeps existing per-ticket response display/CSV code
+  // working unchanged).
   const responseRows: Record<string, any>[] = []
   inserted.forEach((t, i) => {
-    const attendee = order.attendees[i]
-    for (const r of attendee?.responses || []) {
+    const p = pending[i]
+    const responses = p.isTableRow
+      ? order.tables[p.tableIndex!]?.responses || []
+      : order.attendees[p.attendeeIndex!]?.responses || []
+    for (const r of responses) {
       if (!r.fieldId || !r.value) continue
       responseRows.push({ event_id: eventId, ticket_id: t.id, field_id: r.fieldId, response: r.value })
     }
   })
   if (responseRows.length > 0) {
     const { error: responseErr } = await admin.from('event_registration_responses').insert(responseRows)
-    if (responseErr) console.error('[webhook] failed to save attendee responses:', responseErr)
+    if (responseErr) console.error('[webhook] failed to save responses:', responseErr)
   }
 
-  // Email — one confirmation covering every ticket, each with its own
-  // correct tier name and attendee name.
+  // Add-ons — individual attendees attach directly to their own
+  // ticket. Table add-on quantities get distributed across that
+  // table's minted seat rows.
+  const addonRows: Record<string, any>[] = []
+  inserted.forEach((t, i) => {
+    const p = pending[i]
+    if (p.isTableRow) return
+    const attendee = order.attendees[p.attendeeIndex!]
+    for (const ad of attendee?.addons || []) {
+      addonRows.push({ ticket_id: t.id, addon_id: ad.addonId, choice: ad.choice, price_paid: 0 }) // price_paid backfilled below
+    }
+  })
+
+  order.tables.forEach((tb, tableIndex) => {
+    const seatTicketIds = inserted
+      .map((t, i) => ({ t, p: pending[i] }))
+      .filter(({ p }) => p.isTableRow && p.tableIndex === tableIndex)
+      .map(({ t }) => t.id)
+
+    let seatCursor = 0
+    for (const ad of tb.addons) {
+      for (let i = 0; i < ad.quantity; i++) {
+        const ticketId = seatTicketIds[seatCursor]
+        if (!ticketId) break
+        addonRows.push({ ticket_id: ticketId, addon_id: ad.addonId, choice: ad.choice, price_paid: ad.unitAmountCents / 100 })
+        seatCursor++
+      }
+    }
+  })
+
+  // Backfill price_paid for individual-attendee addons (webhook has
+  // the addon's unit price only via the packed attendee data if we
+  // stored it — current format doesn't carry per-attendee-addon price
+  // separately since it's identical to the addon's price at purchase
+  // time; look it up once here).
+  if (addonRows.some((r) => r.price_paid === 0 && r.addon_id)) {
+    const addonIds = [...new Set(addonRows.map((r) => r.addon_id))]
+    const { data: addonPrices } = await admin.from('event_addons').select('id, price').in('id', addonIds)
+    const priceById = new Map((addonPrices || []).map((a) => [a.id, Number(a.price)]))
+    for (const r of addonRows) {
+      if (r.price_paid === 0 && priceById.has(r.addon_id)) {
+        // Only backfill individual-attendee rows (table rows already
+        // have the correct snapshot price set above).
+        const wasTableRow = order.tables.some((tb) => tb.addons.some((ad) => ad.addonId === r.addon_id))
+        if (!wasTableRow || priceById.get(r.addon_id) === 0) r.price_paid = priceById.get(r.addon_id) || 0
+      }
+    }
+  }
+
+  if (addonRows.length > 0) {
+    const { error: addonErr } = await admin.from('ticket_addons').insert(addonRows)
+    if (addonErr) console.error('[webhook] failed to save ticket add-ons:', addonErr)
+  }
+
+  // Confirmation email — one order confirmation to the purchaser,
+  // covering every seat with its correct tier name and attendee name.
   let eventDetails: {
     title: string; slug: string; date: string | null; startTime: string | null; endTime: string | null
     image_url: string | null; venueName: string | null; venueAddress: string | null
@@ -384,8 +436,7 @@ async function mintOrderTickets(args: {
       .from('events')
       .select(`
         title, slug, image_url, event_date, event_start_time, event_end_time, auth_user_id,
-        venues ( name, address ),
-        profiles!events_auth_user_id_profile_fkey ( full_name, email )
+        venues ( name, address ), profiles!events_auth_user_id_profile_fkey ( full_name, email )
       `)
       .eq('id', eventId)
       .single()
@@ -410,7 +461,7 @@ async function mintOrderTickets(args: {
         tickets: inserted.map((t, i) => ({
           qr_token: t.qr_token,
           ticket_tier_name: tierNameById.get(t.ticket_tier_id) || 'Ticket',
-          attendee_name: order.attendees[i]?.name || null,
+          attendee_name: pending[i].isTableRow ? null : (order.attendees[pending[i].attendeeIndex!]?.name || null),
         })),
         amountPaid: ticketRows.reduce((sum, r) => sum + (r.amount_paid || 0), 0),
         orderRef,
@@ -422,22 +473,22 @@ async function mintOrderTickets(args: {
     console.error('[webhook] ticket email send failed (non-fatal):', emailErr)
   }
 
-  // Notify any attendee who has their own email that isn't the
-  // purchaser's — one small email per attendee, just their ticket.
+  // Attendee notifications — individual tickets only, when a distinct
+  // email was given (table seats have no per-seat email).
   if (eventDetails) {
     const buyerEmailLower = buyerInfo.email.toLowerCase()
     for (let i = 0; i < inserted.length; i++) {
       const t = inserted[i]
-      const attendee = order.attendees[i]
-      const attendeeEmail = t.attendee_email || attendee?.email
+      const p = pending[i]
+      if (p.isTableRow) continue
+      const attendeeEmail = t.attendee_email
       if (!attendeeEmail || attendeeEmail.toLowerCase() === buyerEmailLower) continue
 
-      const tierIds2 = [...new Set(order.items.map((it) => it.tierId))]
       try {
         const { data: tierRow } = await admin.from('ticket_tiers').select('name').eq('id', t.ticket_tier_id).single()
         await sendAttendeeTicketEmail({
           to: attendeeEmail,
-          attendeeName: attendee?.name || null,
+          attendeeName: order.attendees[p.attendeeIndex!]?.name || null,
           purchaserName: buyerInfo.name,
           event: { ...eventDetails, venueCityState: null },
           ticket: { qr_token: t.qr_token, ticket_tier_name: tierRow?.name || 'Ticket' },
@@ -465,11 +516,7 @@ async function resolveBuyerInfo(args: {
   let phone = metadata.buyer_phone || null
 
   if (buyerUserId && (!email || !name)) {
-    const { data: profile } = await admin
-      .from('profiles')
-      .select('email, full_name, phone_number')
-      .eq('id', buyerUserId)
-      .single()
+    const { data: profile } = await admin.from('profiles').select('email, full_name, phone_number').eq('id', buyerUserId).single()
     email = email || profile?.email || null
     name = name || profile?.full_name || null
     phone = phone || profile?.phone_number || null
