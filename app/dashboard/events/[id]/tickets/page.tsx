@@ -39,6 +39,8 @@ export default function EventTicketsPage() {
   const [tiers, setTiers] = useState<any[]>([])
   const [tickets, setTickets] = useState<any[]>([])
   const [responsesByTicket, setResponsesByTicket] = useState<Record<string, { label: string; value: string }[]>>({})
+  const [addonsByTicket, setAddonsByTicket] = useState<Record<string, { name: string; choice: string | null }[]>>({})
+  const [addonSummary, setAddonSummary] = useState<Record<string, Record<string, number>>>({})
   const [activeTab, setActiveTab] = useState<'ticketing' | 'marketing'>('ticketing')
   const [checkInCopied, setCheckInCopied] = useState(false)
   const [checkInUrl, setCheckInUrl] = useState('')
@@ -140,7 +142,7 @@ export default function EventTicketsPage() {
         const [{ data: tiersData }, { data: ticketsData }] = await Promise.all([
           supabase
             .from('ticket_tiers')
-            .select('id, name, price, quantity, quantity_sold, is_active')
+            .select('id, name, price, quantity, quantity_sold, is_active, is_group, seats_per_unit')
             .eq('event_id', eventId)
             .order('sort_order'),
           supabase
@@ -177,6 +179,26 @@ export default function EventTicketsPage() {
             grouped[r.ticket_id].push({ label, value: r.response })
           }
           setResponsesByTicket(grouped)
+
+          const { data: addonRows } = await supabase
+            .from('ticket_addons')
+            .select('ticket_id, choice, event_addons(name)')
+            .in('ticket_id', ticketIds)
+
+          const addonGrouped: Record<string, { name: string; choice: string | null }[]> = {}
+          const summary: Record<string, Record<string, number>> = {} // addonName -> (choice||'—') -> count
+          for (const r of addonRows || []) {
+            const name = Array.isArray(r.event_addons) ? r.event_addons[0]?.name : (r.event_addons as any)?.name
+            if (!name) continue
+            addonGrouped[r.ticket_id] = addonGrouped[r.ticket_id] || []
+            addonGrouped[r.ticket_id].push({ name, choice: r.choice })
+
+            summary[name] = summary[name] || {}
+            const choiceKey = r.choice || '—'
+            summary[name][choiceKey] = (summary[name][choiceKey] || 0) + 1
+          }
+          setAddonsByTicket(addonGrouped)
+          setAddonSummary(summary)
         }
 
         setLoading(false)
@@ -226,7 +248,7 @@ export default function EventTicketsPage() {
     const [{ data: tiersData }, { data: ticketsData }] = await Promise.all([
       supabase
         .from('ticket_tiers')
-        .select('id, name, price, quantity, quantity_sold, is_active')
+        .select('id, name, price, quantity, quantity_sold, is_active, is_group, seats_per_unit')
         .eq('event_id', eventId)
         .order('sort_order'),
       supabase
@@ -257,6 +279,26 @@ export default function EventTicketsPage() {
         grouped[r.ticket_id].push({ label, value: r.response })
       }
       setResponsesByTicket(grouped)
+
+      const { data: addonRows } = await supabase
+        .from('ticket_addons')
+        .select('ticket_id, choice, event_addons(name)')
+        .in('ticket_id', ticketIds)
+
+      const addonGrouped: Record<string, { name: string; choice: string | null }[]> = {}
+      const summary: Record<string, Record<string, number>> = {}
+      for (const r of addonRows || []) {
+        const name = Array.isArray(r.event_addons) ? r.event_addons[0]?.name : (r.event_addons as any)?.name
+        if (!name) continue
+        addonGrouped[r.ticket_id] = addonGrouped[r.ticket_id] || []
+        addonGrouped[r.ticket_id].push({ name, choice: r.choice })
+
+        summary[name] = summary[name] || {}
+        const choiceKey = r.choice || '—'
+        summary[name][choiceKey] = (summary[name][choiceKey] || 0) + 1
+      }
+      setAddonsByTicket(addonGrouped)
+      setAddonSummary(summary)
     }
   }
 
@@ -518,11 +560,13 @@ export default function EventTicketsPage() {
                   </thead>
                   <tbody>
                     {eventTiers.map((tier) => {
-                      const remaining =
-                        tier.quantity != null ? tier.quantity - tier.quantity_sold : null
-                      const pct = tier.quantity
-                        ? (tier.quantity_sold / tier.quantity) * 100
-                        : 0
+                      const seatsPerUnit = tier.is_group ? (tier.seats_per_unit || 1) : 1
+                      const unitsSold = tier.is_group
+                        ? Math.floor((tier.quantity_sold || 0) / seatsPerUnit)
+                        : (tier.quantity_sold || 0)
+                      const remaining = tier.quantity != null ? tier.quantity - unitsSold : null
+                      const pct = tier.quantity ? (unitsSold / tier.quantity) * 100 : 0
+                      const unitLabel = tier.is_group ? 'table' : 'ticket'
                       return (
                         <tr
                           key={tier.id}
@@ -532,16 +576,26 @@ export default function EventTicketsPage() {
                             <span className="font-medium text-gray-900 dark:text-white">
                               {tier.name}
                             </span>
+                            {tier.is_group && (
+                              <span className="ml-1.5 text-[10px] uppercase tracking-wide text-blue-600 dark:text-blue-400">
+                                Table of {seatsPerUnit}
+                              </span>
+                            )}
                           </Td>
                           <Td>
                             {Number(tier.price) === 0
                               ? 'Free'
-                              : `$${Number(tier.price).toFixed(2)}`}
+                              : `$${Number(tier.price).toFixed(2)}${tier.is_group ? '/table' : ''}`}
                           </Td>
                           <Td>
                             <div className="flex items-center gap-2">
                               <span className="text-gray-700 dark:text-gray-300">
-                                {tier.quantity_sold}
+                                {unitsSold} {unitLabel}{unitsSold === 1 ? '' : 's'}
+                                {tier.is_group && (
+                                  <span className="ml-1 text-gray-400 dark:text-gray-500">
+                                    ({tier.quantity_sold || 0} seats)
+                                  </span>
+                                )}
                               </span>
                               {tier.quantity != null && (
                                 <div className="h-1.5 w-24 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
@@ -553,12 +607,46 @@ export default function EventTicketsPage() {
                               )}
                             </div>
                           </Td>
-                          <Td>{remaining != null ? remaining : 'Unlimited'}</Td>
+                          <Td>
+                            {remaining != null ? `${remaining} ${unitLabel}${remaining === 1 ? '' : 's'}` : 'Unlimited'}
+                          </Td>
                         </tr>
                       )
                     })}
                   </tbody>
                 </table>
+              </div>
+            </Card>
+          )}
+
+          {/* Add-on summary — total add-ons sold across all tickets,
+              broken down by choice (e.g. meal type). */}
+          {Object.keys(addonSummary).length > 0 && (
+            <Card>
+              <h2 className={sectionHeadingCls}>Add-ons</h2>
+              <div className="space-y-3">
+                {Object.entries(addonSummary).map(([addonName, choiceCounts]) => {
+                  const total = Object.values(choiceCounts).reduce((s, n) => s + n, 0)
+                  return (
+                    <div key={addonName} className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-white/[0.02]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">{addonName}</span>
+                        <span className="text-sm font-bold text-brand-600 dark:text-brand-400">{total} total</span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {Object.entries(choiceCounts).map(([choice, count]) => (
+                          <span
+                            key={choice}
+                            className="inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-700 dark:bg-white/[0.06] dark:text-gray-300"
+                          >
+                            <span className="font-semibold">{choice === '—' ? 'No choice' : choice}:</span>
+                            <span className="ml-1">{count}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </Card>
           )}
@@ -756,6 +844,7 @@ export default function EventTicketsPage() {
                     ? t.ticket_tiers[0]?.name
                     : (t.ticket_tiers as any)?.name
                   const responses = responsesByTicket[t.id]
+                  const addons = addonsByTicket[t.id]
                   const isEditing = editingTicketId === t.id
 
                   if (isEditing) {
@@ -872,6 +961,20 @@ export default function EventTicketsPage() {
                                 {r.label}:
                               </span>
                               <span className="ml-1">{r.value}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {addons && addons.length > 0 && (
+                        <div className={`flex flex-wrap gap-1.5 ${responses && responses.length > 0 ? '' : 'border-t border-gray-100 pt-2 dark:border-gray-800/60'}`}>
+                          {addons.map((a, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center rounded-md bg-success-50 px-2 py-1 text-[11px] text-success-700 dark:bg-success-500/10 dark:text-success-400"
+                            >
+                              <span className="font-semibold">{a.name}</span>
+                              {a.choice && <span className="ml-1">— {a.choice}</span>}
                             </span>
                           ))}
                         </div>
