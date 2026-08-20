@@ -13,6 +13,16 @@ const EVENT_TYPES = [
   'Shop Local', 'Family',
 ]
 
+// Granular descriptors — distinct from EVENT_TYPES. These map 1:1 to the
+// "Tags" field in Airtable and power dedicated SEO landing pages (e.g.
+// /karaoke, /theater, /comedy), so keep this list in sync with what those
+// pages filter on rather than merging it back into EVENT_TYPES.
+const TAGS = [
+  'Theater', 'Comedy Night', 'Karaoke', 'Trivia Night', 'Bingo',
+  'Dance', 'Class', 'Film Screening', 'Literary', 'Sports',
+  'Auditions', 'Exhibition', 'Holiday', 'All Ages', 'Free', 'A Short Drive',
+]
+
 const ARTIST_TYPES = ['Musician', 'Visual', 'Performance', 'Literary'] as const
 
 type TicketMode = 'free' | 'external' | '785'
@@ -29,6 +39,7 @@ type EventForm = {
   ticket_url: string
   learnmore_link: string
   event_types: string[]
+  tags: string[]
   // `star` is an admin-only "featured" flag. The toggle is hidden from
   // the creator UI but we keep it in state so we don't accidentally null
   // it out on save for events that admins have already starred.
@@ -64,7 +75,7 @@ function toInputTime(t: string | null | undefined): string {
 const EMPTY: EventForm = {
   title: '', description: '', event_date: '', event_start_time: '',
   event_end_time: '', image_url: '', ticket_price: '', ticket_url: '',
-  learnmore_link: '', event_types: [], star: false, venue_id: '',
+  learnmore_link: '', event_types: [], tags: [], star: false, venue_id: '',
 }
 
 function EventEditInner() {
@@ -112,6 +123,11 @@ function EventEditInner() {
       ? form.event_types.filter(x => x !== t)
       : [...form.event_types, t])
 
+  const toggleTag = (t: string) =>
+    set('tags', form.tags.includes(t)
+      ? form.tags.filter(x => x !== t)
+      : [...form.tags, t])
+
   useEffect(() => {
     async function load() {
       const supabase = createClient()
@@ -143,7 +159,7 @@ function EventEditInner() {
       if (!isNew && eventId) {
         const { data } = await supabase
           .from('events')
-          .select('id, title, description, event_date, event_start_time, event_end_time, image_url, ticket_price, ticket_url, learnmore_link, event_types, star, venue_id, auth_user_id, venues(id, name, neighborhood)')
+          .select('id, title, description, event_date, event_start_time, event_end_time, image_url, ticket_price, ticket_url, learnmore_link, event_types, tags, star, venue_id, auth_user_id, venues(id, name, neighborhood)')
           .eq('id', eventId)
           .single()
 
@@ -182,6 +198,7 @@ function EventEditInner() {
           ticket_url: data.ticket_url || '',
           learnmore_link: data.learnmore_link || '',
           event_types: data.event_types || [],
+          tags: data.tags || [],
           // Preserve existing star value so we don't clobber admin choices.
           star: data.star || false,
           venue_id: data.venue_id || '',
@@ -371,6 +388,7 @@ function EventEditInner() {
       ...ticketFields,
       learnmore_link: form.learnmore_link || null,
       event_types: form.event_types,
+      tags: form.tags,
       // Preserved from loaded data; not editable in creator UI.
       star: form.star,
       venue_id: form.venue_id || null,
@@ -430,7 +448,10 @@ function EventEditInner() {
   // Step summaries shown on collapsed (completed) cards in the new-event flow.
   const stepSummaries = [
     form.title ? `${form.title}${form.event_date ? ` · ${form.event_date}` : ''}` : '',
-    form.event_types.length ? form.event_types.join(', ') : 'No types selected',
+    [
+      form.event_types.length ? form.event_types.join(', ') : null,
+      form.tags.length ? `Tags: ${form.tags.join(', ')}` : null,
+    ].filter(Boolean).join(' · ') || 'No types selected',
     form.image_url ? 'Image added' : 'No image added',
     ticketMode === 'free' ? 'Free event' : ticketMode === 'external' ? 'Sold elsewhere' : 'Selling on 785',
     form.learnmore_link || 'No link added',
@@ -537,7 +558,7 @@ function EventEditInner() {
         </Field>
       </StepCard>
 
-      {/* Card: Event Types */}
+      {/* Card: Event Types & Tags */}
       <StepCard index={1} step={step} isNew={isNew} title="Event Type" summary={stepSummaries[1]} onEdit={goToStep} onContinue={() => handleContinue(1)}>
         <div className="flex flex-wrap gap-2">
           {EVENT_TYPES.map(t => (
@@ -545,6 +566,22 @@ function EventEditInner() {
               {t}
             </button>
           ))}
+        </div>
+
+        <div className="mt-5">
+          <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.14em] text-gray-800 dark:text-gray-200">
+            Tags (optional)
+          </label>
+          <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+            More specific than Type — these power dedicated pages like Karaoke, Theater and Comedy.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {TAGS.map(t => (
+              <button key={t} type="button" onClick={() => toggleTag(t)} className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${form.tags.includes(t) ? 'border-brand-600 bg-brand-600 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-400 dark:hover:border-gray-600'}`}>
+                {t}
+              </button>
+            ))}
+          </div>
         </div>
       </StepCard>
 
