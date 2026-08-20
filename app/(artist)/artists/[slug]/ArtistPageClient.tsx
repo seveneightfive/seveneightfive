@@ -197,6 +197,27 @@ export default function ArtistPageClient({
     Literary: 'Literary Artist',
   }
 
+  // Lock page scroll while the full-screen intro overlay is up.
+  // body.intro-active (overflow: hidden) already existed in the CSS below
+  // with a comment saying "prevent scroll during intro" — but nothing was
+  // ever toggling that class. That meant the real page (hero, About, and
+  // everything after it) stayed scrollable *behind* the opaque intro
+  // overlay. A wheel/trackpad/swipe scroll made while looking at the intro
+  // screen silently moved window.scrollY with no visual feedback, so by
+  // the time the overlay lifted, the page could already be scrolled past
+  // where the user thought they were — which is exactly what showed up as
+  // "stuck right after About, takes a few tries to scroll" on both desktop
+  // and mobile: the person was really just scrolling to catch up to a
+  // position they'd already blindly scrolled past.
+  useEffect(() => {
+    if (introPhase === 'done') {
+      document.body.classList.remove('intro-active')
+      return
+    }
+    document.body.classList.add('intro-active')
+    return () => { document.body.classList.remove('intro-active') }
+  }, [introPhase])
+
   // Scroll listener — drives white card lift over hero
   useEffect(() => {
     if (introPhase !== 'done') return
@@ -231,6 +252,10 @@ export default function ArtistPageClient({
 
   const handleIntroAdvance = () => {
     setIntroPhase('transitioning')
+    // Defensive reset: even with the scroll lock above, make sure the page
+    // starts at the very top once the real content becomes visible, so
+    // there's no chance of landing mid-scroll from any stray scroll input.
+    window.scrollTo(0, 0)
     setTimeout(() => setIntroPhase('done'), 600)
   }
 
@@ -275,7 +300,11 @@ export default function ArtistPageClient({
           -webkit-font-smoothing: antialiased;
           /* Prevent scroll during intro */
         }
-        body.intro-active { overflow: hidden; }
+        body.intro-active {
+          position: fixed;
+          width: 100%;
+          overflow: hidden;
+        }
 
         /* ─── INTRO SCREEN — preserved exactly ───────── */
         .intro-screen {
