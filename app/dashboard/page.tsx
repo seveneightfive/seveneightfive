@@ -214,6 +214,17 @@ export default async function DashboardPage() {
     //
     // Settings card removed — its three links live in the footer strip now
     // and the Stripe Connect entry point gets its own focused card.
+    //
+    // CHANGE (this pass):
+    //   - "Claim a Venue" / "Claim an Artist Page" merged into a single
+    //     "Manage your listing" card that sends the user to the external
+    //     Zite auth flow in a new tab.
+    //   - "Submit an Event" now points at the external Fillout form (new
+    //     tab); the old destination (Event Manager tab) moved to a new
+    //     "Create Ticketed Event" card so that flow is still one click away.
+    //   - "Post an Opportunity" and "Save the Date" now route through the
+    //     /dashboard/* versions of those pages so the sidebar nav stays
+    //     visible, instead of the public standalone pages.
     // ─────────────────────────────────────────────────────────────────────
 
     return (
@@ -235,15 +246,27 @@ export default async function DashboardPage() {
 
         {/* CREATE STRIP — moved UP from the bottom of the page */}
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-  <ActionCard href="/dashboard/events/edit" icon="calendar" title="Submit an Event" text="Add a new event to the calendar." />
-  <ActionCard href="/dashboard/venues/claim" icon="venue" title="Claim a Venue" text="Manage your venue page and events." />
-  <ActionCard href="/dashboard/artists/claim" icon="artist" title="Claim an Artist Page" text="Manage your artist profile and events." />
+  <ActionCard
+    href="https://seveneightfive.fillout.com/add-event"
+    icon="calendar"
+    title="Submit an Event"
+    text="Add a new event to the calendar."
+    external
+  />
+  <ActionCard
+    href="https://auth.zite.com/auth?flowPublicIdentifier=qoadtntjnq&redirectUrl=https%3A%2F%2Fqoadtntjnq.zite.so%2F"
+    icon="manage"
+    title="Manage your listing"
+    text="Manage your venue or artist page."
+    external
+  />
+  <ActionCard href="/dashboard/events/edit" icon="ticket" title="Create Ticketed Event" text="Set up ticket tiers and sell online." />
   <ActionCard href="/dashboard/announcements/new" icon="megaphone" title="Post an Announcement" text="Share news with the community." />
 </section>
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-  <ActionCard href="/opportunities/submit" icon="briefcase" title="Post an Opportunity" text="Share jobs, gigs, auditions and calls." />
+  <ActionCard href="/dashboard/opportunities/submit" icon="briefcase" title="Post an Opportunity" text="Share jobs, gigs, auditions and calls." />
   <ActionCard href="/dashboard/advertise" icon="ad" title="Buy an Ad" text="Promote your event or business." />
-  <ActionCard href="/save-the-date" icon="date" title="Save the Date" text="Claim a date before details are final." />
+  <ActionCard href="/dashboard/save-the-date" icon="date" title="Save the Date" text="Claim a date before details are final." />
 </section>
           
         {/* MAIN GRID */}
@@ -255,7 +278,7 @@ export default async function DashboardPage() {
             href={isGuest ? '/login' : '/dashboard/tickets'}
             className="col-span-12 lg:col-span-6 group relative rounded-2xl border border-gray-200 bg-white p-6 transition hover:border-gray-300 hover:shadow-theme-md dark:border-gray-800 dark:bg-white/[0.02] dark:hover:border-gray-700"
           >
-            <CardHead label="Attending" title="My Tickets" />
+            <CardHead label="Attending" title="Browse past events" />
 
             {isGuest ? (
               <GuestSlot>Sign in to purchase, sell, and view your tickets</GuestSlot>
@@ -466,7 +489,7 @@ export default async function DashboardPage() {
 
           {/* SAVE THE DATE */}
           <Link
-            href="/save-the-date"
+            href="/dashboard/save-the-date"
             className="col-span-12 lg:col-span-8 group relative rounded-2xl border border-gray-200 bg-white p-6 transition hover:border-gray-300 hover:shadow-theme-md dark:border-gray-800 dark:bg-white/[0.02] dark:hover:border-gray-700"
           >
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
@@ -509,7 +532,7 @@ export default async function DashboardPage() {
 
           {/* OPPORTUNITIES */}
           <Link
-            href="/opportunities/submit"
+            href="/dashboard/opportunities/submit"
             className="col-span-12 lg:col-span-4 group relative flex flex-col rounded-2xl border border-gray-200 bg-white p-6 transition hover:border-gray-300 hover:shadow-theme-md dark:border-gray-800 dark:bg-white/[0.02] dark:hover:border-gray-700"
           >
             <CardHead label="Creative Calls" title="Opportunities" />
@@ -777,11 +800,13 @@ function CreateBtn({
   title,
   text,
   icon,
+  external,
 }: {
   href: string
   title: string
   text: string
-  icon: 'calendar' | 'venue' | 'artist' | 'megaphone' | 'briefcase' | 'ad' | 'date'
+  icon: 'calendar' | 'venue' | 'artist' | 'megaphone' | 'briefcase' | 'ad' | 'date' | 'manage' | 'ticket'
+  external?: boolean
 }) {
   const icons = {
     calendar: '▣',
@@ -791,13 +816,15 @@ function CreateBtn({
     briefcase: '▤',
     ad: 'AD',
     date: '◇',
+    manage: '◆',
+    ticket: '❖',
   }
 
-  return (
-    <Link
-      href={href}
-      className="group rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm transition hover:-translate-y-1 hover:border-brand-500 hover:shadow-theme-md dark:border-gray-800 dark:bg-white/[0.02]"
-    >
+  const cardCls =
+    'group rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm transition hover:-translate-y-1 hover:border-brand-500 hover:shadow-theme-md dark:border-gray-800 dark:bg-white/[0.02]'
+
+  const inner = (
+    <>
       <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 font-display text-xl font-bold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
         {icons[icon]}
       </div>
@@ -813,6 +840,20 @@ function CreateBtn({
       <div className="mt-4 font-body text-xs font-bold text-brand-600 dark:text-brand-400">
         Get Started →
       </div>
+    </>
+  )
+
+  if (external) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className={cardCls}>
+        {inner}
+      </a>
+    )
+  }
+
+  return (
+    <Link href={href} className={cardCls}>
+      {inner}
     </Link>
   )
 }
