@@ -40,7 +40,7 @@ function computeTimestamps(eventDate: string, startTime: string | null, endTime:
 const ALLOWED_FIELDS = [
   'title', 'description', 'event_date',
   'event_start_time', 'event_end_time', 'image_url', 'ticket_price',
-  'ticket_url', 'learnmore_link', 'event_types', 'star', 'venue_id',
+  'ticket_url', 'learnmore_link', 'event_types', 'tags', 'star', 'venue_id',
 ]
 
 export async function POST(request: Request) {
