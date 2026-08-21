@@ -520,7 +520,7 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
   return (
     <div style={{ margin: '24px 0' }}>
       <style>{`
-        .tpb-wrap { border: 1.5px solid #ece8e2; border-radius: 12px; overflow: hidden; background: #f7f6f4; }
+        .tpb-wrap { border: 1.5px solid #ece8e2; border-radius: 12px; overflow: hidden; background: #f7f6f4; color-scheme: light; }
         .tpb-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; cursor: pointer; user-select: none; }
         .tpb-header-left { display: flex; flex-direction: column; gap: 3px; }
         .tpb-eyebrow { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #b8b3ad; }
@@ -590,7 +590,7 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         .tpb-table-note { font-size: 0.75rem; color: #6b6560; margin-bottom: 10px; padding: 8px 10px; background: #f7f6f4; border-radius: 6px; }
         .tpb-table-addon-choice-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; gap: 10px; }
         .tpb-table-addon-choice-label { font-size: 0.82rem; color: #1a1814; flex: 1; }
-        .tpb-table-addon-qty-input { width: 56px; padding: 6px 8px; font-size: 0.85rem; border: 1.5px solid #ece8e2; border-radius: 6px; text-align: center; }
+        .tpb-table-addon-qty-input { width: 56px; padding: 6px 8px; font-size: 0.85rem; border: 1.5px solid #ece8e2; border-radius: 6px; text-align: center; background: #fff; color: #1a1814; }
         .tpb-table-addon-hint { font-size: 0.7rem; color: #8a8580; margin-top: 4px; }
         .tpb-confirm-btn { margin-top: 16px; width: 100%; padding: 14px; border: none; border-radius: 8px; font-family: 'Oswald', sans-serif; font-size: 0.9rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #fff; cursor: pointer; transition: all 0.15s; }
         .tpb-confirm-btn.paid { background: #C80650; }
