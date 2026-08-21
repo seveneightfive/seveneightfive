@@ -554,7 +554,7 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         .tpb-summary-row + .tpb-summary-row { margin-top: 6px; }
         .tpb-summary-label { color: #6b6560; }
         .tpb-summary-total { border-top: 1px solid #ece8e2; margin-top: 10px; padding-top: 10px; font-family: 'Oswald', sans-serif; font-size: 1rem; font-weight: 600; }
-        .tpb-error { margin-top: 12px; padding: 10px 14px; background: rgba(200,6,80,0.08); border: 1px solid rgba(200,6,80,0.2); border-radius: 8px; font-size: 0.82rem; color: #C80650; }
+        .tpb-error { margin-top: 12px; padding: 10px 14px; background: #2e0a15; border: 1px solid rgba(200,6,80,0.4); border-radius: 8px; font-size: 0.82rem; color: #ff6b93; }
         .tpb-guest-form { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
         .tpb-guest-row { display: flex; flex-direction: column; gap: 4px; }
         .tpb-guest-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #6b6560; }
@@ -580,16 +580,16 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
         .tpb-guest-form .tpb-guest-signin a { color: #ff9dbb; }
         .tpb-addon-section { margin-top: 12px; padding: 10px; border-radius: 8px; background: #000; border: 1.5px solid #3a352e; }
         .tpb-addon-heading { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #ffffff; margin-bottom: 6px; display: block; }
-        .tpb-addon-row { padding: 10px; border-radius: 8px; border: 1.5px solid #ece8e2; background: #fff; cursor: pointer; transition: all 0.12s; }
+        .tpb-addon-row { padding: 10px; border-radius: 8px; border: 1.5px solid #ece8e2; background: #ffffff !important; cursor: pointer; transition: border-color 0.12s; }
         .tpb-addon-row:hover { border-color: #d8d3cc; }
-        .tpb-addon-row.selected { border-color: #C80650; background: rgba(200,6,80,0.04); }
+        .tpb-addon-row.selected { border-color: #C80650; background: #ffffff !important; }
         .tpb-addon-row + .tpb-addon-row { margin-top: 8px; }
         .tpb-addon-label-row { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
-        .tpb-addon-name { font-size: 0.9rem; color: #1a1814; font-weight: 600; }
+        .tpb-addon-name { font-size: 0.9rem; color: #1a1814 !important; font-weight: 600; }
         .tpb-addon-price { font-size: 0.88rem; color: #C80650; font-weight: 700; }
         .tpb-table-note { font-size: 0.75rem; color: #6b6560; margin-bottom: 10px; padding: 8px 10px; background: #f7f6f4; border-radius: 6px; }
         .tpb-table-addon-choice-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; gap: 10px; }
-        .tpb-table-addon-choice-label { font-size: 0.82rem; color: #1a1814; flex: 1; }
+        .tpb-table-addon-choice-label { font-size: 0.82rem; color: #1a1814 !important; flex: 1; }
         .tpb-table-addon-qty-input { width: 56px; padding: 6px 8px; font-size: 0.85rem; border: 1.5px solid #ece8e2; border-radius: 6px; text-align: center; background: #fff; color: #1a1814; }
         .tpb-table-addon-hint { font-size: 0.7rem; color: #8a8580; margin-top: 4px; }
         .tpb-confirm-btn { margin-top: 16px; width: 100%; padding: 14px; border: none; border-radius: 8px; font-family: 'Oswald', sans-serif; font-size: 0.9rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #fff; cursor: pointer; transition: all 0.15s; }
