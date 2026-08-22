@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabaseBrowser'
 
 const supabase = createClient()
@@ -26,7 +26,27 @@ function toE164(displayValue: string): string | null {
 }
 
 export default function OnboardingPage() {
+  return (
+    <Suspense fallback={null}>
+      <OnboardingPageInner />
+    </Suspense>
+  )
+}
+
+function OnboardingPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Final destination once onboarding is fully complete. Login passes this
+  // through as ?next=<path> so a brand-new user still lands back where they
+  // started (e.g. the ticket page they clicked "sign in" from) instead of
+  // always being dropped on /dashboard.
+  const returnPath = searchParams.get('next') || '/dashboard'
+  // If the session drops mid-onboarding and we bounce to /login, carry the
+  // same return path through login → onboarding again.
+  const loginRedirect = `/login?next=${encodeURIComponent(
+    `/onboarding${returnPath !== '/dashboard' ? `?next=${encodeURIComponent(returnPath)}` : ''}`
+  )}`
 
   const [step, setStep] = useState<Step>('profile')
   const [loading, setLoading] = useState(true)
@@ -46,7 +66,7 @@ export default function OnboardingPage() {
   useEffect(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      if (!user) { router.push(loginRedirect); return }
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -54,14 +74,14 @@ export default function OnboardingPage() {
         .eq('id', user.id)
         .single()
 
-      // Already fully onboarded? Send to dashboard.
+      // Already fully onboarded? Send them on to their destination.
       if (
         profile?.onboarding_completed &&
         profile?.username &&
         profile?.email &&
         profile?.phone_number
       ) {
-        router.push('/dashboard')
+        router.push(returnPath)
         return
       }
 
@@ -75,6 +95,7 @@ export default function OnboardingPage() {
       setLoading(false)
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router])
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,7 +117,7 @@ export default function OnboardingPage() {
     setSaving(true)
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+    if (!user) { router.push(loginRedirect); return }
 
     const { error: authError } = await supabase.auth.updateUser({
       email,
@@ -134,14 +155,15 @@ export default function OnboardingPage() {
 
   // ── Step 2: finish (with or without Stripe) ──────────────────────
   // Called directly from the Yes/No buttons below — no separate
-  // "Continue" click needed. next='stripe' takes the user straight
-  // into Stripe Connect onboarding; next='dashboard' skips it.
-  const finishOnboarding = async (next: 'dashboard' | 'stripe') => {
+  // "Continue" click needed. sellerChoice='stripe' takes the user straight
+  // into Stripe Connect onboarding; sellerChoice='dashboard' skips it and
+  // sends them on to returnPath.
+  const finishOnboarding = async (sellerChoice: 'dashboard' | 'stripe') => {
     setSaving(true)
     setError('')
 
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+    if (!user) { router.push(loginRedirect); return }
 
     await supabase
       .from('profiles')
@@ -152,7 +174,7 @@ export default function OnboardingPage() {
       })
       .eq('id', user.id)
 
-    if (next === 'stripe') {
+    if (sellerChoice === 'stripe') {
       setConnecting(true)
       try {
         const res = await fetch('/api/stripe/connect', {
@@ -168,14 +190,14 @@ export default function OnboardingPage() {
         setError(err?.message || 'Could not start Stripe onboarding — you can connect later from Settings.')
         setConnecting(false)
         setSaving(false)
-        // Fall through to dashboard so they aren't stuck
-        router.push('/dashboard')
+        // Fall through to their destination so they aren't stuck
+        router.push(returnPath)
         return
       }
     }
 
     setSaving(false)
-    router.push('/dashboard')
+    router.push(returnPath)
   }
 
   if (loading) {
@@ -295,7 +317,7 @@ export default function OnboardingPage() {
             className="w-full p-4 rounded text-left border border-zinc-700 bg-zinc-900 hover:border-zinc-500 transition disabled:opacity-50"
           >
             <div className="font-semibold">
-              {saving && !connecting ? 'Taking you to your dashboard…' : 'Not right now'}
+              {saving && !connecting ? 'Taking you onward…' : 'Not right now'}
             </div>
             <div className="text-sm text-zinc-400 mt-1">
               I'm just here to attend events and follow artists. I can connect
