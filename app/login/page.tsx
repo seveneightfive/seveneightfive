@@ -1,13 +1,28 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabaseBrowser'
 
 const supabase = createClient()
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
+  )
+}
+
+function LoginPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Where to send the user after a successful login. Every page that
+  // redirects here for auth (tickets, advertise, following, events/edit,
+  // event tickets tab) appends ?next=<path>. Falls back to /dashboard if
+  // someone lands on /login directly with no ?next.
+  const nextPath = searchParams.get('next') || '/dashboard'
 
   const [mode, setMode] = useState<'email' | 'phone'>('email')
 
@@ -90,11 +105,14 @@ export default function LoginPage() {
       !profile?.phone_number ||
       !profile?.onboarding_completed
     ) {
-      router.push('/onboarding')
+      // Preserve the intended destination through onboarding too, so a
+      // brand-new user still lands back where they started once they've
+      // finished setting up their profile.
+      router.push(`/onboarding?next=${encodeURIComponent(nextPath)}`)
       return
     }
 
-    router.push('/dashboard')
+    router.push(nextPath)
   }
 
   // ── Resend / change destination ────────────────────────────────────
