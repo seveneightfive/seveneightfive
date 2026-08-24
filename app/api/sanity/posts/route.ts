@@ -84,7 +84,9 @@ export async function PATCH(request: Request) {
     { id }
   )
   if (!existing) return NextResponse.json({ error: 'Article not found' }, { status: 404 })
-  if (existing.authUserId !== user.id) {
+  // Imported articles have no authUserId — anyone signed in can edit those.
+  // Only block editing something a *different* dashboard user actually wrote.
+  if (existing.authUserId && existing.authUserId !== user.id) {
     return NextResponse.json({ error: 'Access denied' }, { status: 403 })
   }
 
