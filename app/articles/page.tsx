@@ -24,8 +24,11 @@ export type ArticleSummary = {
 }
 
 const QUERY = `*[_type == "post" && status == "published"] | order(publishedAt desc){
-  _id, title, "slug": slug.current, excerpt, mainImageUrl, publishedAt, authorName,
-  "categoryNames": coalesce(categoryNames, []), "tagNames": coalesce(tagNames, [])
+  _id, title, "slug": slug.current, excerpt, publishedAt,
+  "mainImageUrl": coalesce(mainImageUrl, mainImage.asset->url),
+  "authorName": coalesce(authorName, author->name),
+  "categoryNames": coalesce(categoryNames, categories[]->name, []),
+  "tagNames": coalesce(tagNames, tags, [])
 }`
 
 // Same guard as /local-flavor and /[slug]: lib/sanity.js's createClient()
