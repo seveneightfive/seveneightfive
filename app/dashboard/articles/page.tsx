@@ -29,12 +29,18 @@ export default function MyArticlesPage() {
         return
       }
 
-      // Sanity read is via the public read-only client, filtered to this
-      // user's own authUserId — no server round trip needed for a list view.
+      // Imported articles (from the WordPress migration) have no
+      // authUserId at all — they weren't written by any dashboard user.
+      // Showing them to everyone here (alongside anything the signed-in
+      // user personally authored) means the ~260 existing articles are
+      // actually reachable/editable instead of permanently invisible.
+      // Revisit this once there's a real "imported vs. mine" distinction
+      // worth enforcing.
       const { client } = await import('@/lib/sanity')
       const data = await client.fetch(
-        `*[_type == "post" && authUserId == $uid] | order(_updatedAt desc){
-          _id, title, slug, status, publishedAt, mainImageUrl
+        `*[_type == "post" && (authUserId == $uid || !defined(authUserId))] | order(_updatedAt desc){
+          _id, title, slug, status, publishedAt,
+          "mainImageUrl": coalesce(mainImageUrl, mainImage.asset->url)
         }`,
         { uid: session.user.id }
       )
