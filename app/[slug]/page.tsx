@@ -23,10 +23,10 @@ const QUERY = `*[_type == "post" && status == "published" && slug.current == $sl
   "tagNames": coalesce(tagNames, tags, [])
 }`
 
-// Loaded dynamically and guarded — see app/local-flavor/page.tsx for why:
-// lib/sanity.js's createClient() throws at import time if
-// NEXT_PUBLIC_SANITY_PROJECT_ID/DATASET aren't set, which would otherwise
-// take this whole route (a root-level catch-all) down with it.
+// Same reasoning as app/articles/page.tsx: the imported `tags` data has at
+// least one stray reference object where a string was expected, which
+// crashes rendering if handed straight to JSX. General safety net, not a
+// one-off patch.
 async function getArticle(slug: string): Promise<ArticlePost | null> {
   if (!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || !process.env.NEXT_PUBLIC_SANITY_DATASET) {
     console.warn('[slug] Sanity env vars not set — article pages will 404.')
@@ -34,7 +34,12 @@ async function getArticle(slug: string): Promise<ArticlePost | null> {
   }
   try {
     const { client } = await import('@/lib/sanity')
-    return await client.fetch(QUERY, { slug })
+    const article = await client.fetch(QUERY, { slug })
+    if (!article) return null
+    return {
+      ...article,
+      tagNames: (article.tagNames || []).filter((x: unknown) => typeof x === 'string'),
+    }
   } catch (err) {
     console.error('[slug] Sanity fetch failed:', err)
     return null
