@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabaseServer'
-import { client as sanityClient } from '@/lib/sanity'
 import LocalFlavorClient from './LocalFlavorClient'
 
 export const metadata: Metadata = {
@@ -31,6 +30,28 @@ const PROCLAMATIONS_QUERY = `*[_type == "post" && status == "published" && "Loca
   "authorName": author->name
 }`
 
+// This is currently the only place in the app that actually imports
+// lib/sanity.js at runtime — its `createClient()` call throws synchronously
+// if NEXT_PUBLIC_SANITY_PROJECT_ID/DATASET aren't set, which would take the
+// whole page (and build) down with it. Loading it dynamically inside a
+// try/catch means a missing/misconfigured Sanity env just means an empty
+// Proclamations rail (which is already hidden when empty) instead of a
+// broken page. Once NEXT_PUBLIC_SANITY_PROJECT_ID/DATASET are confirmed set
+// in Vercel, this can safely go back to a static top-level import if desired.
+async function getProclamations() {
+  if (!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || !process.env.NEXT_PUBLIC_SANITY_DATASET) {
+    console.warn('[local-flavor] Sanity env vars not set — skipping Menu Proclamations rail.')
+    return []
+  }
+  try {
+    const { client: sanityClient } = await import('@/lib/sanity')
+    return await sanityClient.fetch(PROCLAMATIONS_QUERY)
+  } catch (err) {
+    console.error('[local-flavor] Sanity fetch failed:', err)
+    return []
+  }
+}
+
 export default async function LocalFlavorPage() {
   const supabase = createClient()
 
@@ -56,10 +77,7 @@ export default async function LocalFlavorPage() {
       .order('created_at', { ascending: false })
       .limit(12),
 
-    sanityClient.fetch(PROCLAMATIONS_QUERY).catch((err: unknown) => {
-      console.error('[local-flavor] Sanity fetch failed:', err)
-      return []
-    }),
+    getProclamations(),
   ])
 
   const venues = (venueData || []).map((v: any) => ({
