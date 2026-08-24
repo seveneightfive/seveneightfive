@@ -31,9 +31,21 @@ const QUERY = `*[_type == "post" && status == "published"] | order(publishedAt d
   "tagNames": coalesce(tagNames, tags, [])
 }`
 
-// Same guard as /local-flavor and /[slug]: lib/sanity.js's createClient()
-// throws at import time if the env vars aren't set, so this loads it
-// dynamically inside a try/catch rather than as a static top-level import.
+// Data reality check: the imported `tags` field is a plain string array on
+// 81 of 82 tagged posts, but at least one has a stray reference object in
+// there instead (leftover from an inconsistent import batch). Rendering
+// that object directly as a React child crashes the whole page — hence the
+// `.filter(x => typeof x === 'string')` below. This is a general safety
+// net (not a one-off patch for that single document): anything that isn't
+// actually a string gets silently dropped rather than reaching JSX.
+function sanitizeArticle(a: any): ArticleSummary {
+  return {
+    ...a,
+    categoryNames: (a.categoryNames || []).filter((x: unknown) => typeof x === 'string'),
+    tagNames: (a.tagNames || []).filter((x: unknown) => typeof x === 'string'),
+  }
+}
+
 async function getArticles(): Promise<ArticleSummary[]> {
   if (!process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || !process.env.NEXT_PUBLIC_SANITY_DATASET) {
     console.warn('[articles] Sanity env vars not set — showing empty list.')
@@ -41,7 +53,8 @@ async function getArticles(): Promise<ArticleSummary[]> {
   }
   try {
     const { client } = await import('@/lib/sanity')
-    return await client.fetch(QUERY)
+    const raw = await client.fetch(QUERY)
+    return (raw || []).map(sanitizeArticle)
   } catch (err) {
     console.error('[articles] Sanity fetch failed:', err)
     return []
