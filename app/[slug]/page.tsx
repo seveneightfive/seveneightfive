@@ -17,7 +17,10 @@ type ArticlePost = {
 }
 
 const QUERY = `*[_type == "post" && status == "published" && slug.current == $slug][0]{
-  _id, title, "slug": slug.current, excerpt, mainImageUrl, publishedAt, body, authorName, tagNames
+  _id, title, "slug": slug.current, excerpt, publishedAt, body,
+  "mainImageUrl": coalesce(mainImageUrl, mainImage.asset->url),
+  "authorName": coalesce(authorName, author->name),
+  "tagNames": coalesce(tagNames, tags, [])
 }`
 
 // Loaded dynamically and guarded — see app/local-flavor/page.tsx for why:
