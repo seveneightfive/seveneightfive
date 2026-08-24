@@ -25,9 +25,10 @@ export const metadata: Metadata = {
 
 const FOOD_VENUE_TYPES = ['Local Flavor', 'Bar/Tavern', 'Brewery / Winery', 'Coffee Shop', 'Catering']
 
-const PROCLAMATIONS_QUERY = `*[_type == "post" && status == "published" && "Local Flavor" in categories[]->name] | order(publishedAt desc) [0...6]{
-  _id, title, "slug": slug.current, excerpt, mainImageUrl, publishedAt,
-  "authorName": author->name
+const PROCLAMATIONS_QUERY = `*[_type == "post" && status == "published" && ("Local Flavor" in categories[]->name || "Local Flavor" in categoryNames)] | order(publishedAt desc) [0...6]{
+  _id, title, "slug": slug.current, excerpt, publishedAt,
+  "mainImageUrl": coalesce(mainImageUrl, mainImage.asset->url),
+  "authorName": coalesce(authorName, author->name)
 }`
 
 // This is currently the only place in the app that actually imports
