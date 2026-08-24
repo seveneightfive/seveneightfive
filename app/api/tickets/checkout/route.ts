@@ -288,15 +288,24 @@ export async function POST(request: NextRequest) {
       buyerUserId = user.id
 
       let existingCustomerId = buyerProfile?.stripe_customer_id
-      if (!existingCustomerId) {
-        const customer = await stripe.customers.create({
-          email: buyerEmail, name: buyerName || undefined, phone: buyerPhone || undefined,
-          metadata: { supabase_user_id: user.id },
-        })
-        existingCustomerId = customer.id
-        await admin.from('profiles').update({ stripe_customer_id: existingCustomerId }).eq('id', user.id)
-      }
-      customerId = existingCustomerId
+
+if (existingCustomerId) {
+  try {
+    await stripe.customers.retrieve(existingCustomerId)
+  } catch {
+    existingCustomerId = null // stale/wrong-mode id — fall through and recreate
+  }
+}
+
+if (!existingCustomerId) {
+  const customer = await stripe.customers.create({
+    email: buyerEmail, name: buyerName || undefined, phone: buyerPhone || undefined,
+    metadata: { supabase_user_id: user.id },
+  })
+  existingCustomerId = customer.id
+  await admin.from('profiles').update({ stripe_customer_id: existingCustomerId }).eq('id', user.id)
+}
+customerId = existingCustomerId
     } else {
       buyerEmail = guest.email.trim().toLowerCase()
       buyerName = guest.name.trim()
