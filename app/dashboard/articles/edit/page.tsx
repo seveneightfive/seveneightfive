@@ -52,11 +52,21 @@ function ArticleEditInner() {
       if (!isNew && postId) {
         const { client } = await import('@/lib/sanity')
         const post = await client.fetch(
-          `*[_type == "post" && _id == $id][0]{ _id, title, excerpt, mainImageUrl, tagNames, status, authUserId, body }`,
+          `*[_type == "post" && _id == $id][0]{
+            _id, title, excerpt, status, authUserId, body,
+            "mainImageUrl": coalesce(mainImageUrl, mainImage.asset->url),
+            "tagNames": coalesce(tagNames, tags, categories[]->name, [])
+          }`,
           { id: postId }
         )
         if (!post) { router.push('/dashboard/articles'); return }
-        if (post.authUserId !== session.user.id) { router.push('/dashboard/articles'); return }
+        // Imported articles have no authUserId at all — anyone signed in
+        // can edit those (there's no "original author" to defer to).
+        // Only block editing something a *different* dashboard user wrote.
+        if (post.authUserId && post.authUserId !== session.user.id) {
+          router.push('/dashboard/articles')
+          return
+        }
 
         setTitle(post.title || '')
         setExcerpt(post.excerpt || '')
