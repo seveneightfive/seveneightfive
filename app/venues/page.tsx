@@ -26,7 +26,7 @@ export default async function VenuesPage({ searchParams }: { searchParams: Promi
   const [{ data: venues }, { data: upcomingEvents }] = await Promise.all([
     supabase
       .from('venues')
-      .select('id, name, slug, description, address, neighborhood, city, state, image_url, logo, website, venue_type')
+      .select('id, name, slug, description, address, neighborhood, city, state, image_url, logo, website, venue_type, latitude, longitude')
       .order('name'),
     supabase
       .from('events')

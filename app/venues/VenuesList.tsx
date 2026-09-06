@@ -21,6 +21,8 @@ type Venue = {
   website: string | null
   venue_type: string[] | null
   upcoming_events_count?: number
+  latitude: number | null
+  longitude: number | null
 }
 
 // Matches the neighborhood_enum values on venues.neighborhood exactly.
@@ -88,7 +90,7 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
       const [{ data, error }, counts] = await Promise.all([
         supabase
           .from('venues')
-          .select('id, name, slug, description, address, neighborhood, city, state, image_url, logo, website, venue_type')
+          .select('id, name, slug, description, address, neighborhood, city, state, image_url, logo, website, venue_type, latitude, longitude')
           .order('name'),
         fetchUpcomingEventCounts(),
       ])
