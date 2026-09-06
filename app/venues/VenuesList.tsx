@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import BrowseHeader from '../components/BrowseHeader'
 import SearchFilterSheet from '../components/SearchFilterSheet'
 import FollowFavoriteButtons from '../components/FollowFavoriteButtons'
-import MapListLayout from '@/components/MapListLayout'
+import MapListLayout from '../components/MapListLayout'
 
 type Venue = {
   id: string
