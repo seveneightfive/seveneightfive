@@ -230,21 +230,21 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
             <div className="empty-sub">Try adjusting your filters or search.</div>
           </div>
         ) : (
-          <section className="grid-section">
-  <MapListLayout
-    items={filtered}
-    getPopupLabel={(venue) => venue.name}
-    renderCard={(venue, { isActive, setActive, cardRef }) => {
-      const street = venue.address?.split(',')[0]
-      const eventCount = venue.upcoming_events_count || 0
-      return (
-        <a
-          key={venue.id}
-          ref={cardRef as any}
-          href={venue.slug ? `/venues/${venue.slug}` : '#'}
-          className={`venue-card${isActive ? ' active' : ''}`}
-          onClick={(e) => { handleVenueClick(); setActive() }}
-        >
+           <section className="grid-section">
+            <MapListLayout
+              items={filtered}
+              getPopupLabel={(venue) => venue.name}
+              renderCard={(venue, { isActive, setActive, cardRef }) => {
+                const street = venue.address?.split(',')[0]
+                const eventCount = venue.upcoming_events_count || 0
+                return (
+                  
+                    key={venue.id}
+                    ref={cardRef as any}
+                    href={venue.slug ? `/venues/${venue.slug}` : '#'}
+                    className={`venue-card${isActive ? ' active' : ''}`}
+                    onClick={() => { handleVenueClick(); setActive() }}
+                  >
                     <div className="venue-card-media">
                       {venue.image_url || venue.logo
                         ? <img src={venue.image_url || venue.logo!} alt={venue.name} className="venue-card-img" />
@@ -277,8 +277,6 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
                     </div>
 
                     <div className="venue-card-right">
-                      {/* Hours — will be pulled in via the Google Places sync;
-                          intentionally left blank until that's wired up. */}
                       {venue.venue_type && venue.venue_type.length > 0 && (
                         <div className="venue-card-type-pills">
                           {venue.venue_type.map(t => <span key={t} className="venue-card-type-pill">{t}</span>)}
@@ -290,8 +288,8 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
                     </div>
                   </a>
                 )
-              })}
-            </div>
+              }}
+            />
           </section>
         )}
       </div>
