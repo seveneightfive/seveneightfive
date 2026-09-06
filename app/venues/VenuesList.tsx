@@ -230,17 +230,20 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
           </div>
         ) : (
           <section className="grid-section">
-            <div className="venues-grid">
-              {filtered.map(venue => {
-                const street = venue.address?.split(',')[0]
-                const eventCount = venue.upcoming_events_count || 0
-                return (
-                  <a
-                    key={venue.id}
-                    href={venue.slug ? `/venues/${venue.slug}` : '#'}
-                    className="venue-card"
-                    onClick={handleVenueClick}
-                  >
+  <MapListLayout
+    items={filtered}
+    getPopupLabel={(venue) => venue.name}
+    renderCard={(venue, { isActive, setActive, cardRef }) => {
+      const street = venue.address?.split(',')[0]
+      const eventCount = venue.upcoming_events_count || 0
+      return (
+        <a
+          key={venue.id}
+          ref={cardRef as any}
+          href={venue.slug ? `/venues/${venue.slug}` : '#'}
+          className={`venue-card${isActive ? ' active' : ''}`}
+          onClick={(e) => { handleVenueClick(); setActive() }}
+        >
                     <div className="venue-card-media">
                       {venue.image_url || venue.logo
                         ? <img src={venue.image_url || venue.logo!} alt={venue.name} className="venue-card-img" />
