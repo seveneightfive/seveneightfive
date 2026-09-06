@@ -238,7 +238,7 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
                 const street = venue.address?.split(',')[0]
                 const eventCount = venue.upcoming_events_count || 0
                 return (
-                  
+                  <a
                     key={venue.id}
                     ref={cardRef as any}
                     href={venue.slug ? `/venues/${venue.slug}` : '#'}
