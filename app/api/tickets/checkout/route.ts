@@ -324,11 +324,12 @@ customerId = existingCustomerId
     let totalApplicationFeeCents = 0
     const packedItems: PackedItem[] = []
 
-    for (const it of items) {
+        for (const it of items) {
       const tier = tierById.get(it.tierId)!
       const unitAmount = Math.round(Number(tier.price) * 100)
+      const seatMultiplier = tier.is_group ? (tier.seats_per_unit || 1) : 1
       const serviceFeePerUnit = serviceFeeAmount(unitAmount)
-      const appFeePerUnit = applicationFeeAmount(unitAmount)
+      const appFeePerUnit = applicationFeeAmount(unitAmount, seatMultiplier)
 
       totalServiceFeeCents += serviceFeePerUnit * it.quantity
       totalApplicationFeeCents += appFeePerUnit * it.quantity
