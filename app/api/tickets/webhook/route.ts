@@ -76,9 +76,20 @@ export async function POST(request: NextRequest) {
         const paymentIntentId =
           (typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id) ?? null
 
-        const order = parseOrder(meta)
+                const order = parseOrder(meta)
         if (!eventId || order.items.length === 0) {
           console.error('[webhook] checkout.session.completed missing event_id/order items', meta)
+          break
+        }
+
+        const { data: existingForSession } = await admin
+          .from('tickets')
+          .select('id')
+          .eq('stripe_checkout_session_id', session.id)
+          .limit(1)
+          .maybeSingle()
+        if (existingForSession) {
+          console.log(`[webhook] tickets already minted for session ${session.id}, skipping`)
           break
         }
 
