@@ -4,18 +4,18 @@ import LiveMusicClient from './LiveMusicClient'
 
 export const metadata: Metadata = {
   title: 'Live Music Topeka KS | Concerts & Music Events | seveneightfive',
-  description: 'Find live music in Topeka, KS — upcoming concerts, local musicians, and the best music venues. Updated daily. The 785 is your guide to live music in Topeka.',
+  description: 'Find live music in Topeka, KS — upcoming concerts, local musicians, and the best music venues. Updated daily. seveneightfive is your guide to live music in Topeka.',
   keywords: ['live music topeka ks', 'topeka concerts', 'topeka live music', 'music venues topeka', 'topeka bands', 'kansas live music'],
   openGraph: {
     title: 'Live Music Topeka KS | Concerts & Music Events | seveneightfive',
-    description: 'Find live music in Topeka, KS — upcoming concerts, local musicians, and the best music venues.',
+    description: 'Find live music in Topeka, KS - concerts, local musicians, and the best venues.',
     images: [{ url: 'https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/hero-images/ILove90s-TylerStruck-Web.jpg' }],
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Live Music Topeka KS | seveneightfive',
-    description: 'Find live music in Topeka, KS — upcoming concerts, local musicians, and the best music venues.',
+    description: 'Find live music in Topeka, KS: concerts, local musicians and the best venues.',
     images: ['https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/hero-images/ILove90s-TylerStruck-Web.jpg'],
   },
   alternates: {
