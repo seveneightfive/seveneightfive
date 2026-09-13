@@ -452,14 +452,14 @@ export default function LiveMusicClient({
       <section className="lm-hero" aria-label="Live music in Topeka KS">
         <img src={HERO_IMG} alt="Live music in Topeka, KS" className="lm-hero-img" />
         <div className="lm-hero-body">
-          <p className="lm-hero-eyebrow">Topeka, Kansas</p>
+          <p className="lm-hero-eyebrow">seveneightfive</p>
           <h1 className="lm-hero-title">Keep <span>Music</span> Live</h1>
           <p className="lm-hero-byline">— Suki</p>
           <p className="lm-hero-sub">
-            Your guide to live music in Topeka, KS — concerts, local artists, and the venues keeping it all live.
+            Your guide to live music in Top City.
           </p>
           <a href="#concerts" className="lm-hero-cta">
-            See Upcoming Concerts
+            Upcoming Concerts
           </a>
         </div>
         <div className="lm-hero-scroll" aria-hidden>
@@ -692,10 +692,10 @@ export default function LiveMusicClient({
         {/* ── FOOTER CTA ── */}
         <section style={{ padding: '48px 0 64px', textAlign: 'center', borderTop: '1px solid var(--border)' }}>
           <p style={{ fontFamily: 'var(--serif)', fontSize: 'clamp(1.4rem, 3vw, 2rem)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '-0.01em', marginBottom: 12 }}>
-            Know a show we&rsquo;re missing?
+            What are we&rsquo;re missing?
           </p>
           <p style={{ color: 'var(--ink-soft)', fontSize: '0.9rem', marginBottom: 24, fontWeight: 300 }}>
-            Submit events, claim your artist profile, and help build the Topeka music scene.
+            Submit events, create artist profile, help build Topeka's music scene.
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <a
