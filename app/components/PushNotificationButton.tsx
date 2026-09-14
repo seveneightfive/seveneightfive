@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { usePathname } from "next/navigation"
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4)
@@ -12,6 +13,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 type PermissionState = "default" | "granted" | "denied" | "unsupported"
 
 export default function PushNotificationButton() {
+  const pathname = usePathname()
   const [permState, setPermState] = useState<PermissionState>("default")
   const [loading, setLoading] = useState(false)
 
@@ -76,6 +78,11 @@ export default function PushNotificationButton() {
       setLoading(false)
     }
   }
+
+  // Standalone pages — like the public ticket view — shouldn't prompt
+  // for push notifications. Matches the exclusion list in
+  // NavWrapper.tsx.
+  if (pathname.startsWith("/tickets/")) return null
 
   if (permState === "unsupported") return null
 
