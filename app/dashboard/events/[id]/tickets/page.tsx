@@ -15,6 +15,7 @@ import {
   AlertCircle,
   ArrowUpRight,
   Download,
+  Mail,
 } from 'lucide-react'
 
 /**
@@ -46,6 +47,13 @@ export default function EventTicketsPage() {
   const [checkInUrl, setCheckInUrl] = useState('')
   const [checkInUrlLoading, setCheckInUrlLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
+
+  // Reminder email — optional organizer note inserted into the
+  // automated 3-days-before reminder.
+  const [reminderNote, setReminderNote] = useState('')
+  const [reminderNoteSaving, setReminderNoteSaving] = useState(false)
+  const [reminderNoteSaved, setReminderNoteSaved] = useState(false)
+  const [reminderNoteError, setReminderNoteError] = useState('')
 
   // Inline edit of a ticket's attendee name/email
   const [editingTicketId, setEditingTicketId] = useState<string | null>(null)
@@ -89,7 +97,7 @@ export default function EventTicketsPage() {
         const { data: eventData } = await supabase
           .from('events')
           .select(`
-            id, title, slug, event_date, ticketing_enabled,
+            id, title, slug, event_date, ticketing_enabled, reminder_note,
             auth_user_id, venue_id,
             venues(id, name, auth_user_id)
           `)
@@ -131,6 +139,7 @@ export default function EventTicketsPage() {
         }
 
         setEvent(eventData)
+        setReminderNote(eventData.reminder_note || '')
 
         const { data: profileData } = await supabase
           .from('profiles')
@@ -235,6 +244,15 @@ export default function EventTicketsPage() {
 
   const stripeReady = profile?.stripe_account_status === 'enabled'
 
+  // When the automated reminder will (or would have) gone out.
+  const reminderSendDate = (() => {
+    if (!event.event_date) return null
+    const d = new Date(`${event.event_date}T00:00:00Z`)
+    d.setUTCDate(d.getUTCDate() - 3)
+    return d
+  })()
+  const reminderAlreadyPassed = reminderSendDate ? reminderSendDate.getTime() < Date.now() : false
+
 
 
   const copyCheckInUrl = () => {
@@ -242,6 +260,28 @@ export default function EventTicketsPage() {
     navigator.clipboard.writeText(checkInUrl)
     setCheckInCopied(true)
     setTimeout(() => setCheckInCopied(false), 2000)
+  }
+
+  async function saveReminderNote() {
+    setReminderNoteSaving(true)
+    setReminderNoteError('')
+    setReminderNoteSaved(false)
+    try {
+      const res = await fetch(`/api/events/${eventId}/reminder-note`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: reminderNote }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Failed to save note')
+      setReminderNote(json.reminder_note || '')
+      setReminderNoteSaved(true)
+      setTimeout(() => setReminderNoteSaved(false), 2000)
+    } catch (err: any) {
+      setReminderNoteError(err?.message || 'Failed to save note')
+    } finally {
+      setReminderNoteSaving(false)
+    }
   }
 
   async function refreshTickets() {
@@ -542,6 +582,67 @@ export default function EventTicketsPage() {
               eventId={eventId}
               tiers={eventTiers.map((t) => ({ id: t.id, name: t.name }))}
             />
+          </Card>
+
+          {/* Reminder email */}
+          <Card>
+            <h2 className={sectionHeadingCls}>
+              <span className="inline-flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Reminder Email
+              </span>
+            </h2>
+            <p className="mb-4 -mt-2 text-sm text-gray-600 dark:text-gray-400">
+              Every ticket buyer automatically gets a reminder email 3 days before your
+              event, with their QR code(s) included in case the original got lost. You
+              can add an optional note below — it'll be inserted right into that email.
+            </p>
+
+            <div className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+              {reminderSendDate ? (
+                <>
+                  Scheduled to send{' '}
+                  <strong className="text-gray-700 dark:text-gray-300">
+                    {reminderSendDate.toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </strong>
+                  {reminderAlreadyPassed && ' — this date has already passed for this event.'}
+                </>
+              ) : (
+                'Set an event date to schedule the reminder.'
+              )}
+            </div>
+
+            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
+              Optional note to buyers
+            </label>
+            <textarea
+              value={reminderNote}
+              onChange={(e) => setReminderNote(e.target.value)}
+              maxLength={1000}
+              rows={4}
+              placeholder="e.g. Doors open at 5:30, street parking fills up fast so give yourself extra time."
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-800 dark:bg-white/[0.03] dark:text-white/90"
+            />
+            <div className="mt-2 flex items-center gap-3">
+              <button
+                onClick={saveReminderNote}
+                disabled={reminderNoteSaving}
+                className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {reminderNoteSaving ? 'Saving…' : 'Save note'}
+              </button>
+              {reminderNoteSaved && (
+                <span className="text-xs font-semibold text-success-700 dark:text-success-400">Saved</span>
+              )}
+              {reminderNoteError && (
+                <span className="text-xs font-medium text-brand-600 dark:text-brand-400">{reminderNoteError}</span>
+              )}
+            </div>
           </Card>
 
           {/* Tier performance */}
@@ -1071,8 +1172,19 @@ function StatusPill({ status }: { status: string }) {
       label: 'Refunded',
       cls: 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400',
     },
+    cancelled: {
+      label: 'Cancelled',
+      cls: 'bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-500',
+    },
   }
-  const m = map[status] ?? map.valid
+  // Falls back to the raw status label rather than defaulting to
+  // "Valid" — an unrecognized status (e.g. a future one added to the
+  // DB check constraint but not here yet) should never silently read
+  // as valid in the organizer's attendee list.
+  const m = map[status] ?? {
+    label: status,
+    cls: 'bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-400',
+  }
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] ${m.cls}`}
