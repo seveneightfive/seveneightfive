@@ -10,6 +10,11 @@ import { createClient } from '@/lib/supabaseServer'
  * (UUID, ~10^36 entropy), so guessing one is infeasible. This is the
  * same security model as Eventbrite / Ticketmaster shareable links.
  *
+ * Deliberately standalone: no site nav, no push-notification prompt
+ * (see NavWrapper.tsx / PushNotificationButton.tsx, both hide
+ * themselves on this route) — this page is meant to be pulled up at
+ * the door and read at a glance, not browsed as part of the site.
+ *
  * Renders:
  *   - Event hero image, title, date/time, venue
  *   - Big QR code (PNG generated server-side from qr_token)
@@ -82,9 +87,10 @@ export default async function TicketPage({
   const endTimeStr = ev?.event_end_time ? formatTime(ev.event_end_time) : null
   const timeDisplay = timeStr ? (endTimeStr ? `${timeStr} – ${endTimeStr}` : timeStr) : null
 
-  const venueLine = [venue?.name, venue?.address, [venue?.city, venue?.state].filter(Boolean).join(', ')]
-    .filter(Boolean)
-    .join(' · ')
+  // venue.address already carries city/state (e.g. "One Expocentre
+  // Drive, Topeka KS 66612"), so appending [city, state] again just
+  // duplicates it — name + address is the full picture on its own.
+  const venueLine = [venue?.name, venue?.address].filter(Boolean).join(' · ')
 
   return (
     <div
@@ -98,19 +104,6 @@ export default async function TicketPage({
       }}
     >
       <div style={{ maxWidth: 480, margin: '0 auto' }}>
-        {/* Brand header */}
-        <div
-          style={{
-            fontFamily: "'Oswald', sans-serif",
-            fontSize: 16,
-            fontWeight: 600,
-            letterSpacing: '0.08em',
-            marginBottom: 16,
-          }}
-        >
-          🎟 785 TICKETS
-        </div>
-
         {/* Status banner */}
         {isValid && (
           <StatusBanner color="#2d7a2d" label="Valid Ticket" sub="Present at entrance" />
@@ -173,13 +166,13 @@ export default async function TicketPage({
             </h1>
             {(dateStr || timeDisplay) && (
               <div style={{ marginTop: 12, fontSize: 15 }}>
-                {dateStr && <div>📅 {dateStr}</div>}
-                {timeDisplay && <div style={{ marginTop: 4 }}>🕐 {timeDisplay}</div>}
+                {dateStr && <div>{dateStr}</div>}
+                {timeDisplay && <div style={{ marginTop: 4 }}>{timeDisplay}</div>}
               </div>
             )}
             {venueLine && (
               <div style={{ marginTop: 12, fontSize: 13, color: '#6b6560' }}>
-                📍 {venueLine}
+                {venueLine}
               </div>
             )}
           </div>
@@ -245,7 +238,7 @@ export default async function TicketPage({
               }}
               title="Coming soon"
             >
-               Add to Apple Wallet (coming soon)
+              Add to Apple Wallet (coming soon)
             </button>
             <button
               disabled
