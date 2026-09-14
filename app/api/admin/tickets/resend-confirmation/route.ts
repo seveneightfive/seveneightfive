@@ -26,6 +26,18 @@ import { sendTicketEmail } from '@/app/lib/email'
  */
 export async function POST(request: NextRequest) {
   const secret = request.headers.get('x-admin-secret')
+
+  // TEMP DIAGNOSTIC — remove once the 401 is sorted out. Never logs
+  // either actual secret value, only whether each is present and how
+  // long it is, so this is safe to leave in Vercel's logs briefly.
+  console.log('[resend-confirmation] auth debug', {
+    envVarSet: !!process.env.ADMIN_API_SECRET,
+    envVarLength: process.env.ADMIN_API_SECRET?.length ?? 0,
+    headerReceived: !!secret,
+    headerLength: secret?.length ?? 0,
+    match: secret === process.env.ADMIN_API_SECRET,
+  })
+
   if (!process.env.ADMIN_API_SECRET || secret !== process.env.ADMIN_API_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
