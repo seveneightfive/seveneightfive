@@ -227,6 +227,11 @@ function StatusBadge({ status }: { status: string }) {
       classes:
         'bg-brand-50 text-brand-700 border-brand-200 dark:bg-brand-500/15 dark:text-brand-400 dark:border-brand-500/30',
     },
+    cancelled: {
+      label: 'Cancelled',
+      classes:
+        'bg-gray-100 text-gray-600 border-gray-200 dark:bg-white/[0.06] dark:text-gray-300 dark:border-gray-700',
+    },
   }
   const m = map[status] ?? {
     label: status,
@@ -253,6 +258,8 @@ function Modal({
   qrDataUrl: string
   onClose: () => void
 }) {
+  const isVoided = ticket.status === 'refunded' || ticket.status === 'cancelled'
+
   return (
     <>
       {/* Backdrop */}
@@ -307,10 +314,12 @@ function Modal({
 
             {/* QR code section */}
             <div className="space-y-4">
-              {ticket.status === 'refunded' ? (
+              {isVoided ? (
                 <div className="flex items-center justify-center rounded-lg bg-brand-50 px-4 py-6 text-center dark:bg-brand-500/10">
                   <p className="text-sm font-semibold text-brand-700 dark:text-brand-400">
-                    This ticket has been refunded.
+                    {ticket.status === 'cancelled'
+                      ? 'This ticket has been cancelled.'
+                      : 'This ticket has been refunded.'}
                   </p>
                 </div>
               ) : (
