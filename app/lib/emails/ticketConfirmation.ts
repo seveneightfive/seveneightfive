@@ -23,6 +23,7 @@ export function ticketConfirmationEmail(args: SendTicketEmailArgs & {
     siteUrl,
     organizerName,
     organizerEmail,
+    qrDataUris,
   } = args
 
   const greeting = buyerName ? `Thanks, ${escapeHtml(buyerName)}!` : 'Thanks!'
