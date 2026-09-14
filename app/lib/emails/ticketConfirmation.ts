@@ -51,8 +51,6 @@ export function ticketConfirmationEmail(args: SendTicketEmailArgs & {
   const ticketCards = tickets
     .map((t, i) => {
       const ticketUrl = `${siteUrl}/tickets/${encodeURIComponent(t.qr_token)}`
-      // Generate QR via qr.io service — URL-based, works in all email clients
-      const qrUrl = `https://qr.io/?qr=${encodeURIComponent(t.qr_token)}`
       
       return `
         <tr>
@@ -70,7 +68,7 @@ export function ticketConfirmationEmail(args: SendTicketEmailArgs & {
               </tr>
               <tr>
                 <td align="center" style="padding:0 24px 16px;">
-                  <img src="${qrUrl}" alt="QR code for ticket ${i + 1}" width="240" height="240" style="display:block;width:240px;height:240px;border:0;background:#ffffff;padding:8px;border-radius:4px;" />
+                  <img src="${qrDataUris[i]}" alt="QR code for ticket ${i + 1}" width="240" height="240" style="display:block;width:240px;height:240px;border:0;background:#ffffff;padding:8px;border-radius:4px;" />
                 </td>
               </tr>
               <tr>
