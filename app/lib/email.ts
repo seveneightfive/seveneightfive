@@ -1,6 +1,7 @@
 import { Resend } from 'resend'
 import QRCode from 'qrcode'
 import { ticketConfirmationEmail } from './emails/ticketConfirmation'
+import { ticketReminderEmail } from './emails/ticketReminder'
 
 export const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -50,14 +51,17 @@ export type SendTicketEmailArgs = {
  * Send a single confirmation email to the buyer containing one QR code
  * per ticket purchased.
  *
- * QR codes are generated via qr.io service (URL-based, works in all clients).
+ * QR codes are generated locally with the `qrcode` package and embedded
+ * as base64 PNG data URIs directly in the HTML — no external image host
+ * to fail, expire, or get blocked by a mail client's image proxy.
  * Organizer contact info is included at the bottom so buyers can reach out
  * with questions.
  */
 export async function sendTicketEmail(args: SendTicketEmailArgs) {
-  // Generate dummy data URIs (we don't actually use them, but the function
-  // signature still expects them for backward compatibility)
-    const url = siteUrl()
+  const url = siteUrl()
+
+  // One QR per ticket, encoding the same ticket URL as the "View ticket
+  // online" link so a scan and a click land in the same place.
   const qrDataUris = await Promise.all(
     args.tickets.map((t) =>
       QRCode.toDataURL(`${url}/tickets/${encodeURIComponent(t.qr_token)}`, {
@@ -258,6 +262,104 @@ export async function sendAttendeeTicketEmail(args: AttendeeTicketEmailArgs) {
       { name: 'event_slug', value: event.slug },
     ],
   })
+}
+
+export type SendTicketReminderArgs = {
+  to: string
+  buyerName: string | null
+  event: SendTicketEmailArgs['event']
+  tickets: TicketEmailTicket[]
+  organizerName: string | null
+  organizerEmail: string | null
+  // Optional free-text note the organizer set on the event
+  // (events.reminder_note). Null/blank means no note section renders.
+  organizerNote: string | null
+}
+
+/**
+ * Sends the automated "your event is in 3 days" reminder to a ticket
+ * buyer, re-including their QR code(s) in case the original
+ * confirmation was lost, deleted, or (as with the qr.io bug) never
+ * rendered in the first place. Triggered by the
+ * /api/cron/ticket-reminders job, once per event per buyer_email —
+ * see ticket_reminders_sent for the dedup guard.
+ */
+export async function sendTicketReminderEmail(args: SendTicketReminderArgs) {
+  const url = siteUrl()
+
+  const qrDataUris = await Promise.all(
+    args.tickets.map((t) =>
+      QRCode.toDataURL(`${url}/tickets/${encodeURIComponent(t.qr_token)}`, {
+        margin: 1,
+        width: 480,
+      })
+    )
+  )
+
+  const html = ticketReminderEmail({
+    buyerName: args.buyerName,
+    event: args.event,
+    tickets: args.tickets,
+    qrDataUris,
+    siteUrl: url,
+    organizerName: args.organizerName,
+    organizerEmail: args.organizerEmail,
+    organizerNote: args.organizerNote,
+  })
+
+  const text = buildReminderPlainText(args)
+
+  return resend.emails.send({
+    from: TICKET_FROM,
+    to: args.to,
+    subject: `Reminder: ${args.event.title} is in 3 days`,
+    html,
+    text,
+    tags: [
+      { name: 'category', value: 'ticket_reminder' },
+      { name: 'event_slug', value: args.event.slug },
+    ],
+  })
+}
+
+function buildReminderPlainText(args: SendTicketReminderArgs): string {
+  const url = siteUrl()
+  const lines: string[] = [
+    args.buyerName ? `Hey, ${args.buyerName}!` : 'Hey!',
+    '',
+    `${args.event.title} is coming up in 3 days.`,
+    '',
+  ]
+
+  if (args.event.date) lines.push(`DATE: ${formatDate(args.event.date)}`)
+  if (args.event.startTime) lines.push(`TIME: ${formatTime(args.event.startTime)}`)
+
+  const venueLine = [args.event.venueName, args.event.venueAddress].filter(Boolean).join(' · ')
+  if (venueLine) lines.push(`WHERE: ${venueLine}`)
+
+  if (args.organizerNote?.trim()) {
+    lines.push('', `A note from ${args.organizerName || 'the organizer'}:`, args.organizerNote.trim())
+  }
+
+  lines.push('', `Your ${args.tickets.length} ticket${args.tickets.length > 1 ? 's' : ''}:`)
+  args.tickets.forEach((t, i) => {
+    lines.push('')
+    lines.push(`  Ticket ${i + 1}: ${t.ticket_tier_name}`)
+    lines.push(`  View / scan: ${url}/tickets/${t.qr_token}`)
+  })
+
+  lines.push('', 'See you there!', '785 Magazine', '')
+
+  if (args.organizerName || args.organizerEmail) {
+    lines.push(
+      'Questions about the event? Contact ' +
+        (args.organizerName ? args.organizerName : 'the organizer') +
+        (args.organizerEmail ? ` at ${args.organizerEmail}` : '')
+    )
+  }
+  lines.push('Questions about your order? Send to kerrice@seveneightfive.com')
+
+  return lines.join('\n')
 }
 
 function escapeHtml(s: string): string {
