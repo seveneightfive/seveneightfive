@@ -29,6 +29,22 @@ import { sendTicketEmail, sendAttendeeTicketEmail } from '@/app/lib/email'
  *   2. cart_items_* and custom_responses_* (multi-tier, no per-attendee names, no addons)
  *   3. tier_id/quantity/custom_responses (original single-tier)
  * Older sessions still in flight when this shipped complete correctly.
+ *
+ * IDEMPOTENCY: Stripe can (and for at least one real order, did)
+ * deliver both checkout.session.completed and payment_intent.succeeded
+ * for the same order, in either order, close enough together to race
+ * a naive "check tickets table, then insert" guard — the two handlers
+ * key their existence checks off different columns
+ * (stripe_checkout_session_id vs stripe_payment_intent_id), and
+ * payment_intent.succeeded never sets stripe_checkout_session_id at
+ * all, so neither check reliably sees the other's rows. To close this
+ * for real, both branches take out a lock in ticket_order_locks
+ * (payment_intent_id primary key, or a `session:<id>` fallback key
+ * when there's no payment intent) *before* minting anything. The
+ * lock insert is atomic at the database level, so even two requests
+ * arriving at the same instant can't both proceed — the loser hits a
+ * unique-violation and skips. The old per-branch existence checks are
+ * kept as a secondary, non-authoritative safety net.
  */
 export async function POST(request: NextRequest) {
   const body = await request.text()
@@ -76,12 +92,25 @@ export async function POST(request: NextRequest) {
         const paymentIntentId =
           (typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id) ?? null
 
-                const order = parseOrder(meta)
+        const order = parseOrder(meta)
         if (!eventId || order.items.length === 0) {
           console.error('[webhook] checkout.session.completed missing event_id/order items', meta)
           break
         }
 
+        // Authoritative dedup guard — see IDEMPOTENCY note above.
+        // Fall back to a session-scoped key on the rare order with no
+        // payment intent (e.g. a $0 checkout) so the lock table always
+        // has something non-null to key on.
+        const lockKey = paymentIntentId || `session:${session.id}`
+        const locked = await acquireOrderLock(admin, lockKey)
+        if (!locked) {
+          console.log(`[webhook] order lock already held for ${lockKey}, skipping checkout.session.completed`)
+          break
+        }
+
+        // Secondary safety net — kept from the original implementation.
+        // Not relied on for correctness anymore, but harmless.
         const { data: existingForSession } = await admin
           .from('tickets')
           .select('id')
@@ -117,6 +146,14 @@ export async function POST(request: NextRequest) {
         const order = parseOrder(meta)
         if (order.items.length === 0) break
 
+        // Authoritative dedup guard — see IDEMPOTENCY note above.
+        const locked = await acquireOrderLock(admin, pi.id)
+        if (!locked) {
+          console.log(`[webhook] order lock already held for ${pi.id}, skipping payment_intent.succeeded`)
+          break
+        }
+
+        // Secondary safety net.
         const { data: existing } = await admin
           .from('tickets')
           .select('id')
@@ -169,6 +206,24 @@ export async function POST(request: NextRequest) {
     console.error('[webhook] handler error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
+}
+
+// ── Idempotency lock ────────────────────────────────────────────────
+
+/**
+ * Attempts to atomically claim `key` in ticket_order_locks.
+ * Returns true if this call claimed it (proceed with minting), false
+ * if it was already claimed (another delivery got there first — skip).
+ * Throws on any other database error, so a transient failure surfaces
+ * as a 500 and Stripe retries, rather than silently skipping a mint.
+ */
+async function acquireOrderLock(admin: ReturnType<typeof createClient>, key: string): Promise<boolean> {
+  const { error } = await admin.from('ticket_order_locks').insert({ payment_intent_id: key })
+  if (!error) return true
+  // Postgres unique_violation — someone else already holds this lock.
+  if ((error as any).code === '23505') return false
+  console.error('[webhook] failed to acquire order lock:', error)
+  throw new Error('Failed to acquire order lock')
 }
 
 // ── Metadata parsing ────────────────────────────────────────────────
