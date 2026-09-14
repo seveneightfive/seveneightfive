@@ -57,12 +57,20 @@ export type SendTicketEmailArgs = {
 export async function sendTicketEmail(args: SendTicketEmailArgs) {
   // Generate dummy data URIs (we don't actually use them, but the function
   // signature still expects them for backward compatibility)
-  const qrDataUris = args.tickets.map(() => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==')
+    const url = siteUrl()
+  const qrDataUris = await Promise.all(
+    args.tickets.map((t) =>
+      QRCode.toDataURL(`${url}/tickets/${encodeURIComponent(t.qr_token)}`, {
+        margin: 1,
+        width: 480,
+      })
+    )
+  )
 
   const html = ticketConfirmationEmail({
     ...args,
     qrDataUris,
-    siteUrl: siteUrl(),
+    siteUrl: url,
   })
 
   const text = buildPlainText(args)
@@ -150,7 +158,7 @@ export async function sendAttendeeTicketEmail(args: AttendeeTicketEmailArgs) {
   const { to, attendeeName, purchaserName, event, ticket, organizerName, organizerEmail } = args
   const url = siteUrl()
   const ticketUrl = `${url}/tickets/${encodeURIComponent(ticket.qr_token)}`
-  const qrUrl = `https://qr.io/?qr=${encodeURIComponent(ticket.qr_token)}`
+  const qrDataUri = await QRCode.toDataURL(ticketUrl, { margin: 1, width: 440 })
 
   const dateStr = event.date ? formatDate(event.date) : null
   const timeStr = event.startTime ? formatTime(event.startTime) : null
@@ -200,7 +208,7 @@ export async function sendAttendeeTicketEmail(args: AttendeeTicketEmailArgs) {
                   </tr>
                   <tr>
                     <td align="center" style="padding:0 24px 16px;">
-                      <img src="${qrUrl}" alt="QR code" width="220" height="220" style="display:block;width:220px;height:220px;border:0;background:#fff;padding:8px;border-radius:4px;" />
+                      <img src="${qrDataUri}" alt="QR code" width="220" height="220" style="display:block;width:220px;height:220px;border:0;background:#fff;padding:8px;border-radius:4px;" />
                     </td>
                   </tr>
                   <tr>
