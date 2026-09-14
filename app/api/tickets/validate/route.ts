@@ -17,7 +17,7 @@ import { createClient as createAdmin } from '@/lib/supabaseServer'
  *   401  not authenticated
  *   403  not the event owner
  *   404  ticket not found
- *   422  ticket refunded / invalid
+ *   422  ticket refunded / cancelled / invalid
  */
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -63,9 +63,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'You are not the organizer of this event' }, { status: 403 })
   }
 
-  // Refunded tickets can't be used
+  // Refunded or cancelled tickets can't be used. Cancelled covers
+  // rows voided outside of a Stripe refund — e.g. duplicate tickets
+  // minted by a webhook double-delivery — so it needs the same
+  // door-block as refunded, not just a different badge color.
   if (ticket.status === 'refunded' || ticket.payment_status === 'refunded') {
     return NextResponse.json({ error: 'Ticket has been refunded', ticket: formatTicket(ticket) }, { status: 422 })
+  }
+  if (ticket.status === 'cancelled') {
+    return NextResponse.json({ error: 'Ticket has been cancelled', ticket: formatTicket(ticket) }, { status: 422 })
   }
 
   // Already checked in
