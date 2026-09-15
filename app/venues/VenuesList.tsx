@@ -32,6 +32,17 @@ const NEIGHBORHOODS = [
   'South Topeka', 'Midtown', 'West Topeka', 'East Topeka',
 ]
 
+// venues.venue_type is a text[] column — these are the distinct values in
+// use today (confirmed via `select unnest(venue_type)... group by`).
+// Update this list if new types get added in the CMS.
+const VENUE_TYPES = [
+  'Artist Studio', 'Bar/Tavern', 'Brewery / Winery', 'Catering', 'Church',
+  'Coffee Shop', 'Community Space', 'Event Space', 'Experiences',
+  'First Friday ArtWalk', 'Gallery / Museum', 'Live Music', 'Local Flavor',
+  'Outdoor / Park', 'Outdoor Space', 'Shop Local', 'Studio / Classes',
+  'Theatre', 'Trades + Services',
+]
+
 // Counts upcoming events per venue in one query, rather than N+1-ing it
 // per card. Keyed by venue_id -> count.
 async function fetchUpcomingEventCounts(): Promise<Record<string, number>> {
@@ -63,6 +74,7 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
   const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>(
     initialNeighborhood ? [initialNeighborhood] : []
   )
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([])
   const scrollRestored = useRef(false)
 
   useEffect(() => {
@@ -109,6 +121,9 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
     if (selectedNeighborhoods.length > 0) {
       result = result.filter(v => v.neighborhood && selectedNeighborhoods.includes(v.neighborhood))
     }
+    if (selectedTypes.length > 0) {
+      result = result.filter(v => v.venue_type?.some(t => selectedTypes.includes(t)))
+    }
     if (search.trim()) {
       const q = search.toLowerCase()
       result = result.filter(v =>
@@ -118,18 +133,22 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
       )
     }
     setFiltered(result)
-  }, [venues, selectedNeighborhoods, search])
+  }, [venues, selectedNeighborhoods, selectedTypes, search])
 
   useEffect(() => { applyFilters() }, [applyFilters])
 
   const toggleNeighborhood = (n: string) => {
     setSelectedNeighborhoods(prev => prev.includes(n) ? prev.filter(x => x !== n) : [...prev, n])
   }
+  const toggleType = (t: string) => {
+    setSelectedTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
+  }
   const clearAllFilters = () => {
     setSelectedNeighborhoods([])
+    setSelectedTypes([])
     setSearch('')
   }
-  const activeFilterCount = selectedNeighborhoods.length
+  const activeFilterCount = selectedNeighborhoods.length + selectedTypes.length
 
   return (
     <>
@@ -216,6 +235,15 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
         categoriesLabel="Neighborhood"
         selectedCategories={selectedNeighborhoods}
         onToggleCategory={toggleNeighborhood}
+        extraSections={[
+          {
+            key: 'venue_type',
+            label: 'Venue Type',
+            options: VENUE_TYPES,
+            selected: selectedTypes,
+            onToggle: toggleType,
+          },
+        ]}
         showDateFilters={false}
         resultCount={filtered.length}
         resultLabel="Venues"
@@ -236,6 +264,37 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
             <MapListLayout
               items={filtered}
               getPopupLabel={(venue) => venue.name}
+              renderPreview={(venue) => (
+                <a
+                  href={venue.slug ? `/venues/${venue.slug}` : '#'}
+                  onClick={handleVenueClick}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', color: 'var(--ink)' }}
+                >
+                  {venue.image_url || venue.logo ? (
+                    <img
+                      src={venue.image_url || venue.logo!}
+                      alt={venue.name}
+                      style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}
+                    />
+                  ) : (
+                    <div style={{ width: 56, height: 56, borderRadius: 10, flexShrink: 0, background: 'linear-gradient(135deg, #2a2620, #1a1814)' }} />
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {venue.neighborhood && (
+                      <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--accent)', marginBottom: 2 }}>
+                        {venue.neighborhood}
+                      </div>
+                    )}
+                    <div style={{ fontFamily: 'var(--serif)', fontWeight: 600, textTransform: 'uppercase', fontSize: '0.95rem', lineHeight: 1.1 }}>
+                      {venue.name}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--ink-soft)', marginTop: 3 }}>
+                      {venue.upcoming_events_count || 0} upcoming event{venue.upcoming_events_count === 1 ? '' : 's'}
+                    </div>
+                  </div>
+                  <span style={{ color: 'var(--ink-faint)', fontSize: '1.1rem', flexShrink: 0 }}>&rarr;</span>
+                </a>
+              )}
               renderCard={(venue, { isActive, setActive, cardRef }) => {
                 const street = venue.address?.split(',')[0]
                 const eventCount = venue.upcoming_events_count || 0
