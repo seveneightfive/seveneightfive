@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
+import FollowFavoriteButtons from '@/app/components/FollowFavoriteButtons'
+import VenueShareButton from './VenueShareButton'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,6 +16,7 @@ type Venue = {
   city: string | null
   state: string | null
   image_url: string | null
+  logo: string | null
   website: string | null
   venue_type: string[] | null
   phone: string | null
@@ -36,6 +39,13 @@ type Event = {
 
 const SITE_URL = 'https://seveneightfive.com'
 
+// Image_url is the venue's photo; logo is a fallback for venues that only
+// have a business logo on file (no on-site photo yet). Used for the hero,
+// OG image, and JSON-LD image — anywhere we need "the" picture of a venue.
+function getHeroImage(venue: Pick<Venue, 'image_url' | 'logo'>): string | null {
+  return venue.image_url || venue.logo || null
+}
+
 // ─── SEO ─────────────────────────────────────────────────────────────────────
 
 export async function generateMetadata(
@@ -45,12 +55,13 @@ export async function generateMetadata(
   const venue = await getVenue(slug)
   if (!venue) return { title: 'Venue Not Found' }
   const description = venue.description || `${venue.name} — ${venue.neighborhood || venue.city || 'Topeka'}, KS`
+  const heroImage = getHeroImage(venue)
   return {
     title: `${venue.name} | The 785`,
     description,
     alternates: { canonical: `${SITE_URL}/venues/${venue.slug}` },
-    openGraph: { title: venue.name, description, images: venue.image_url ? [{ url: venue.image_url }] : [], type: 'website' },
-    twitter: { card: 'summary_large_image', title: venue.name, description, images: venue.image_url ? [venue.image_url] : [] },
+    openGraph: { title: venue.name, description, images: heroImage ? [{ url: heroImage }] : [], type: 'website' },
+    twitter: { card: 'summary_large_image', title: venue.name, description, images: heroImage ? [heroImage] : [] },
   }
 }
 
@@ -61,7 +72,7 @@ async function getVenue(slug: string): Promise<Venue | null> {
     .from('venues')
     .select(`
       id, name, slug, description, address, neighborhood, city, state,
-      image_url, website, venue_type, phone, email,
+      image_url, logo, website, venue_type, phone, email,
       social_instagram, social_facebook, est
     `)
     .eq('slug', slug)
@@ -108,13 +119,14 @@ function getJsonLd(venue: Venue) {
     .filter(Boolean)
 
   const sameAs = [venue.social_instagram, venue.social_facebook].filter(Boolean) as string[]
+  const heroImage = getHeroImage(venue)
 
   return {
     '@context': 'https://schema.org',
     '@type': matchedTypes.length > 0 ? ['LocalBusiness', ...matchedTypes] : 'LocalBusiness',
     name: venue.name,
     ...(venue.description && { description: venue.description }),
-    ...(venue.image_url && { image: venue.image_url }),
+    ...(heroImage && { image: heroImage }),
     ...(venue.website && { url: venue.website }),
     ...(venue.phone && { telephone: venue.phone }),
     ...(sameAs.length > 0 && { sameAs }),
@@ -152,6 +164,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
   const events = await getVenueEvents(venue.id)
   const jsonLd = getJsonLd(venue)
   const breadcrumbJsonLd = getBreadcrumbJsonLd(venue)
+  const heroImage = getHeroImage(venue)
 
   // Contact / social icons — order intentional: primary action first, then reach-out, then socials
   const contactLinks: { label: string; url: string; icon: React.ReactNode; color: string }[] = []
@@ -251,6 +264,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
         .hero-monogram { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: clamp(8rem, 30vw, 20rem); font-weight: 700; color: rgba(255,255,255,0.04); text-transform: uppercase; letter-spacing: -0.04em; user-select: none; }
         .hero-back { position: absolute; top: 20px; left: 20px; z-index: 3; display: inline-flex; align-items: center; gap: 6px; font-size: 0.7rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: #fff; text-decoration: none; background: rgba(0,0,0,0.32); backdrop-filter: blur(6px); padding: 8px 14px; border-radius: 100px; border: 1px solid rgba(255,255,255,0.16); transition: background 0.15s; }
         .hero-back:hover { background: rgba(0,0,0,0.5); }
+        .hero-actions { position: absolute; top: 20px; right: 20px; z-index: 3; display: flex; align-items: center; gap: 8px; }
         .hero-body { position: relative; z-index: 2; padding: 24px 32px 40px var(--page-pad); }
         .hero-eyebrow { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
         .hero-type-label { font-size: 0.65rem; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); }
@@ -261,7 +275,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
 
         /* ── LAYOUT ── */
         :root { --page-pad: 64px; }
-        .venue-main { max-width: 1440px; margin: 0 auto; padding: 48px var(--page-pad) 0; }
+        .venue-main { max-width: 1440px; margin: 0 auto; padding: 48px var(--page-pad) 0; position: relative; background: var(--white); }
         .venue-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 40px; align-items: start; }
 
         .panel-header { padding: 0; }
@@ -277,11 +291,11 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
         .desc-empty { font-size: 0.92rem; font-style: italic; color: var(--ink-faint); }
         .address-block { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--border); display: flex; align-items: flex-start; gap: 10px; }
         .address-icon { color: var(--accent); flex-shrink: 0; margin-top: 2px; }
-        .address-text { font-size: 0.88rem; color: var(--ink-soft); line-height: 1.5; }
-        .address-link { color: var(--accent); text-decoration: none; font-size: 0.8rem; font-weight: 500; }
+        .address-text { font-size: 0.88rem; color: var(--ink); line-height: 1.5; }
+        .address-link { color: var(--accent); text-decoration: none; font-size: 0.8rem; font-weight: 600; }
         .address-link:hover { text-decoration: underline; }
         .type-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
-        .type-tag { font-size: 0.65rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); background: var(--off); border-radius: 100px; padding: 5px 11px; }
+        .type-tag { font-size: 0.65rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); background: var(--off); border-radius: 100px; padding: 5px 11px; }
 
         /* ── EVENTS ── */
         .events-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 0; text-align: center; }
@@ -299,19 +313,19 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
         .link-date-day { font-family: var(--serif); font-size: 1.4rem; font-weight: 700; line-height: 1; }
         .link-date-mon { font-family: var(--serif); font-size: 0.62rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 3px; }
         .link-content { flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px; padding: 14px 16px; }
-        .link-title { font-family: var(--serif); font-size: 0.95rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
-        .link-time { font-size: 0.78rem; color: var(--ink-soft); margin-top: 3px; }
-        .link-chevron { color: var(--ink-faint); font-size: 1rem; flex-shrink: 0; transition: transform 0.15s; }
+        .link-title { font-family: var(--serif); font-size: 0.95rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink); }
+        .link-time { font-size: 0.78rem; color: var(--ink); margin-top: 3px; }
+        .link-chevron { color: var(--ink-soft); font-size: 1rem; flex-shrink: 0; transition: transform 0.15s; }
         .link-row:hover .link-chevron { transform: translateX(3px); }
 
         /* ── CONTACT STRIP ── */
         .contact-strip { margin-top: 32px; padding: 28px 0 56px; border-top: 1px solid var(--border); }
-        .contact-strip-label { text-align: center; font-size: 0.65rem; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 20px; }
+        .contact-strip-label { text-align: center; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink); margin-bottom: 20px; }
         .contact-icons { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
         .contact-icon-btn { display: flex; flex-direction: column; align-items: center; gap: 8px; text-decoration: none; width: 84px; }
         .contact-icon-circle { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--border); transition: transform 0.15s, border-color 0.15s, background 0.15s; }
         .contact-icon-btn:hover .contact-icon-circle { transform: translateY(-3px); border-color: currentColor; background: var(--off); }
-        .contact-icon-label { font-size: 0.68rem; font-weight: 500; letter-spacing: 0.03em; color: var(--ink-soft); text-align: center; }
+        .contact-icon-label { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.03em; color: var(--ink); text-align: center; }
 
         /* ── FOOTER ── */
         .venue-footer { padding: 0 24px 40px; text-align: center; }
@@ -328,7 +342,11 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
           :root { --page-pad: 20px; }
           .hero { height: 100svh; max-height: 100svh; min-height: 0; }
           .hero-body { padding: 20px 20px 28px var(--page-pad); }
-          .venue-main { padding: 32px var(--page-pad) 0; }
+
+          /* Curved panel: pull the content up over the hero's bottom edge,
+             mobile only — desktop keeps the flat two-column layout. */
+          .venue-main { margin-top: -20px; padding-top: 28px; border-radius: 20px 20px 0 0; }
+
           .contact-strip { padding: 24px 0 40px; }
         }
       `}</style>
@@ -341,9 +359,13 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
           </svg>
           Venues
         </a>
-        {venue.image_url ? (
+        <div className="hero-actions">
+          <VenueShareButton title={venue.name} text={venue.description ?? undefined} />
+          <FollowFavoriteButtons entityType="venue" entityId={venue.id} heartOnly />
+        </div>
+        {heroImage ? (
           <>
-            <img src={venue.image_url} alt={venue.name} className="hero-img" />
+            <img src={heroImage} alt={venue.name} className="hero-img" />
             <div className="hero-scrim" />
           </>
         ) : (
@@ -451,7 +473,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
                             )}
                           </div>
                           {event.ticket_price !== null && (
-                            <span style={{ fontSize: '0.8rem', fontWeight: 500, color: event.ticket_price === 0 ? 'var(--accent)' : 'var(--ink-soft)', flexShrink: 0 }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: event.ticket_price === 0 ? 'var(--accent)' : 'var(--ink)', flexShrink: 0 }}>
                               {event.ticket_price === 0 ? 'Free' : `$${event.ticket_price}`}
                             </span>
                           )}
