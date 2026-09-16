@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { Fragment, useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
-import BrowseHeader from '../components/BrowseHeader'
+import BrowseHeader, { type BrowseLinkGroup } from '../components/BrowseHeader'
 import SearchFilterSheet, { getActiveFilterCount } from '../components/SearchFilterSheet'
 import AdvertisementBanner from '../components/AdvertisementBanner'
 
@@ -12,6 +12,11 @@ type Venue = {
   address: string | null
   neighborhood: string | null
   city: string | null
+  slug: string | null
+}
+
+type Artist = {
+  name: string
   slug: string | null
 }
 
@@ -33,6 +38,9 @@ type Event = {
   star: boolean | null
   slug: string | null
   venue: Venue | null
+  // Linked via event_artists — shown as the "featured artist" line on the
+  // mobile row (all names, comma-separated) when non-empty.
+  artists: Artist[]
 }
 
 type DayGroup = {
@@ -137,9 +145,13 @@ type EventsListProps = {
   // The client fetch below still runs after mount to pick up anything that
   // changed since the server render, then replaces this seed.
   initialEvents?: Event[]
+  // Passed straight through to BrowseHeader — see its own comment for what
+  // this does. Omit entirely (as /artists, /venues do) to get the old
+  // plain-title header with no dropdown.
+  browseLinks?: BrowseLinkGroup[]
 }
 
-export default function EventsList({ initialEvents }: EventsListProps = {}) {
+export default function EventsList({ initialEvents, browseLinks }: EventsListProps = {}) {
   const [events, setEvents] = useState<Event[]>(initialEvents ?? [])
   const [filtered, setFiltered] = useState<Event[]>(initialEvents ?? [])
   const [loading, setLoading] = useState(!initialEvents || initialEvents.length === 0)
@@ -186,7 +198,8 @@ export default function EventsList({ initialEvents }: EventsListProps = {}) {
           id, title, description, event_date, start_date, end_date,
           event_start_time, event_end_time, image_url, ticket_price,
           ticket_url, learnmore_link, event_types, tags, star, slug,
-          venues (id, name, address, neighborhood, city, slug)
+          venues (id, name, address, neighborhood, city, slug),
+          event_artists ( artists ( name, slug ) )
         `)
         .gte('event_date', showPast ? '2020-01-01' : today)
         .order('event_date', { ascending: true })
@@ -196,6 +209,7 @@ export default function EventsList({ initialEvents }: EventsListProps = {}) {
       const mapped = (data || []).map((e: any) => ({
         ...e,
         venue: Array.isArray(e.venues) ? e.venues[0] || null : e.venues || null,
+        artists: (e.event_artists || []).map((ea: any) => ea.artists).filter(Boolean),
       }))
       setEvents(mapped)
       setFiltered(mapped)
@@ -362,6 +376,26 @@ export default function EventsList({ initialEvents }: EventsListProps = {}) {
         .event-price.free { color: #2d7a2d; }
         .event-arrow { color: var(--ink-faint); font-size: 0.9rem; transition: transform 0.15s, color 0.15s; }
         .event-card:hover .event-arrow { transform: translateX(3px); color: var(--accent); }
+
+        /* Compact mobile row (matches EventListRow on the category pages) —
+           hidden ≥641px, where .event-card (above) takes over instead. See
+           the max-width:640px block below for .event-card-desktop hiding. */
+        .event-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--white); text-decoration: none; color: var(--ink); -webkit-tap-highlight-color: transparent; }
+        .event-row:active { background: var(--off); }
+        .event-row.starred { background: var(--accent-light); }
+        .event-row-thumb { width: 44px; height: 44px; flex-shrink: 0; border-radius: 6px; overflow: hidden; background: var(--ink); display: flex; align-items: center; justify-content: center; }
+        .event-row-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .event-row-thumb span { color: rgba(255,255,255,0.15); font-size: 10px; font-weight: 700; }
+        .event-row-body { min-width: 0; flex: 1; }
+        .event-row-title { font-size: 0.85rem; margin-bottom: 2px; display: block; -webkit-line-clamp: unset; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .event-row-sub { font-size: 0.75rem; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .event-row-dot { color: var(--ink-faint); margin: 0 2px; }
+        .event-row-artist { font-size: 0.72rem; color: var(--accent); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .event-row-chevron { flex-shrink: 0; color: var(--ink-faint); }
+        @media (min-width: 641px) {
+          .event-row { display: none; }
+        }
+
         .empty { padding: 80px 24px; text-align: center; color: var(--ink-soft); }
         .empty-title { font-family: var(--serif); font-size: 1.4rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
         .empty-sub { font-size: 0.88rem; color: var(--ink-faint); }
@@ -372,18 +406,16 @@ export default function EventsList({ initialEvents }: EventsListProps = {}) {
         .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
         @keyframes pulse { 0%,80%,100%{opacity:0.3;transform:scale(0.85)}40%{opacity:1;transform:scale(1)} }
         @media (max-width: 640px) {
-          .event-card { grid-template-columns: 68px 1fr auto; }
-          .event-time-col { padding: 14px 10px 14px 14px; }
-          .event-img-thumb { width: 48px; height: 48px; }
-          .event-title { font-size: 0.9rem; }
+          .event-card-desktop { display: none; }
           .page { padding: 0 16px; }
-          .day-label { font-size: 1.1rem; }
-          .day-label-box { padding: 8px 12px; }
-          .event-description { display: none; }
-        }
-        @media (max-width: 480px) {
-          .event-right { padding: 12px 12px 12px 4px; }
-          .event-img-thumb { display: none; }
+
+          /* Day header becomes a full-width bar on mobile instead of the
+             badge + plain text treatment desktop keeps. */
+          .day-header { margin: 0 -16px 16px; padding: 10px 16px; background: var(--ink); border-bottom: none; gap: 10px; }
+          .day-label-box { background: transparent; padding: 0; }
+          .day-label { font-size: 1rem; }
+          .day-sublabel { color: rgba(255,255,255,0.65); font-size: 0.78rem; }
+          .day-count { background: var(--yellow); color: var(--ink); border: none; }
         }
       `}</style>
 
@@ -391,6 +423,7 @@ export default function EventsList({ initialEvents }: EventsListProps = {}) {
         title="Events"
         activeFilterCount={activeFilterCount}
         onOpenFilters={() => setFiltersOpen(true)}
+        browseLinks={browseLinks}
       />
 
       <SearchFilterSheet
@@ -448,64 +481,102 @@ export default function EventsList({ initialEvents }: EventsListProps = {}) {
                     {group.events.map(event => {
                       const href = event.slug ? `/events/${event.slug}` : event.ticket_url || event.learnmore_link || '#'
                       const isExternal = !event.slug
+                      const artistNames = (event.artists || []).map(a => a.name).filter(Boolean).join(', ')
                       return (
-                        <a
-                          key={event.id}
-                          href={href}
-                          target={isExternal ? '_blank' : '_self'}
-                          rel={isExternal ? 'noopener noreferrer' : undefined}
-                          className={`event-card${event.star ? ' starred' : ''}`}
-                          onClick={() => handleEventClick(isExternal)}
-                        >
-                          <div className="event-time-col">
-                            {event.event_start_time ? (
-                              <>
-                                <span className="event-time">{formatTime(event.event_start_time)}</span>
-                                {event.event_end_time && (
-                                  <span className="event-time-end">→ {formatTimeShort(event.event_end_time)}</span>
-                                )}
-                              </>
-                            ) : (
-                              <span className="event-time-tba">TBA</span>
-                            )}
-                          </div>
-                          <div className="event-body">
-                            {event.event_types && event.event_types.length > 0 && (
-                              <div className="event-types-row">
-                                {event.event_types.slice(0, 2).map(t => (
-                                  <span key={t} className="event-type-tag">{t}</span>
-                                ))}
-                              </div>
-                            )}
-                            <div className="event-title">{event.title}</div>
-                            {event.venue && (
-                              <div className="event-venue">
-                                <span className="event-venue-name">{event.venue.name}</span>
-                                {(event.venue.neighborhood || event.venue.city) && (
-                                  <span className="event-venue-neighborhood">
-                                    {' · '}{event.venue.neighborhood || event.venue.city}
+                        <Fragment key={event.id}>
+                          {/* Desktop card — unchanged from before, just hidden ≤640px now */}
+                          <a
+                            href={href}
+                            target={isExternal ? '_blank' : '_self'}
+                            rel={isExternal ? 'noopener noreferrer' : undefined}
+                            className={`event-card event-card-desktop${event.star ? ' starred' : ''}`}
+                            onClick={() => handleEventClick(isExternal)}
+                          >
+                            <div className="event-time-col">
+                              {event.event_start_time ? (
+                                <>
+                                  <span className="event-time">{formatTime(event.event_start_time)}</span>
+                                  {event.event_end_time && (
+                                    <span className="event-time-end">→ {formatTimeShort(event.event_end_time)}</span>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="event-time-tba">TBA</span>
+                              )}
+                            </div>
+                            <div className="event-body">
+                              {event.event_types && event.event_types.length > 0 && (
+                                <div className="event-types-row">
+                                  {event.event_types.slice(0, 2).map(t => (
+                                    <span key={t} className="event-type-tag">{t}</span>
+                                  ))}
+                                </div>
+                              )}
+                              <div className="event-title">{event.title}</div>
+                              {event.venue && (
+                                <div className="event-venue">
+                                  <span className="event-venue-name">{event.venue.name}</span>
+                                  {(event.venue.neighborhood || event.venue.city) && (
+                                    <span className="event-venue-neighborhood">
+                                      {' · '}{event.venue.neighborhood || event.venue.city}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              {event.description && (
+                                <div className="event-description">{event.description}</div>
+                              )}
+                            </div>
+                            <div className="event-right">
+                              {event.image_url && (
+                                <img src={event.image_url} alt={event.title} className="event-img-thumb" />
+                              )}
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                {event.ticket_price !== null && (
+                                  <span className={`event-price ${event.ticket_price === 0 ? 'free' : ''}`}>
+                                    {event.ticket_price === 0 ? 'Free' : `$${event.ticket_price}`}
                                   </span>
                                 )}
+                                <span className="event-arrow">→</span>
                               </div>
-                            )}
-                            {event.description && (
-                              <div className="event-description">{event.description}</div>
-                            )}
-                          </div>
-                          <div className="event-right">
-                            {event.image_url && (
-                              <img src={event.image_url} alt={event.title} className="event-img-thumb" />
-                            )}
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                              {event.ticket_price !== null && (
-                                <span className={`event-price ${event.ticket_price === 0 ? 'free' : ''}`}>
-                                  {event.ticket_price === 0 ? 'Free' : `$${event.ticket_price}`}
-                                </span>
-                              )}
-                              <span className="event-arrow">→</span>
                             </div>
-                          </div>
-                        </a>
+                          </a>
+
+                          {/* Compact mobile row — hidden ≥641px (see .event-row CSS) */}
+                          <a
+                            href={href}
+                            target={isExternal ? '_blank' : '_self'}
+                            rel={isExternal ? 'noopener noreferrer' : undefined}
+                            className={`event-row${event.star ? ' starred' : ''}`}
+                            onClick={() => handleEventClick(isExternal)}
+                          >
+                            <div className="event-row-thumb">
+                              {event.image_url ? (
+                                <img src={event.image_url} alt="" />
+                              ) : (
+                                <span>785</span>
+                              )}
+                            </div>
+                            <div className="event-row-body">
+                              <div className="event-title event-row-title">{event.title}</div>
+                              <div className="event-row-sub">
+                                {event.event_start_time ? formatTime(event.event_start_time) : 'TBA'}
+                                {event.venue?.name && (
+                                  <>
+                                    <span className="event-row-dot">·</span>
+                                    {event.venue.name}
+                                  </>
+                                )}
+                              </div>
+                              {artistNames && (
+                                <div className="event-row-artist">{artistNames}</div>
+                              )}
+                            </div>
+                            <svg className="event-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                          </a>
+                        </Fragment>
                       )
                     })}
                   </div>
