@@ -12,6 +12,11 @@ const SENDER_API_TOKEN = process.env.SENDER_API_TOKEN as string;
 // GET https://api.sender.net/v2/groups if you forget it.
 const GROUP_ID = process.env.SENDER_GROUP_ID as string;
 
+// Anything submitted faster than this (ms) after the form rendered is
+// treated as a bot, not a fast typist — nobody sees the form, reads it,
+// and fills in a real email in under a second.
+const MIN_SUBMIT_MS = 1500;
+
 async function senderFetch(path: string, options: RequestInit = {}) {
   const res = await fetch(`${SENDER_API_BASE}${path}`, {
     ...options,
@@ -40,6 +45,22 @@ export async function handleSignup(formData: FormData) {
   const phone = formData.get('phone') as string;
   const subscribeEmail = formData.get('subscribeEmail') === 'true';
   const subscribeSMS = formData.get('subscribeSMS') === 'true';
+
+  // --- Bot checks -----------------------------------------------------
+  // Both checks fail *silently* — we return the normal success message
+  // rather than an error, so a bot gets no signal about which defense
+  // caught it (or that anything was caught at all) and has less reason
+  // to adapt and retry.
+  const honeypot = formData.get('company') as string | null;
+  if (honeypot) {
+    return { success: true, message: 'Successfully subscribed!' };
+  }
+
+  const renderedAt = Number(formData.get('renderedAt'));
+  if (renderedAt && Date.now() - renderedAt < MIN_SUBMIT_MS) {
+    return { success: true, message: 'Successfully subscribed!' };
+  }
+  // ---------------------------------------------------------------------
 
   if (!email && subscribeEmail) {
     return { success: false, error: 'Email is required for email updates.' };
