@@ -30,6 +30,11 @@ export type SeoFilteredEvent = {
   event_types: string[] | null
   star: boolean | null
   venue: { name: string; neighborhood: string | null } | null
+  // Artists linked via event_artists — shown as the "featured artist" line
+  // on the /events mobile list when non-empty. Multiple artists (e.g. a
+  // multi-act bill) are all included, in whatever order Supabase returns
+  // the join; render-side code joins them for display.
+  artists: { name: string; slug: string | null }[]
 }
 
 // "Today" in America/Chicago, as YYYY-MM-DD — every event is Topeka-area, so
@@ -78,7 +83,8 @@ function chicagoThisMonthRange(): { start: string; end: string } {
 const EVENT_SELECT = `
   id, title, slug, event_date, event_start_time, event_end_time, start_date, end_date,
   image_url, ticket_price, ticket_url, event_types, star, description,
-  venues (name, neighborhood)
+  venues (name, neighborhood),
+  event_artists ( artists ( name, slug ) )
 `
 
 export async function getSeoPage(slug: string): Promise<SeoPageRow | null> {
@@ -154,5 +160,6 @@ export async function getFilteredEvents(page: SeoPageRow, limit = 60): Promise<S
   return (data || []).map((e: any) => ({
     ...e,
     venue: Array.isArray(e.venues) ? e.venues[0] || null : e.venues || null,
+    artists: (e.event_artists || []).map((ea: any) => ea.artists).filter(Boolean),
   }))
 }
