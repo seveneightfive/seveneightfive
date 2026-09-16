@@ -167,12 +167,20 @@ export default function EventsList({ initialEvents, browseLinks }: EventsListPro
   const [endDate, setEndDate] = useState<string | null>(null)
 
   const scrollRestored = useRef(false)
+  // Distinct from `loading`: `loading` is already false as soon as the SSR
+  // seed (initialEvents, capped at 60) is in state, so gating scroll
+  // restoration on `loading` alone was restoring against that truncated
+  // list — anything scrolled to past event #60 got clamped to the bottom
+  // of the short seed list instead of its real position. This only flips
+  // true once the client-side fetch (unbounded, the real full list) has
+  // actually landed.
+  const [freshDataLoaded, setFreshDataLoaded] = useState(false)
 
   useEffect(() => {
-    if (!loading && !scrollRestored.current) {
+    if (freshDataLoaded && !scrollRestored.current) {
+      scrollRestored.current = true
       const saved = sessionStorage.getItem('eventsScrollPos')
       if (saved) {
-        scrollRestored.current = true
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             window.scrollTo({ top: parseInt(saved), behavior: 'instant' })
@@ -181,7 +189,7 @@ export default function EventsList({ initialEvents, browseLinks }: EventsListPro
         })
       }
     }
-  }, [loading])
+  }, [freshDataLoaded])
 
   const handleEventClick = useCallback((isExternal: boolean) => {
     if (!isExternal) {
@@ -214,6 +222,7 @@ export default function EventsList({ initialEvents, browseLinks }: EventsListPro
       setEvents(mapped)
       setFiltered(mapped)
       setLoading(false)
+      setFreshDataLoaded(true)
     }
     fetchEvents()
   }, [showPast])
@@ -342,8 +351,8 @@ export default function EventsList({ initialEvents, browseLinks }: EventsListPro
           --serif: 'Oswald', sans-serif; --sans: 'DM Sans', system-ui, sans-serif;
         }
         html, body { background: var(--white); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
-        .events-root { overflow-x: hidden; max-width: 100vw; }
-        .page { max-width: 1100px; margin: 0 auto; padding: 0 24px; overflow: hidden; }
+        .events-root { max-width: 100vw; }
+        .page { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
 
         .calendar { padding: 24px 0 80px; }
         .day-group { margin-bottom: 48px; }
@@ -410,12 +419,35 @@ export default function EventsList({ initialEvents, browseLinks }: EventsListPro
           .page { padding: 0 16px; }
 
           /* Day header becomes a full-width bar on mobile instead of the
-             badge + plain text treatment desktop keeps. */
-          .day-header { margin: 0 -16px 16px; padding: 10px 16px; background: var(--ink); border-bottom: none; gap: 10px; }
+             badge + plain text treatment desktop keeps. Uses the viewport-
+             relative bleed trick (same one SignupForm's .wrap uses) rather
+             than a negative margin sized to cancel this component's own
+             padding — .page here sits inside another 24px-padded wrapper
+             from app/events/page.tsx, so a margin only large enough to
+             cancel .page's own padding would still land short of the true
+             edge. This version doesn't care how many padded ancestors are
+             in between; it's always exactly the viewport width. */
+          .day-header {
+            width: 100vw;
+            margin-left: calc(50% - 50vw);
+            margin-right: calc(50% - 50vw);
+            margin-bottom: 16px;
+            padding: 10px 16px;
+            background: var(--ink);
+            border-bottom: none;
+            gap: 10px;
+          }
           .day-label-box { background: transparent; padding: 0; }
           .day-label { font-size: 1rem; }
           .day-sublabel { color: rgba(255,255,255,0.65); font-size: 0.78rem; }
           .day-count { background: var(--yellow); color: var(--ink); border: none; }
+
+          /* Wider, 16:9 thumbnail instead of a 44px square — there was
+             spare horizontal room to the left of the text in each row,
+             this uses it rather than leaving it blank. Facebook's event
+             list is the reference point: a landscape thumbnail, not a
+             square avatar-style one. */
+          .event-row-thumb { width: 112px; aspect-ratio: 16 / 9; height: auto; }
         }
       `}</style>
 
