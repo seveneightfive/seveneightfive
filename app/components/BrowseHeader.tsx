@@ -15,6 +15,11 @@ const NAV_LINKS = [
   { href: '/dashboard', label: 'Dashboard' },
 ]
 
+export type BrowseLinkGroup = {
+  group: string
+  links: { href: string; label: string }[]
+}
+
 // Only show a back arrow when there's actually somewhere to go back to —
 // i.e. the user navigated here from elsewhere on the site during this
 // session, rather than landing directly on /events, /artists, or /venues
@@ -38,13 +43,29 @@ type BrowseHeaderProps = {
   title: string
   activeFilterCount: number
   onOpenFilters: () => void
+  // Optional. When provided, the header swaps its plain title for a
+  // "Browse Events" dropdown trigger below 900px (the same breakpoint
+  // where app/events/page.tsx's own desktop sidebar takes over) — so
+  // browsing by date/category and Search & Filter live in one sticky
+  // row instead of a separate <details> block further down the page.
+  // At ≥900px the plain title returns, since the sidebar already covers
+  // the same links there.
+  browseLinks?: BrowseLinkGroup[]
+  browseLabel?: string
 }
 
-export default function BrowseHeader({ title, activeFilterCount, onOpenFilters }: BrowseHeaderProps) {
+export default function BrowseHeader({
+  title,
+  activeFilterCount,
+  onOpenFilters,
+  browseLinks,
+  browseLabel = 'Browse Events',
+}: BrowseHeaderProps) {
   const pathname = usePathname()
   const router = useRouter()
   const showBack = useShowBackButton()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [browseOpen, setBrowseOpen] = useState(false)
   const isActive = (href: string) => href === '/' ? pathname === '/' : pathname.startsWith(href)
 
   return (
@@ -56,12 +77,8 @@ export default function BrowseHeader({ title, activeFilterCount, onOpenFilters }
               /events, /artists, /venues (see SiteNav's
               HIDE_DESKTOP_TOPNAV_PATHS), which means its logo needs to
               come along too, or there's no way back to "/" on desktop
-              except browser back. Mobile skips this: the compact header
-              itself is hidden on mobile for these routes (SiteNav's
-              HIDE_MOBILE_HEADER_PATHS), and the bottom tab bar doesn't
-              have a Home tab either (Events/Artists/Venues/MY 785 only,
-              intentionally capped at 4) — same gap exists on mobile,
-              just not what was asked about here. */}
+              except browser back. Mobile gets a Home tab in the bottom
+              nav instead. */}
           <Link href="/" className={styles.logo} aria-label="seveneightfive home">785</Link>
           <span className={styles.logoDivider} aria-hidden="true" />
           {showBack && (
@@ -71,7 +88,57 @@ export default function BrowseHeader({ title, activeFilterCount, onOpenFilters }
               </svg>
             </button>
           )}
-          <span className={styles.title}>{title}</span>
+
+          {browseLinks ? (
+            <>
+              {/* ≥900px only — the sidebar in app/events/page.tsx already
+                  covers browsing at this width, so this is just a label. */}
+              <span className={`${styles.title} ${styles.titleDesktopOnly}`}>{title}</span>
+
+              {/* <900px only — merges what used to be the separate
+                  "Browse Events" <details> accordion into this sticky row. */}
+              <div className={styles.browseWrap}>
+                <button
+                  type="button"
+                  className={styles.browseTrigger}
+                  onClick={() => setBrowseOpen(o => !o)}
+                  aria-expanded={browseOpen}
+                  aria-haspopup="true"
+                >
+                  {browseLabel}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+                {browseOpen && (
+                  <>
+                    <div className={styles.menuScrim} onClick={() => setBrowseOpen(false)} />
+                    <div className={styles.browseDropdown} role="menu">
+                      {browseLinks.map((section) => (
+                        <div key={section.group} className={styles.browseGroup}>
+                          <div className={styles.browseGroupLabel}>{section.group}</div>
+                          <div className={styles.browseGroupLinks}>
+                            {section.links.map((link) => (
+                              <a
+                                key={link.href}
+                                href={link.href}
+                                className={styles.browsePill}
+                                onClick={() => setBrowseOpen(false)}
+                              >
+                                {link.label}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          ) : (
+            <span className={styles.title}>{title}</span>
+          )}
         </div>
 
         <div className={styles.right}>

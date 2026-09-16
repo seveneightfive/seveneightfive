@@ -75,6 +75,91 @@
   text-overflow: ellipsis;
 }
 
+/* Hidden by default — only shown at ≥900px when browseLinks is passed
+   (see media query below). Pages that don't pass browseLinks render
+   .title unconditionally instead and never get this class. */
+.titleDesktopOnly {
+  display: none;
+}
+
+.browseWrap {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+
+.browseTrigger {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-family: 'Oswald', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #0A0A0A;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.browseDropdown {
+  position: absolute;
+  top: 38px;
+  left: 0;
+  z-index: 200;
+  width: 260px;
+  max-width: calc(100vw - 40px);
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #ece8e2;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(10, 10, 10, 0.1);
+}
+
+.browseGroup {
+  margin-bottom: 14px;
+}
+
+.browseGroup:last-child {
+  margin-bottom: 0;
+}
+
+.browseGroupLabel {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9a948c;
+  margin-bottom: 8px;
+}
+
+.browseGroupLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.browsePill {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1814;
+  background: #f2ede6;
+  border: 1px solid #ece8e2;
+  border-radius: 999px;
+  padding: 5px 12px;
+  text-decoration: none;
+}
+
+.browsePill:hover {
+  background: #ece5db;
+}
+
 .right {
   display: flex;
   align-items: center;
@@ -210,5 +295,18 @@
 
   .hamburgerWrap {
     display: block;
+  }
+}
+
+/* Matches the breakpoint where app/events/page.tsx switches from the
+   mobile single-column layout to its desktop sidebar — the Browse
+   Events dropdown is redundant once that sidebar is visible. */
+@media (min-width: 900px) {
+  .browseWrap {
+    display: none;
+  }
+
+  .titleDesktopOnly {
+    display: inline-block;
   }
 }
