@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import styles from './nav.module.css'
-import { useNavState } from './NavContext'
 import MobileBottomNav from './MobileBottomNav'
 
 // Routes where ALL nav chrome (header + bottom nav) is hidden — detail
@@ -19,18 +18,7 @@ const IMMERSIVE_PREFIXES = [
 ]
 
 // Routes with their own BrowseHeader (logo/back + title + Search & Filter),
-// so SiteNav's mobile 785 header would be redundant here.
-const HIDE_MOBILE_HEADER_PATHS = [
-  '/',
-  '/events',
-  '/artists',
-  '/venues',
-  '/magazine',
-]
-
-// Of those, the browse (non-home) pages also replace the desktop topnav —
-// BrowseHeader includes its own hamburger with the same nav links.
-// Home keeps the desktop topnav for site-wide navigation.
+// so SiteNav's desktop topnav would be redundant here.
 const HIDE_DESKTOP_TOPNAV_PATHS = [
   '/events',
   '/artists',
@@ -43,14 +31,10 @@ function isImmersive(pathname: string) {
 
 export default function SiteNav() {
   const pathname = usePathname()
-  const { rightText } = useNavState()
 
   if (isImmersive(pathname)) return null
 
-  const hideMobileHeader = HIDE_MOBILE_HEADER_PATHS.includes(pathname)
   const hideDesktopTopnav = HIDE_DESKTOP_TOPNAV_PATHS.includes(pathname)
-
-  const date = new Date().toLocaleString('en-US', { month: 'short', year: 'numeric' })
   const isActive = (prefix: string) => pathname.startsWith(prefix)
 
   return (
@@ -74,20 +58,9 @@ export default function SiteNav() {
         </header>
       )}
 
-      {!hideMobileHeader && (
-        <header className={styles.mobileHeader}>
-          <Link href="/" className={styles.logoLink} aria-label="seveneightfive home">
-            <img
-              src="https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785logo_web_Proxy.png"
-              alt="seveneightfive"
-              className={styles.logoImgMobile}
-            />
-          </Link>
-          <span className={styles.date}>
-            {rightText || date}
-          </span>
-        </header>
-      )}
+      {/* Mobile header (logo + date bar) intentionally removed — it read as
+          a web-page banner rather than app chrome. Getting back to '/' on
+          mobile now happens via the Home tab in MobileBottomNav instead. */}
 
       <MobileBottomNav />
     </>
