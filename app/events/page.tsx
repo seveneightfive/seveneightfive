@@ -23,10 +23,10 @@ export const metadata: Metadata = {
 }
 
 // Real, crawlable HTML links to every filter destination page. Rendered
-// twice below (once in the desktop sidebar, once in the mobile <details>)
-// from this one array, so both stay in sync and neither view is JS-gated —
-// Google's mobile-first indexing sees the same links a desktop crawl would,
-// just laid out differently.
+// twice below (once in the desktop sidebar, once in BrowseHeader's mobile
+// "Browse Events" dropdown) from this one array, so both stay in sync and
+// neither view is JS-gated — Google's mobile-first indexing sees the same
+// links a desktop crawl would, just laid out differently.
 const BROWSE_LINKS: { group: string; links: { href: string; label: string }[] }[] = [
   {
     group: 'By Date',
@@ -89,8 +89,9 @@ function buildItemListJsonLd(events: Awaited<ReturnType<typeof getFilteredEvents
   }
 }
 
-// Shared so the sidebar and the mobile <details> render identical markup
-// from the same array — see BROWSE_LINKS comment above.
+// Used by the desktop sidebar only now — the mobile equivalent lives inside
+// BrowseHeader's dropdown (see EventsList's browseLinks prop), rendered from
+// this same BROWSE_LINKS array so both stay in sync.
 function BrowseLinksGroups() {
   return (
     <>
@@ -134,20 +135,6 @@ export default async function EventsPage() {
         }
         .events-hub-sub { margin-top: 10px; max-width: 720px; font-size: 15px; line-height: 1.5; color: #4a4640; }
 
-        /* Mobile: browse links live in a plain <details> disclosure right
-           under the intro — collapsed by default so they don't push the
-           event list down, but still real, crawlable, JS-free markup. */
-        .browse-mobile { margin-top: 18px; border: 1px solid #ece8e2; border-radius: 10px; }
-        .browse-mobile summary {
-          list-style: none; cursor: pointer; padding: 12px 16px; font-family: 'Oswald', sans-serif;
-          font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: #1a1814;
-          display: flex; align-items: center; justify-content: space-between;
-        }
-        .browse-mobile summary::-webkit-details-marker { display: none; }
-        .browse-mobile summary::after { content: '+'; font-size: 18px; color: #9a948c; }
-        .browse-mobile[open] summary::after { content: '−'; }
-        .browse-mobile-body { padding: 4px 16px 16px; }
-
         .browse-group { margin-bottom: 12px; }
         .browse-group:last-child { margin-bottom: 0; }
         .browse-group-label {
@@ -163,17 +150,17 @@ export default async function EventsPage() {
         .browse-pill:hover { background: #ece5db; }
 
         /* Desktop: two-column layout — sticky sidebar + main content.
-           Below 900px this collapses to a single column (sidebar hidden,
-           mobile <details> shown instead) — matches the breakpoint used
-           elsewhere on the site (e.g. the event detail page's image/details
-           split) for consistency. */
+           Below 900px this collapses to a single column (sidebar hidden;
+           BrowseHeader's "Browse Events" dropdown covers the same links
+           instead) — matches the breakpoint used elsewhere on the site
+           (e.g. the event detail page's image/details split) for
+           consistency. */
         .events-hub-layout { max-width: 1100px; margin: 0 auto; padding: 20px 24px 0; display: block; }
         .events-hub-sidebar { display: none; }
 
         @media (min-width: 900px) {
           .events-hub-layout { display: grid; grid-template-columns: 220px 1fr; gap: 32px; align-items: start; padding: 20px 0 0; }
           .events-hub-sidebar { display: block; position: sticky; top: 84px; }
-          .browse-mobile { display: none; }
         }
       `}</style>
 
@@ -183,14 +170,6 @@ export default async function EventsPage() {
           Find upcoming concerts, live music, festivals, art exhibits, theater, comedy, family activities
           and more happening in Topeka, Kansas.
         </p>
-
-        {/* Mobile only (hidden ≥900px via CSS) */}
-        <details className="browse-mobile">
-          <summary>Browse Events</summary>
-          <div className="browse-mobile-body">
-            <BrowseLinksGroups />
-          </div>
-        </details>
       </div>
 
       <div className="events-hub-layout">
@@ -203,8 +182,8 @@ export default async function EventsPage() {
           {/* Full interactive browse/filter experience, seeded with the
               same server-fetched events above so there's real content in
               the initial HTML — not an empty shell waiting on a client
-              fetch. */}
-          <EventsList initialEvents={initialEvents as any} />
+              fetch. browseLinks feeds BrowseHeader's mobile dropdown. */}
+          <EventsList initialEvents={initialEvents as any} browseLinks={BROWSE_LINKS} />
         </div>
       </div>
     </>
