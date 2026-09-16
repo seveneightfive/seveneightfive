@@ -64,6 +64,18 @@
   color: rgba(255, 255, 255, 0.4);
 }
 
+/* Honeypot — positioned off-screen rather than display:none/visibility:
+   hidden, since some bot scripts specifically skip fields hidden that way.
+   Real visitors (and screen readers, via aria-hidden on the wrapper) never
+   encounter it. */
+.hp {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
 .btn {
   flex-shrink: 0;
   background: #ffffff;
