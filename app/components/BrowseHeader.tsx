@@ -52,6 +52,13 @@ type BrowseHeaderProps = {
   // the same links there.
   browseLinks?: BrowseLinkGroup[]
   browseLabel?: string
+  // /events uses a bespoke month-nav toolbar (rendered by EventsList) below
+  // 900px instead of this header, since "Browse Events" and "Search &
+  // Filter" as plain text no longer fit that design. This hides this whole
+  // header there while leaving it exactly as before at ≥900px, where the
+  // sidebar + this header are still the nav. /artists, /venues don't pass
+  // this, so they're unaffected.
+  hideOnMobile?: boolean
 }
 
 export default function BrowseHeader({
@@ -60,6 +67,7 @@ export default function BrowseHeader({
   onOpenFilters,
   browseLinks,
   browseLabel = 'Browse Events',
+  hideOnMobile = false,
 }: BrowseHeaderProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -69,7 +77,7 @@ export default function BrowseHeader({
   const isActive = (href: string) => href === '/' ? pathname === '/' : pathname.startsWith(href)
 
   return (
-    <div className={styles.browseHeader}>
+    <div className={`${styles.browseHeader}${hideOnMobile ? ` ${styles.hideOnMobile}` : ''}`}>
       <div className={styles.row}>
         <div className={styles.left}>
           {/* Desktop-only home mark (hidden below 640px via CSS) — this
