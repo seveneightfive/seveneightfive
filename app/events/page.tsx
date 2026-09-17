@@ -127,11 +127,23 @@ export default async function EventsPage() {
       )}
 
       <style>{`
-        .events-hub-intro { max-width: 1100px; margin: 0 auto; padding: 24px 24px 0; }
+        .events-hub-intro { max-width: 1100px; margin: 0 auto; padding: 12px 24px 0; }
         .events-hub-h1 {
           font-family: 'Oswald', sans-serif; font-weight: 800; text-transform: uppercase;
           letter-spacing: 0.02em; font-size: clamp(1.6rem, 4vw, 2.4rem); line-height: 1.15;
           margin: 0; color: #1a1814;
+        }
+
+        /* Mobile: the new month-nav toolbar (rendered inside EventsList) is
+           the primary chrome now, so the H1 steps back to a small label
+           above it — still real text for SEO, just not competing visually
+           with the toolbar underneath it. Desktop keeps the larger H1 since
+           it still sits above the sidebar + BrowseHeader layout as before. */
+        @media (max-width: 899px) {
+          .events-hub-intro { padding: 10px 16px 0; }
+          .events-hub-h1 {
+            font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: #8a8479;
+          }
         }
 
         .browse-group { margin-bottom: 12px; }
@@ -156,6 +168,10 @@ export default async function EventsPage() {
            consistency. */
         .events-hub-layout { max-width: 1100px; margin: 0 auto; padding: 20px 24px 0; display: block; }
         .events-hub-sidebar { display: none; }
+
+        @media (max-width: 899px) {
+          .events-hub-layout { padding: 0; }
+        }
 
         @media (min-width: 900px) {
           .events-hub-layout { display: grid; grid-template-columns: 220px 1fr; gap: 32px; align-items: start; padding: 20px 0 0; }
