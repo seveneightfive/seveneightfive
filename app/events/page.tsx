@@ -133,7 +133,6 @@ export default async function EventsPage() {
           letter-spacing: 0.02em; font-size: clamp(1.6rem, 4vw, 2.4rem); line-height: 1.15;
           margin: 0; color: #1a1814;
         }
-        .events-hub-sub { margin-top: 10px; max-width: 720px; font-size: 15px; line-height: 1.5; color: #4a4640; }
 
         .browse-group { margin-bottom: 12px; }
         .browse-group:last-child { margin-bottom: 0; }
@@ -166,10 +165,6 @@ export default async function EventsPage() {
 
       <div className="events-hub-intro">
         <h1 className="events-hub-h1">Topeka Events &amp; Things to Do</h1>
-        <p className="events-hub-sub">
-          Find upcoming concerts, live music, festivals, art exhibits, theater, comedy, family activities
-          and more happening in Topeka, Kansas.
-        </p>
       </div>
 
       <div className="events-hub-layout">
