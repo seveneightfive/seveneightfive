@@ -339,6 +339,70 @@ export default function EventsList({ initialEvents, browseLinks }: EventsListPro
 
   const dayGroups = getDayGroups(filtered)
 
+  // ── Month nav (toolbar) ──────────────────────────────────────────────
+  // Distinct months present in the current (filtered) list, in order, each
+  // tagged with the dateKey of its first day-group — that's the scroll
+  // target. Arrows move through this array; they don't refetch or filter,
+  // just scroll the existing list (per the "scroll, don't filter" call).
+  const monthMarkers = useMemo(() => {
+    const seen = new Set<string>()
+    const markers: { key: string; label: string; firstDateKey: string }[] = []
+    dayGroups.forEach(g => {
+      const monthKey = g.dateKey.slice(0, 7) // 'YYYY-MM'
+      if (!seen.has(monthKey)) {
+        seen.add(monthKey)
+        const d = new Date(g.dateKey + 'T12:00:00')
+        markers.push({
+          key: monthKey,
+          label: d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+          firstDateKey: g.dateKey,
+        })
+      }
+    })
+    return markers
+  }, [dayGroups])
+
+  const [activeMonthIdx, setActiveMonthIdx] = useState(0)
+  useEffect(() => { setActiveMonthIdx(0) }, [monthMarkers.length])
+
+  const monthRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  // Keeps the toolbar's month label in sync with free scrolling too, not
+  // just the arrows — otherwise scrolling manually would leave the arrows'
+  // label pointing at the wrong month. rootMargin's negative top roughly
+  // matches the sticky toolbar's height, so a month only counts as "active"
+  // once it's actually clear of that overlay, not just technically visible
+  // behind it.
+  useEffect(() => {
+    if (monthMarkers.length === 0) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const idx = monthMarkers.findIndex(m => m.firstDateKey === entry.target.getAttribute('data-month-marker'))
+            if (idx !== -1) setActiveMonthIdx(idx)
+          }
+        })
+      },
+      { rootMargin: '-116px 0px -70% 0px', threshold: 0 }
+    )
+    monthMarkers.forEach(m => {
+      const el = monthRefs.current[m.firstDateKey]
+      if (el) observer.observe(el)
+    })
+    return () => observer.disconnect()
+  }, [monthMarkers])
+
+  const navigateMonth = (direction: -1 | 1) => {
+    const nextIdx = activeMonthIdx + direction
+    if (nextIdx < 0 || nextIdx >= monthMarkers.length) return
+    setActiveMonthIdx(nextIdx)
+    const target = monthRefs.current[monthMarkers[nextIdx].firstDateKey]
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const [categoriesOpen, setCategoriesOpen] = useState(false)
+
   return (
     <>
       <style>{`
@@ -355,7 +419,24 @@ export default function EventsList({ initialEvents, browseLinks }: EventsListPro
         .page { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
 
         .calendar { padding: 24px 0 80px; }
-        .day-group { margin-bottom: 48px; }
+        .day-group { margin-bottom: 48px; scroll-margin-top: 116px; }
+
+        .events-toolbar { position: sticky; top: 0; z-index: 100; background: var(--white); border-bottom: 2px solid var(--ink); }
+        .events-toolbar-month { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 10px 14px 8px; }
+        .events-toolbar-arrow { display: flex; align-items: center; justify-content: center; background: none; border: none; padding: 4px; color: var(--ink); cursor: pointer; }
+        .events-toolbar-arrow:disabled { color: var(--ink-faint); cursor: default; }
+        .events-toolbar-month-label { font-family: var(--serif); font-weight: 700; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink); min-width: 150px; text-align: center; }
+        .events-toolbar-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px 10px; border-top: 0.5px solid var(--border); }
+        .events-toolbar-cal-btn { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 100px; border: 1.5px solid var(--border); background: none; color: var(--ink); cursor: pointer; }
+        .events-toolbar-categories-wrap { position: relative; }
+        .events-toolbar-categories-btn { display: flex; align-items: center; gap: 5px; background: none; border: none; padding: 0; font-family: var(--serif); font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink); cursor: pointer; }
+        .events-toolbar-scrim { position: fixed; inset: 0; z-index: 150; background: transparent; }
+        .events-toolbar-categories-panel { position: absolute; top: 30px; right: 0; z-index: 200; width: 240px; max-height: 320px; overflow-y: auto; padding: 10px; background: var(--white); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(10,10,10,0.12); }
+        .events-toolbar-cat-option { display: flex; align-items: center; gap: 8px; padding: 7px 6px; font-size: 0.82rem; color: var(--ink); }
+        .events-toolbar-cat-clear { width: 100%; margin-top: 6px; padding: 8px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--accent); background: none; border: none; border-top: 0.5px solid var(--border); cursor: pointer; }
+        @media (min-width: 900px) {
+          .events-toolbar { display: none; }
+        }
         .day-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 3px solid var(--ink); }
         .day-label-box { background: var(--ink); padding: 10px 16px; flex-shrink: 0; }
         .day-label { font-family: var(--serif); font-size: 1.3rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; line-height: 1; color: var(--yellow); }
@@ -389,7 +470,7 @@ export default function EventsList({ initialEvents, browseLinks }: EventsListPro
         /* Compact mobile row (matches EventListRow on the category pages) —
            hidden ≥641px, where .event-card (above) takes over instead. See
            the max-width:640px block below for .event-card-desktop hiding. */
-        .event-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--white); text-decoration: none; color: var(--ink); -webkit-tap-highlight-color: transparent; }
+        .event-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; background: var(--white); text-decoration: none; color: var(--ink); -webkit-tap-highlight-color: transparent; }
         .event-row:active { background: var(--off); }
         .event-row.starred { background: var(--accent-light); }
         .event-row-thumb { width: 44px; height: 44px; flex-shrink: 0; border-radius: 6px; overflow: hidden; background: var(--ink); display: flex; align-items: center; justify-content: center; }
@@ -456,7 +537,90 @@ export default function EventsList({ initialEvents, browseLinks }: EventsListPro
         activeFilterCount={activeFilterCount}
         onOpenFilters={() => setFiltersOpen(true)}
         browseLinks={browseLinks}
+        hideOnMobile
       />
+
+      {/* Mobile-only (≥900px hides via CSS — BrowseHeader + the sidebar
+          cover that range instead). Sticky from the top of the page,
+          not just after scrolling past the intro — the month arrows
+          scroll the existing list to that month rather than refetching,
+          and the label re-syncs while scrolling freely too (see the
+          IntersectionObserver effect above). */}
+      <div className="events-toolbar">
+        <div className="events-toolbar-month">
+          <button
+            type="button"
+            className="events-toolbar-arrow"
+            onClick={() => navigateMonth(-1)}
+            disabled={activeMonthIdx === 0}
+            aria-label="Previous month"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
+          <span className="events-toolbar-month-label">
+            {monthMarkers[activeMonthIdx]?.label || '\u00A0'}
+          </span>
+          <button
+            type="button"
+            className="events-toolbar-arrow"
+            onClick={() => navigateMonth(1)}
+            disabled={activeMonthIdx >= monthMarkers.length - 1}
+            aria-label="Next month"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+          </button>
+        </div>
+        <div className="events-toolbar-row">
+          <button
+            type="button"
+            className="events-toolbar-cal-btn"
+            onClick={() => setFiltersOpen(true)}
+            aria-label="Open date and search filters"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+          </button>
+          <div className="events-toolbar-categories-wrap">
+            <button
+              type="button"
+              className="events-toolbar-categories-btn"
+              onClick={() => setCategoriesOpen(o => !o)}
+              aria-expanded={categoriesOpen}
+              aria-haspopup="true"
+            >
+              Categories{selectedCategories.length > 0 ? ` (${selectedCategories.length})` : ''}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
+            </button>
+            {categoriesOpen && (
+              <>
+                <div className="events-toolbar-scrim" onClick={() => setCategoriesOpen(false)} />
+                <div className="events-toolbar-categories-panel" role="menu">
+                  {CATEGORY_OPTIONS.map(cat => (
+                    <label key={cat} className="events-toolbar-cat-option">
+                      <input
+                        type="checkbox"
+                        checked={selectedCategories.includes(cat)}
+                        onChange={() => toggleCategory(cat)}
+                      />
+                      {cat}
+                    </label>
+                  ))}
+                  {selectedCategories.length > 0 && (
+                    <button
+                      type="button"
+                      className="events-toolbar-cat-clear"
+                      onClick={() => setSelectedCategories([])}
+                    >
+                      Clear categories
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
 
       <SearchFilterSheet
         open={filtersOpen}
@@ -494,14 +658,20 @@ export default function EventsList({ initialEvents, browseLinks }: EventsListPro
                 <div className="empty-sub">Try adjusting your filters or check back soon.</div>
               </div>
             ) : (
-              dayGroups.map((group, groupIdx) => (
+              dayGroups.map((group, groupIdx) => {
+                const isFirstOfMonth = groupIdx === 0 || dayGroups[groupIdx - 1].dateKey.slice(0, 7) !== group.dateKey.slice(0, 7)
+                return (
                 <div key={group.dateKey}>
                 {groupIdx === 1 && (
                   <div style={{ marginBottom: 48 }}>
                     <AdvertisementBanner />
                   </div>
                 )}
-                <div className="day-group">
+                <div
+                  className="day-group"
+                  ref={isFirstOfMonth ? (el => { monthRefs.current[group.dateKey] = el }) : undefined}
+                  data-month-marker={isFirstOfMonth ? group.dateKey : undefined}
+                >
                   <div className="day-header">
                     <div className="day-label-box">
                       <span className="day-label">{group.label.toUpperCase()}</span>
@@ -614,7 +784,8 @@ export default function EventsList({ initialEvents, browseLinks }: EventsListPro
                   </div>
                 </div>
                 </div>
-              ))
+                )
+              })
             )}
           </section>
         )}
