@@ -12,6 +12,13 @@ type Props = {
   venueAddress: string | null
   description: string | null
   slug: string
+  // Icon-only circular trigger instead of the full-width labeled button —
+  // used in the mobile time+actions row, where there isn't room for two
+  // full-width "Add to Calendar" / "Share" buttons stacked under the time.
+  // Same dropdown, same everything else; just the trigger and its anchor
+  // side change (anchored right instead of left, so the panel doesn't run
+  // off the edge of the screen from a button sitting near the right side).
+  compact?: boolean
 }
 
 function toCalStamp(date: string, time: string | null): string {
@@ -26,7 +33,7 @@ function toCalStamp(date: string, time: string | null): string {
 
 export default function AddToCalendar({
   title, date, startTime, endTime, endDate,
-  venueName, venueAddress, description, slug,
+  venueName, venueAddress, description, slug, compact = false,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [hovered, setHovered] = useState<string | null>(null)
@@ -121,36 +128,62 @@ export default function AddToCalendar({
   }
 
   return (
-    <div style={{ position: 'relative', width: '100%' }} ref={ref}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        style={{
-          display: 'inline-flex',
-          width: '100%',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '7px',
-          padding: '13px 20px',
-          borderRadius: '8px',
-          fontFamily: 'var(--serif)',
-          fontSize: '0.88rem',
-          fontWeight: 600,
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-          background: 'transparent',
-          color: 'var(--ink)',
-          border: '2px solid var(--border)',
-          cursor: 'pointer',
-          transition: 'border-color 0.15s',
-        }}
-        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--ink)')}
-        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
-      >
-        Add to Calendar
-        <ChevronIcon open={open} />
-      </button>
+    <div style={{ position: 'relative', width: compact ? 'auto' : '100%' }} ref={ref}>
+      {compact ? (
+        <button
+          onClick={() => setOpen(o => !o)}
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          aria-label="Add to calendar"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '34px',
+            height: '34px',
+            borderRadius: '100px',
+            border: '1.5px solid var(--border)',
+            background: 'transparent',
+            color: 'var(--ink)',
+            cursor: 'pointer',
+            transition: 'border-color 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--ink)')}
+          onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+        >
+          <CalendarIcon />
+        </button>
+      ) : (
+        <button
+          onClick={() => setOpen(o => !o)}
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          style={{
+            display: 'inline-flex',
+            width: '100%',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '7px',
+            padding: '13px 20px',
+            borderRadius: '8px',
+            fontFamily: 'var(--serif)',
+            fontSize: '0.88rem',
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            background: 'transparent',
+            color: 'var(--ink)',
+            border: '2px solid var(--border)',
+            cursor: 'pointer',
+            transition: 'border-color 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--ink)')}
+          onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+        >
+          Add to Calendar
+          <ChevronIcon open={open} />
+        </button>
+      )}
 
       {open && (
         <div
@@ -158,7 +191,8 @@ export default function AddToCalendar({
           style={{
             position: 'absolute',
             top: 'calc(100% + 8px)',
-            left: 0,
+            left: compact ? 'auto' : 0,
+            right: compact ? 0 : 'auto',
             background: 'var(--white)',
             border: '1px solid var(--border)',
             borderRadius: '12px',
@@ -239,6 +273,22 @@ function ChevronIcon({ open }: { open: boolean }) {
       style={{ transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
     >
       <polyline points="6 9 12 15 18 9" />
+    </svg>
+  )
+}
+
+// Outline calendar-plus glyph for the compact circular trigger — matches
+// the stroke-icon language used elsewhere (event type icons, chevrons)
+// rather than introducing a filled icon style just for this one button.
+function CalendarIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <line x1="12" y1="14" x2="12" y2="18" />
+      <line x1="10" y1="16" x2="14" y2="16" />
     </svg>
   )
 }
