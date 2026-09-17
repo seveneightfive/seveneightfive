@@ -5,9 +5,12 @@ import { useState } from 'react'
 type Props = {
   title: string
   description: string | null
+  // See AddToCalendar's identical prop for why this exists — same reasoning
+  // applies here, just for the Share trigger instead of the Calendar one.
+  compact?: boolean
 }
 
-export default function ShareButtons({ title, description }: Props) {
+export default function ShareButtons({ title, description, compact = false }: Props) {
   const [copied, setCopied] = useState(false)
   const [open, setOpen] = useState(false)
   const [hovered, setHovered] = useState<string | null>(null)
@@ -83,41 +86,66 @@ export default function ShareButtons({ title, description }: Props) {
   }
 
   return (
-    <div style={{ position: 'relative' }}>
-      <button
-        onClick={handleShare}
-        aria-label="Share this event"
-        style={{
-          display: 'inline-flex',
-          width: '100%',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '7px',
-          padding: '13px 20px',
-          borderRadius: '8px',
-          fontFamily: 'var(--serif)',
-          fontSize: '0.88rem',
-          fontWeight: 600,
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-          background: 'transparent',
-          color: 'var(--ink)',
-          border: '2px solid var(--border)',
-          cursor: 'pointer',
-          transition: 'border-color 0.15s',
-        }}
-        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--ink)')}
-        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
-      >
-        Share
-      </button>
+    <div style={{ position: 'relative', width: compact ? 'auto' : undefined }}>
+      {compact ? (
+        <button
+          onClick={handleShare}
+          aria-label="Share this event"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '34px',
+            height: '34px',
+            borderRadius: '100px',
+            border: '1.5px solid var(--border)',
+            background: 'transparent',
+            color: 'var(--ink)',
+            cursor: 'pointer',
+            transition: 'border-color 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--ink)')}
+          onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+        >
+          <ShareIcon />
+        </button>
+      ) : (
+        <button
+          onClick={handleShare}
+          aria-label="Share this event"
+          style={{
+            display: 'inline-flex',
+            width: '100%',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '7px',
+            padding: '13px 20px',
+            borderRadius: '8px',
+            fontFamily: 'var(--serif)',
+            fontSize: '0.88rem',
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            background: 'transparent',
+            color: 'var(--ink)',
+            border: '2px solid var(--border)',
+            cursor: 'pointer',
+            transition: 'border-color 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--ink)')}
+          onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+        >
+          Share
+        </button>
+      )}
 
       {open && (
         <div
           style={{
             position: 'absolute',
             top: 'calc(100% + 8px)',
-            left: 0,
+            left: compact ? 'auto' : 0,
+            right: compact ? 0 : 'auto',
             background: 'var(--white)',
             border: '1px solid var(--border)',
             borderRadius: '12px',
@@ -200,6 +228,21 @@ function CheckIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2d7a2d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="20 6 9 17 4 12" />
+    </svg>
+  )
+}
+
+// Outline share glyph (node-and-lines style) for the compact circular
+// trigger — reads clearly at 16px, unlike trying to shrink the X/Facebook
+// marks down to icon-button size.
+function ShareIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <line x1="8.59" y1="10.51" x2="15.42" y2="6.49" />
+      <line x1="8.59" y1="13.49" x2="15.42" y2="17.51" />
     </svg>
   )
 }
