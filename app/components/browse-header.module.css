@@ -309,4 +309,14 @@
   .titleDesktopOnly {
     display: inline-block;
   }
+
+  .hideOnMobile {
+    display: block;
+  }
+}
+
+@media (max-width: 899px) {
+  .hideOnMobile {
+    display: none;
+  }
 }
