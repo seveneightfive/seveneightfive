@@ -488,11 +488,41 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         /* PAGE WRAP */
         .page-wrap { max-width: 1240px; margin: 0 auto; padding: 0 24px 0; }
 
+        /* MOBILE STICKY BACK BAR — separate element from .back-link (which
+           stays put for desktop, overlaid on the hero band). This one is
+           its own element specifically so it can be position:sticky: the
+           hero band has overflow:hidden (needed to crop the background
+           image), and sticky positioning doesn't work on anything nested
+           inside an overflow-hidden ancestor — the element just never
+           sticks. Living outside the hero band sidesteps that entirely.
+           Desktop-hidden; mobile-shown (see the max-width:640 block). */
+        .mobile-back-bar { display: none; }
+
+        /* MOBILE HERO — plain background alternative to the hero band's
+           faded-photo-overlay treatment. Same date badge styling (kept —
+           it's got more brand voice than a plain gray box), same eyebrow/
+           title, just sitting on white instead of doubling up the event
+           photo as a translucent backdrop for it. Desktop-hidden; see the
+           max-width:640 block for what shows it and hides .hero-band. */
+        .mobile-hero { display: none; }
+        .mobile-hero-row { display: flex; align-items: flex-end; gap: 12px; padding: 16px 20px 4px; }
+        .mobile-hero-text { min-width: 0; }
+        .mobile-date-badge { background: var(--ink); color: white; border-radius: 6px; padding: 7px 11px; text-align: center; min-width: 52px; flex-shrink: 0; }
+        .mobile-date-badge .dow { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.65; }
+        .mobile-date-badge .day { font-family: var(--serif); font-size: 1.3rem; font-weight: 700; line-height: 1; }
+        .mobile-date-badge .mon { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.65; }
+        .mobile-eyebrow { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 3px; }
+        .mobile-title { font-family: var(--serif); font-size: 1.15rem; font-weight: 700; text-transform: uppercase; line-height: 1.15; letter-spacing: -0.005em; }
+
         /* FADED HERO BAND — viewport-relative, not a fixed px height.
            back-link/hero-bottom align with the centered 1240px content
            column via calc()/max() directly, rather than an inner wrapper
            div — a wrapper relying on height:100% turned out fragile and
-           caused the whole title/date/back-link block to disappear. */
+           caused the whole title/date/back-link block to disappear.
+           Desktop only now — mobile uses .mobile-back-bar + .mobile-hero
+           instead (see the max-width:640 block), since showing the same
+           photo faded-out up here AND at full strength in the image card
+           right below it was just showing the same asset twice. */
         .hero-band { position: relative; height: clamp(160px, 30vh, 320px); overflow: hidden; width: 100vw; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); margin-bottom: 28px; }
         .hero-band img { width: 100%; height: 100%; object-fit: cover; opacity: 0.32; display: block; }
         .hero-fade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, var(--white) 94%); }
@@ -507,10 +537,6 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         .date-badge .mon { font-size: 0.64rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.65; }
         .top-eyebrow { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
         .page-title { font-family: var(--serif); font-size: clamp(1.5rem, 3vw, 2.3rem); font-weight: 700; text-transform: uppercase; line-height: 1.05; letter-spacing: -0.01em; }
-        @media (max-width: 640px) {
-          .back-link, .hero-bottom { left: 20px; }
-          .hero-bottom { right: 20px; }
-        }
 
         /* TWO-COLUMN: image standing alone LEFT, details block RIGHT */
         .event-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 40px; align-items: start; }
@@ -533,6 +559,15 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
 
         .time-box { background: var(--off); border-radius: 14px; padding: 18px 22px; font-family: var(--serif); font-size: clamp(1.4rem, 2.4vw, 1.9rem); font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
         .time-box__sep { margin: 0 10px; color: var(--ink-faint); font-weight: 400; }
+
+        /* MOBILE TIME + ACTIONS ROW — merges the time (smaller, ~50% of the
+           desktop .time-box size) with icon-only Calendar/Share triggers on
+           the same line, instead of a big standalone time box followed by
+           two separate full-width "Add to Calendar" / "Share" buttons
+           further down the column. Desktop-hidden; see max-width:640 block. */
+        .mobile-time-actions { display: none; }
+        .mobile-time { font-family: var(--serif); font-size: 1rem; font-weight: 700; color: var(--ink); }
+        .mobile-time__sep { margin: 0 6px; color: var(--ink-faint); font-weight: 400; }
 
         .info-card { background: var(--off); border-radius: 14px; overflow: hidden; }
         .info-grid { display: grid; grid-template-columns: 1fr 1fr; }
@@ -564,7 +599,9 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         /* FOLLOW ROW — small, on its own, not part of the 50/50 grid below */
         .follow-row { display: flex; }
 
-        /* ACTION ROW — Calendar + Share, even 50/50 split */
+        /* ACTION ROW — Calendar + Share, even 50/50 split. Desktop only now
+           — mobile merges these into .mobile-time-actions instead (see
+           max-width:640 block), so this row would otherwise duplicate them. */
         .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
         /* VENUE CARD — full-height image like the artist card, black bg */
@@ -627,16 +664,69 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         .browse-cta-link:hover { color: var(--ink); }
 
         @media (max-width: 640px) {
-          .page-wrap { padding: 28px 20px 0; }
+          .page-wrap { padding: 0 16px 0; }
           .browse-cta { padding: 32px 0 40px; }
           .btn-block { width: 100%; }
+
+          /* Swap desktop's overlay-on-photo hero for the sticky back bar +
+             plain-background hero block. */
+          .hero-band { display: none; }
+          .mobile-back-bar {
+            display: block; position: sticky; top: 0; z-index: 100;
+            background: var(--white); border-bottom: 1px solid var(--border);
+            padding: 10px 16px; margin: 0 -16px;
+          }
+          .mobile-back-link {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 0.78rem; font-weight: 700; color: var(--ink);
+            background: var(--white); border: 1px solid var(--border);
+            padding: 6px 13px; border-radius: 100px; text-decoration: none;
+          }
+          .mobile-hero { display: block; margin: 0 -16px 20px; }
+
+          /* No category pills on mobile — kept on desktop where there's
+             more horizontal room for them. */
+          .event-types-row { display: none; }
+
+          /* Address line dropped from the venue card on mobile — logo,
+             name, neighborhood, arrow is enough; the full address is one
+             tap away on the venue's own page anyway. */
+          .venue-card-address { display: none; }
+
+          /* Desktop's standalone time box + separate action row give way
+             to the merged mobile-time-actions row instead. */
+          .time-box { display: none; }
+          .action-row { display: none; }
+          .mobile-time-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
         }
       `}</style>
 
 
       <main className="page-wrap">
 
-        {/* FADED HERO BAND */}
+        {/* MOBILE STICKY BACK BAR (mobile only — see .mobile-back-bar CSS) */}
+        <div className="mobile-back-bar">
+          <a href="/events" className="mobile-back-link">← All Events</a>
+        </div>
+
+        {/* MOBILE HERO — plain background, no faded photo overlay (mobile
+            only — see .mobile-hero CSS). Same date badge treatment as
+            desktop's, just not sitting on top of an image. */}
+        <div className="mobile-hero">
+          <div className="mobile-hero-row">
+            <div className="mobile-date-badge">
+              <div className="dow">{dayOfWeek.slice(0, 3)}</div>
+              <div className="day">{d.getDate()}</div>
+              <div className="mon">{d.toLocaleDateString('en-US', { month: 'short' })}</div>
+            </div>
+            <div className="mobile-hero-text">
+              {event.venue?.name && <div className="mobile-eyebrow">{event.venue.name}</div>}
+              <h1 className="mobile-title">{event.title}</h1>
+            </div>
+          </div>
+        </div>
+
+        {/* FADED HERO BAND (desktop only — see .hero-band CSS) */}
         <div className="hero-band">
           {event.image_url && <img src={event.image_url} alt="" />}
           <div className="hero-fade" />
@@ -685,7 +775,8 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
           {/* DETAILS COLUMN */}
           <div className="details-col">
 
-            {/* Time — big and bold on its own, not squeezed into the grid */}
+            {/* Time — big and bold on its own, not squeezed into the grid.
+                Desktop only — see .time-box CSS. */}
             <div className="time-box">
               {event.event_start_time ? (
                 <>
@@ -694,6 +785,38 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
                   {event.event_end_time && formatTime(event.event_end_time)}
                 </>
               ) : 'Time TBA'}
+            </div>
+
+            {/* Time + Calendar/Share merged row — mobile only (see
+                .mobile-time-actions CSS). Same data as .time-box above,
+                smaller, sharing its row with the two icon-only triggers
+                instead of those living in a separate .action-row further
+                down (which is hidden on mobile so it isn't duplicated). */}
+            <div className="mobile-time-actions">
+              <div className="mobile-time">
+                {event.event_start_time ? (
+                  <>
+                    {formatTime(event.event_start_time)}
+                    {event.event_end_time && <span className="mobile-time__sep">–</span>}
+                    {event.event_end_time && formatTime(event.event_end_time)}
+                  </>
+                ) : 'Time TBA'}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <AddToCalendar
+                  compact
+                  title={event.title}
+                  date={event.event_date}
+                  startTime={event.event_start_time}
+                  endTime={event.event_end_time}
+                  endDate={event.end_date}
+                  venueName={event.venue?.name ?? null}
+                  venueAddress={event.venue?.address ?? null}
+                  description={event.description}
+                  slug={event.slug ?? event.id}
+                />
+                <ShareButtons compact title={event.title} description={event.description} />
+              </div>
             </div>
 
             {/* Venue callout — black bg, full-height image like the artist card.
@@ -769,7 +892,9 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
                 Follow button) rather than relying on the className alone —
                 check how it actually looks once rendered. */}
 
-            {/* Calendar + Share — even 50/50 split, same width as the boxes above */}
+            {/* Calendar + Share — even 50/50 split, same width as the boxes
+                above. Desktop only now — mobile uses .mobile-time-actions
+                instead (see .action-row CSS). */}
             <div className="action-row">
               <AddToCalendar
                 title={event.title}
