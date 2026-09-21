@@ -1,5 +1,412 @@
 'use client'
 
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import { supabase } from '@/lib/supabase'
+import BrowseHeader from '../components/BrowseHeader'
+import SearchFilterSheet from '../components/SearchFilterSheet'
+import FollowFavoriteButtons from '../components/FollowFavoriteButtons'
+import MapListLayout from '../components/MapListLayout'
+
+type Venue = {
+  id: string
+  name: string
+  slug: string | null
+  description: string | null
+  address: string | null
+  neighborhood: string | null
+  city: string | null
+  state: string | null
+  image_url: string | null
+  logo: string | null
+  website: string | null
+  venue_type: string[] | null
+  upcoming_events_count?: number
+  latitude: number | null
+  longitude: number | null
+}
+
+// Matches the neighborhood_enum values on venues.neighborhood exactly.
+const NEIGHBORHOODS = [
+  'Downtown', 'NOTO', 'North Topeka', 'Oakland', 'Westboro Mart',
+  'College Hill', 'Lake Shawnee', 'Golden Mile', 'A Short Drive',
+  'South Topeka', 'Midtown', 'West Topeka', 'East Topeka',
+]
+
+// One color per neighborhood — used for the map dots, the map legend, and the
+// small dot on each card's neighborhood badge. Chosen to read on the dark
+// Mapbox basemap. Anything not listed falls back to the brand accent.
+const NEIGHBORHOOD_COLORS: Record<string, string> = {
+  'Downtown':      '#FFCE03',
+  'NOTO':          '#E6195E',
+  'North Topeka':  '#34D399',
+  'Oakland':       '#FB923C',
+  'Westboro Mart': '#A78BFA',
+  'College Hill':  '#38BDF8',
+  'Lake Shawnee':  '#F0ABFC',
+  'Golden Mile':   '#A3E635',
+  'A Short Drive': '#94A3B8',
+  'South Topeka':  '#3B82F6',
+  'Midtown':       '#2DD4BF',
+  'West Topeka':   '#F87171',
+  'East Topeka':   '#D6A77A',
+}
+const FALLBACK_COLOR = '#C80650'
+const colorFor = (n: string | null) => (n && NEIGHBORHOOD_COLORS[n]) || FALLBACK_COLOR
+
+// How card images are fitted:
+//  'auto'        – image_url (photos) fill the frame; if a venue only has a
+//                  `logo`, it's shown whole (contain) over a blurred backdrop.
+//  'contain-all' – every image is shown whole over the blurred backdrop.
+//                  Use this if some logos are stored in image_url.
+const IMAGE_FIT_MODE: 'auto' | 'contain-all' = 'auto'
+
+// venues.venue_type is a text[] column — these are the distinct values in
+// use today. Still used for the Venue Type filter in the Search & Filter
+// sheet (the pills were removed from the cards themselves).
+const VENUE_TYPES = [
+  'Artist Studio', 'Bar/Tavern', 'Brewery / Winery', 'Catering', 'Church',
+  'Coffee Shop', 'Community Space', 'Event Space', 'Experiences',
+  'First Friday ArtWalk', 'Gallery / Museum', 'Live Music', 'Local Flavor',
+  'Outdoor / Park', 'Outdoor Space', 'Shop Local', 'Studio / Classes',
+  'Theatre', 'Trades + Services',
+]
+
+// Counts upcoming events per venue in one query, rather than N+1-ing it
+// per card. Keyed by venue_id -> count.
+async function fetchUpcomingEventCounts(): Promise<Record<string, number>> {
+  const today = new Date().toLocaleDateString('en-CA')
+  const { data, error } = await supabase
+    .from('events')
+    .select('venue_id')
+    .gte('event_date', today)
+    .not('venue_id', 'is', null)
+
+  if (error) { console.error('event counts error:', error.message); return {} }
+
+  const counts: Record<string, number> = {}
+  for (const row of data || []) {
+    const vid = (row as { venue_id: string }).venue_id
+    counts[vid] = (counts[vid] || 0) + 1
+  }
+  return counts
+}
+
+function VenueCardMedia({ venue }: { venue: Venue }) {
+  const src = venue.image_url || venue.logo
+  const showWhole = IMAGE_FIT_MODE === 'contain-all' || (!venue.image_url && !!venue.logo)
+
+  if (!src) {
+    return <div className="venue-card-img-placeholder">{venue.name[0]}</div>
+  }
+  if (showWhole) {
+    return (
+      <>
+        <div className="venue-card-img-blur" style={{ backgroundImage: `url("${src}")` }} aria-hidden="true" />
+        <img src={src} alt={venue.name} className="venue-card-img venue-card-img--contain" />
+      </>
+    )
+  }
+  return <img src={src} alt={venue.name} className="venue-card-img" />
+}
+
+export default function VenuesList({ initialNeighborhood, initialVenues = [] }: { initialNeighborhood?: string; initialVenues?: Venue[] }) {
+  const [venues, setVenues] = useState<Venue[]>(initialVenues)
+  const [filtered, setFiltered] = useState<Venue[]>(initialVenues)
+  const [loading, setLoading] = useState(initialVenues.length === 0)
+  const [search, setSearch] = useState('')
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>(
+    initialNeighborhood ? [initialNeighborhood] : []
+  )
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([])
+  const scrollRestored = useRef(false)
+
+  useEffect(() => {
+    if (!loading && !scrollRestored.current) {
+      const saved = sessionStorage.getItem('venuesScrollPos')
+      if (saved) {
+        scrollRestored.current = true
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            window.scrollTo({ top: parseInt(saved), behavior: 'instant' })
+            sessionStorage.removeItem('venuesScrollPos')
+          })
+        })
+      }
+    }
+  }, [loading])
+
+  const handleVenueClick = useCallback(() => {
+    sessionStorage.setItem('venuesScrollPos', window.scrollY.toString())
+  }, [])
+
+  useEffect(() => {
+    if (initialVenues.length > 0) return // already have server-fetched data
+    async function fetchVenues() {
+      const [{ data, error }, counts] = await Promise.all([
+        supabase
+          .from('venues')
+          .select('id, name, slug, description, address, neighborhood, city, state, image_url, logo, website, venue_type, latitude, longitude')
+          .order('name'),
+        fetchUpcomingEventCounts(),
+      ])
+
+      if (error) { console.error('venues error:', error.message, error.details); setLoading(false); return }
+      const withCounts = (data || []).map(v => ({ ...v, upcoming_events_count: counts[v.id] || 0 }))
+      setVenues(withCounts)
+      setFiltered(withCounts)
+      setLoading(false)
+    }
+    fetchVenues()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const applyFilters = useCallback(() => {
+    let result = [...venues]
+    if (selectedNeighborhoods.length > 0) {
+      result = result.filter(v => v.neighborhood && selectedNeighborhoods.includes(v.neighborhood))
+    }
+    if (selectedTypes.length > 0) {
+      result = result.filter(v => v.venue_type?.some(t => selectedTypes.includes(t)))
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      result = result.filter(v =>
+        v.name.toLowerCase().includes(q) ||
+        v.neighborhood?.toLowerCase().includes(q) ||
+        v.address?.toLowerCase().includes(q)
+      )
+    }
+    setFiltered(result)
+  }, [venues, selectedNeighborhoods, selectedTypes, search])
+
+  useEffect(() => { applyFilters() }, [applyFilters])
+
+  const toggleNeighborhood = (n: string) => {
+    setSelectedNeighborhoods(prev => prev.includes(n) ? prev.filter(x => x !== n) : [...prev, n])
+  }
+  const toggleType = (t: string) => {
+    setSelectedTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
+  }
+  const clearAllFilters = () => {
+    setSelectedNeighborhoods([])
+    setSelectedTypes([])
+    setSearch('')
+  }
+  const activeFilterCount = selectedNeighborhoods.length + selectedTypes.length
+
+  // Legend: only neighborhoods that have a venue in the current results,
+  // in the same order as the filter list. Selected neighborhoods stay
+  // visible so they can be toggled back off.
+  const legend = useMemo(() => {
+    const present = new Set(filtered.map(v => v.neighborhood).filter(Boolean) as string[])
+    selectedNeighborhoods.forEach(n => present.add(n))
+    return NEIGHBORHOODS.filter(n => present.has(n)).map(n => ({ label: n, color: colorFor(n) }))
+  }, [filtered, selectedNeighborhoods])
+
+  return (
+    <>
+      <style>{`
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+          --ink: #1a1814; --ink-soft: #6b6560; --ink-faint: #b8b3ad;
+          --white: #ffffff; --off: #f7f6f4; --warm: #f2ede6;
+          --accent: #C80650; --accent-light: #fdf1ec; --border: #ece8e2;
+          --serif: 'Oswald', sans-serif; --sans: 'DM Sans', system-ui, sans-serif;
+        }
+        html, body { background: var(--white); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+        /* overflow-x: clip (not hidden) — "hidden" turns this element into a
+           scroll container, which silently breaks position: sticky on the map. */
+        .venues-root { overflow-x: clip; max-width: 100vw; }
+        /* Only used for the loading / empty states now; the map + list layout
+           is full-bleed. */
+        .page { padding: 0 24px; }
+
+        /* ── VENUE CARD ── */
+        .venue-card { text-decoration: none; color: var(--ink); display: flex; align-items: stretch; border-radius: 12px; overflow: hidden; border: 1.5px solid var(--border); background: var(--white); transition: border-color 0.15s, box-shadow 0.15s; -webkit-tap-highlight-color: transparent; }
+        .venue-card:hover { border-color: var(--ink); box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        .venue-card.active { border-color: var(--accent); }
+
+        .venue-card-media { position: relative; width: 210px; min-height: 210px; flex-shrink: 0; overflow: hidden; background: var(--off); }
+        .venue-card-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+        /* Logos: shown whole, with breathing room, over a blurred copy of
+           themselves so the frame never looks empty. */
+        .venue-card-img--contain { object-fit: contain; padding: 18px; z-index: 1; }
+        .venue-card-img-blur { position: absolute; inset: -24px; background-size: cover; background-position: center; filter: blur(22px) saturate(1.2) brightness(0.92); }
+        .venue-card-img-placeholder { position: absolute; inset: 0; background: linear-gradient(135deg, #2a2620, #1a1814); display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 3rem; font-weight: 700; color: rgba(255,255,255,0.08); text-transform: uppercase; }
+        .venue-card-heart-wrap { position: absolute; top: 12px; right: 12px; z-index: 2; }
+
+        .venue-card-body { flex: 1 1 auto; min-width: 0; padding: 20px 22px; display: flex; flex-direction: column; gap: 8px; }
+        .venue-card-hood { align-self: flex-start; display: inline-flex; align-items: center; gap: 7px; background: var(--off); border: 1px solid var(--border); color: var(--ink); font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 5px 12px 5px 10px; border-radius: 100px; }
+        .venue-card-hood-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+        .venue-card-name { font-family: var(--serif); font-size: 1.35rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; line-height: 1.15; }
+        .venue-card-address { font-size: 0.82rem; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; }
+        .venue-card-desc { font-size: 0.85rem; color: var(--ink-soft); line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+        .venue-card-cta { margin-top: auto; align-self: flex-start; background: var(--accent); color: #fff; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 11px 18px; border-radius: 8px; transition: background 0.15s; }
+        .venue-card:hover .venue-card-cta { background: #a20441; }
+
+        /* ── EMPTY / LOADING ── */
+        .empty { padding: 80px 24px; text-align: center; color: var(--ink-soft); }
+        .empty-title { font-family: var(--serif); font-size: 1.4rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
+        .empty-sub { font-size: 0.88rem; color: var(--ink-faint); }
+        .loading { display: flex; align-items: center; justify-content: center; min-height: 320px; }
+        .loading-dots { display: flex; gap: 8px; }
+        .loading-dots span { width: 7px; height: 7px; background: var(--ink-faint); border-radius: 50%; animation: pulse 1.2s ease-in-out infinite; }
+        .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes pulse { 0%,80%,100%{opacity:0.3;transform:scale(0.85)}40%{opacity:1;transform:scale(1)} }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 860px) {
+          .venue-card { flex-direction: column; }
+          .venue-card-media { width: 100%; height: 200px; min-height: 0; }
+        }
+        @media (max-width: 640px) {
+          .page { padding: 0 16px; }
+          .venue-card-name { font-size: 1.1rem; }
+          .venue-card-body { padding: 16px; }
+          .venue-card-cta { align-self: stretch; text-align: center; }
+        }
+      `}</style>
+
+      <BrowseHeader
+        title="Venues"
+        activeFilterCount={activeFilterCount}
+        onOpenFilters={() => setFiltersOpen(true)}
+      />
+
+      <SearchFilterSheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search venues..."
+        categories={NEIGHBORHOODS}
+        categoriesLabel="Neighborhood"
+        selectedCategories={selectedNeighborhoods}
+        onToggleCategory={toggleNeighborhood}
+        extraSections={[
+          {
+            key: 'venue_type',
+            label: 'Venue Type',
+            options: VENUE_TYPES,
+            selected: selectedTypes,
+            onToggle: toggleType,
+          },
+        ]}
+        showDateFilters={false}
+        resultCount={filtered.length}
+        resultLabel="Venues"
+        onClearAll={clearAllFilters}
+      />
+
+      <div className="venues-root">
+        {loading ? (
+          <div className="page"><div className="loading"><div className="loading-dots"><span/><span/><span/></div></div></div>
+        ) : filtered.length === 0 ? (
+          <div className="page">
+            <div className="empty">
+              <div className="empty-title">No venues found</div>
+              <div className="empty-sub">Try adjusting your filters or search.</div>
+            </div>
+          </div>
+        ) : (
+          <MapListLayout
+            items={filtered}
+            getPopupLabel={(venue) => venue.name}
+            getMarkerColor={(venue) => colorFor(venue.neighborhood)}
+            legend={legend}
+            legendSelected={selectedNeighborhoods}
+            onLegendClick={toggleNeighborhood}
+            renderPreview={(venue) => (
+              <a
+                href={venue.slug ? `/venues/${venue.slug}` : '#'}
+                onClick={handleVenueClick}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', color: 'var(--ink)' }}
+              >
+                {venue.image_url || venue.logo ? (
+                  <img
+                    src={venue.image_url || venue.logo!}
+                    alt={venue.name}
+                    style={{ width: 56, height: 56, borderRadius: 10, objectFit: venue.image_url ? 'cover' : 'contain', background: 'var(--off)', flexShrink: 0 }}
+                  />
+                ) : (
+                  <div style={{ width: 56, height: 56, borderRadius: 10, flexShrink: 0, background: 'linear-gradient(135deg, #2a2620, #1a1814)' }} />
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {venue.neighborhood && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-soft)', marginBottom: 2 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: colorFor(venue.neighborhood), flexShrink: 0 }} />
+                      {venue.neighborhood}
+                    </div>
+                  )}
+                  <div style={{ fontFamily: 'var(--serif)', fontWeight: 600, textTransform: 'uppercase', fontSize: '0.95rem', lineHeight: 1.1 }}>
+                    {venue.name}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--ink-soft)', marginTop: 3 }}>
+                    {venue.upcoming_events_count || 0} upcoming event{venue.upcoming_events_count === 1 ? '' : 's'}
+                  </div>
+                </div>
+                <span style={{ color: 'var(--ink-faint)', fontSize: '1.1rem', flexShrink: 0 }}>&rarr;</span>
+              </a>
+            )}
+            renderCard={(venue, { isActive, setActive, cardRef, onHoverChange }) => {
+              const street = venue.address?.split(',')[0]
+              const eventCount = venue.upcoming_events_count || 0
+              return (
+                <a
+                  key={venue.id}
+                  ref={cardRef as any}
+                  href={venue.slug ? `/venues/${venue.slug}` : '#'}
+                  className={`venue-card${isActive ? ' active' : ''}`}
+                  onClick={() => { handleVenueClick(); setActive() }}
+                  onMouseEnter={() => onHoverChange(true)}
+                  onMouseLeave={() => onHoverChange(false)}
+                >
+                  <div className="venue-card-media">
+                    <VenueCardMedia venue={venue} />
+                    <div
+                      className="venue-card-heart-wrap"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
+                    >
+                      <FollowFavoriteButtons entityType="venue" entityId={venue.id} heartOnly />
+                    </div>
+                  </div>
+
+                  <div className="venue-card-body">
+                    {venue.neighborhood && (
+                      <span className="venue-card-hood">
+                        <span className="venue-card-hood-dot" style={{ background: colorFor(venue.neighborhood) }} />
+                        {venue.neighborhood}
+                      </span>
+                    )}
+                    <div className="venue-card-name">{venue.name}</div>
+                    {street && (
+                      <div className="venue-card-address">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                        </svg>
+                        {street}
+                      </div>
+                    )}
+                    {venue.description && (
+                      <p className="venue-card-desc">{venue.description}</p>
+                    )}
+                    <div className="venue-card-cta">
+                      {eventCount} Upcoming Event{eventCount === 1 ? '' : 's'}
+                    </div>
+                  </div>
+                </a>
+              )
+            }}
+          />
+        )}
+      </div>
+    </>
+  )
+}
+'use client'
+
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import BrowseHeader from '../components/BrowseHeader'
