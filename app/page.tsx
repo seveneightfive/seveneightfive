@@ -21,6 +21,7 @@ type EventRow = {
   id: string
   title: string
   event_date: string
+  end_date: string | null
   event_start_time: string | null
   event_end_time: string | null
   ticket_price: number | null
@@ -51,6 +52,7 @@ export default async function HomePage() {
     { data: featuredRaw },
     { data: notoVenues },
     { data: heroSlidesRaw },
+    { data: spotlightRows },
   ] = await Promise.all([
 
     // 1. Events for today + tomorrow for the home page list
@@ -60,6 +62,7 @@ export default async function HomePage() {
         id,
         title,
         event_date,
+        end_date,
         event_start_time,
         event_end_time,
         ticket_price,
@@ -84,11 +87,12 @@ export default async function HomePage() {
     // 3. Featured (starred) upcoming events for the hero slider
     supabase
       .from('events')
-      .select('id, title, event_date, event_start_time, event_types, slug, image_url, ticket_url, venues ( name, neighborhood )')
+      .select('id, title, event_date, end_date, event_start_time, event_types, slug, image_url, ticket_url, venues ( name, neighborhood )')
       .eq('star', true)
       .gte('event_date', today)
       .order('event_date', { ascending: true })
-      .limit(6),
+      // 1 for the hero + up to 6 for the Editor's Pick tab
+      .limit(7),
 
     // 4. NOTO neighborhood venues
     supabase
@@ -102,6 +106,18 @@ export default async function HomePage() {
       .select('id, order, eyebrow, headline, body, button_label, button_url, image_url')
       .eq('active', true)
       .order('order', { ascending: true }),
+
+    // 6. Spotlight tab (e.g. "Fall Spotlight") and its hand-picked events
+    supabase
+      .from('home_spotlights')
+      .select(`
+        id, title, cta_url, starts_on, ends_on,
+        home_spotlight_events (
+          position,
+          event:events ( id, title, slug, event_date, end_date, event_start_time, event_types, image_url, venues ( name, neighborhood ) )
+        )
+      `)
+      .eq('active', true),
   ])
 
   // "Explore our Archives" — a different issue each day, picked pseudo-
@@ -240,6 +256,29 @@ export default async function HomePage() {
 
   const heroSlides: HeroSlide[] = (heroSlidesRaw ?? []) as HeroSlide[]
 
+  // Pick the spotlight whose date window includes today. If several
+  // overlap, the one that started most recently wins, so a new spotlight
+  // can take over without having to switch the old one off.
+  const currentSpotlight = (spotlightRows ?? [])
+    .filter((s: any) => (!s.starts_on || s.starts_on <= today) && (!s.ends_on || s.ends_on >= today))
+    .sort((a: any, b: any) => (b.starts_on ?? '').localeCompare(a.starts_on ?? ''))[0]
+
+  const spotlight = currentSpotlight
+    ? {
+        title: currentSpotlight.title as string,
+        href: (currentSpotlight.cta_url as string | null) ?? '/events',
+        events: (currentSpotlight.home_spotlight_events ?? [])
+          .sort((a: any, b: any) => a.position - b.position)
+          .map((row: any) => row.event)
+          // drop events that have already ended
+          .filter((e: any) => e && ((e.end_date?.slice(0, 10) ?? e.event_date) >= today))
+          .map((e: any) => ({
+            ...e,
+            venue: Array.isArray(e.venues) ? e.venues[0] ?? null : e.venues ?? null,
+          })),
+      }
+    : null
+
   return (
     <HomeClient
       events={normalizedEvents}
@@ -249,6 +288,7 @@ export default async function HomePage() {
       notoEventCount={notoEventCount ?? 0}
       heroSlides={heroSlides}
       archiveIssue={archiveIssue}
+      spotlight={spotlight}
     />
   )
 }

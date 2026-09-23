@@ -2,10 +2,10 @@
 
 import Link from 'next/link'
 import styles from './home.module.css'
-import FeaturedSlider, { type FeaturedEvent } from './FeaturedSlider'
 import HeroSlider, { type HeroSlide } from './HeroSlider'
 import AdvertisementBanner from './components/AdvertisementBanner'
-import EventCard from './components/EventCard'
+import EventTabs, { type EventTab } from './components/EventTabs'
+import type { SpotlightEvent } from './components/SpotlightCard'
 import HomeHero from './components/HomeHero'
 import SignupForm from './components/SignupForm'
 
@@ -14,6 +14,7 @@ type Event = {
   id: string
   title: string
   event_date: string
+  end_date: string | null
   event_start_time: string | null
   event_end_time: string | null
   ticket_price: number | null
@@ -33,6 +34,14 @@ type Artist = {
   avatar_url: string | null   // ← add this
   image_url: string | null    // ← add this
   upcomingCount: number
+}
+
+type FeaturedEvent = SpotlightEvent & { ticket_url: string | null }
+
+type Spotlight = {
+  title: string
+  href: string
+  events: SpotlightEvent[]
 }
 
 type ArchiveIssue = {
@@ -58,6 +67,7 @@ export default function HomeClient({
   notoEventCount,
   heroSlides,
   archiveIssue,
+  spotlight,
 }: {
   events: Event[]
   artists: Artist[]
@@ -66,7 +76,18 @@ export default function HomeClient({
   notoEventCount: number
   heroSlides: HeroSlide[]
   archiveIssue: ArchiveIssue | null
+  spotlight: Spotlight | null
 }) {
+  // Tabs with no events are hidden automatically by EventTabs.
+  const eventTabs: EventTab[] = [
+    ...(spotlight
+      ? [{ key: 'spotlight', label: spotlight.title, href: spotlight.href, events: spotlight.events }]
+      : []),
+    { key: 'today', label: 'Today in Topeka', href: '/events', events: events.slice(0, 6) },
+    // featuredEvents[0] is already the hero's Editor's Pick
+    { key: 'editors-pick', label: "Editor's Pick", href: '/events', events: featuredEvents.slice(1, 7) },
+  ]
+
   return (
     <>
       <main className={styles.main}>
@@ -74,50 +95,15 @@ export default function HomeClient({
         {/* ── Hero ── */}
 <HomeHero editorPick={featuredEvents[0] ?? null} />
 
-{/* ── Featured Events Slider ── */}
-{featuredEvents.length > 1 && (
-  <section className={styles.contentWrap}>
-    <div className={styles.sectionHeader}>
-      <h2>Featured</h2>
-      <Link href="/events">All Events →</Link>
-    </div>
+{/* ── Event tabs (desktop) / stacked rails (mobile) ── */}
+        <section id="events" className={styles.contentWrap}>
+          <EventTabs tabs={eventTabs} />
+        </section>
 
-    <FeaturedSlider events={featuredEvents.slice(1)} />
-  </section>
-)}
         {/* ── Advertisement Banner ── */}
         <section>
           <AdvertisementBanner />
         </section>
-
-        {/* ── Upcoming Events ── */}
-<section id="events" className={styles.contentWrap}>
-  <div className={styles.sectionHeader}>
-    <h2>Upcoming Events</h2>
-    <Link href="/events">See all →</Link>
-  </div>
-
-  <div className={styles.eventsGrid}>
-    {events.length === 0 ? (
-      <p
-        style={{
-          padding: '20px',
-          color: '#AAAAAA',
-          fontFamily: 'Oswald, sans-serif',
-        }}
-      >
-        No upcoming events — check back soon.
-      </p>
-    ) : (
-      events.slice(0, 6).map(event => (
-        <EventCard
-          key={event.id}
-          event={event}
-        />
-      ))
-    )}
-  </div>
-</section>
 
         {/* ── Explore our Archives ── */}
         {archiveIssue && (
