@@ -4,6 +4,7 @@ import Link from 'next/link'
 import styles from './home.module.css'
 import HeroSlider, { type HeroSlide } from './HeroSlider'
 import AdvertisementBanner from './components/AdvertisementBanner'
+import ArchiveReveal from './components/ArchiveReveal'
 import EventTabs, { type EventTab } from './components/EventTabs'
 import type { SpotlightEvent } from './components/SpotlightCard'
 import HomeHero from './components/HomeHero'
@@ -122,69 +123,7 @@ export default function HomeClient({
             >
               Great stories that are still relevant today.
             </p>
-            <Link
-              href={
-                archiveIssue.issue_number
-                  ? `/magazine?issue=${archiveIssue.issue_number}`
-                  : '/magazine'
-              }
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 24,
-                background: '#1a1814',
-                borderRadius: 12,
-                overflow: 'hidden',
-                textDecoration: 'none',
-              }}
-            >
-              <img
-                src={archiveIssue.cover_image_url}
-                alt={archiveIssue.title}
-                style={{
-                  width: 140,
-                  aspectRatio: '0.8',
-                  objectFit: 'cover',
-                  flexShrink: 0,
-                }}
-              />
-              <div style={{ padding: '20px 24px 20px 0', color: 'white' }}>
-                {archiveIssue.issue_number && (
-                  <div
-                    style={{
-                      fontSize: '0.65rem',
-                      fontWeight: 700,
-                      letterSpacing: '0.14em',
-                      textTransform: 'uppercase',
-                      color: '#FFCE03',
-                      marginBottom: 6,
-                    }}
-                  >
-                    Issue {archiveIssue.issue_number}
-                  </div>
-                )}
-                <div
-                  style={{
-                    fontFamily: 'Oswald, sans-serif',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    fontSize: '1.4rem',
-                    lineHeight: 1.1,
-                    marginBottom: 8,
-                  }}
-                >
-                  {/* When this issue has a story callout, lead with that
-                      instead of the plain issue title — it's the specific
-                      hook that gets someone to click. */}
-                  {archiveIssue.callout ? archiveIssue.callout.headline : archiveIssue.title}
-                </div>
-                <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)' }}>
-                  {archiveIssue.callout
-                    ? archiveIssue.callout.teaser
-                    : `From ${archiveIssue.title} — flip through this one →`}
-                </div>
-              </div>
-            </Link>
+            <ArchiveReveal issue={archiveIssue} />
           </section>
         )}
 
