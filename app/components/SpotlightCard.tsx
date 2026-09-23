@@ -37,7 +37,7 @@ export default function SpotlightCard({ event }: { event: SpotlightEvent }) {
 
   return (
     <Link href={href} className="group block text-black">
-      <div className="relative aspect-[3/2] overflow-hidden rounded-lg bg-black">
+      <div className="relative aspect-[1.91/1] overflow-hidden rounded-lg bg-black">
         {event.image_url ? (
           <img
             src={event.image_url}
