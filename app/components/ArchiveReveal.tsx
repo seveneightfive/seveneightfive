@@ -96,16 +96,24 @@ export default function ArchiveReveal({ issue }: { issue: ArchiveRevealIssue }) 
       const spread = ease(range(p, 0.35, 0.75))
       const grow = ease(range(p, 0.4, 0.9))
 
-      // The arcs are drawn in a 640-wide space; convert the spread
-      // distance so they clear the edge on any stage size.
-      const push = spread * 320
-      leftRef.current?.setAttribute('transform', `translate(${-push},0) rotate(${spin} ${CX} ${CY})`)
-      rightRef.current?.setAttribute('transform', `translate(${push},0) rotate(${spin} ${CX} ${CY})`)
+      // Spin, then push the arcs outward by scaling them up around the
+      // centre. Scaling (rather than sliding left/right) moves every arc
+      // away from the logo no matter how far it has rotated.
+      const scale = 1 + spread * 1.6
+      const arcTransform = `translate(${CX} ${CY}) scale(${scale}) rotate(${spin}) translate(${-CX} ${-CY})`
+      leftRef.current?.setAttribute('transform', arcTransform)
+      rightRef.current?.setAttribute('transform', arcTransform)
       if (leftRef.current) leftRef.current.style.opacity = String(1 - spread)
       if (rightRef.current) rightRef.current.style.opacity = String(1 - spread)
 
       const radius = r0 + (r1 - r0) * grow
-      if (panelRef.current) panelRef.current.style.clipPath = `circle(${radius}px at 50% 50%)`
+      const panel = panelRef.current
+      if (panel) {
+        const clip = `circle(${radius.toFixed(1)}px at 50% 50%)`
+        panel.style.clipPath = clip
+        // Older iOS Safari only honours the prefixed property.
+        panel.style.setProperty('-webkit-clip-path', clip)
+      }
 
       if (badgeRef.current) {
         const size = 2 * r0 * (1 + grow * 0.4)
@@ -114,9 +122,9 @@ export default function ArchiveReveal({ issue }: { issue: ArchiveRevealIssue }) 
         badgeRef.current.style.opacity = String(1 - range(p, 0.42, 0.56))
       }
 
-      if (coverRef.current) coverRef.current.style.opacity = String(range(p, 0.62, 0.82))
+      if (coverRef.current) coverRef.current.style.opacity = String(range(p, 0.48, 0.7))
       if (copyRef.current) {
-        const t = range(p, 0.72, 0.94)
+        const t = range(p, 0.66, 0.9)
         copyRef.current.style.opacity = String(t)
         copyRef.current.style.transform = `translateY(${(1 - t) * 14}px)`
       }
@@ -146,7 +154,8 @@ export default function ArchiveReveal({ issue }: { issue: ArchiveRevealIssue }) 
         .ar { position: relative; height: 200vh; }
         .ar--static { height: auto; }
         .ar-sticky {
-          position: sticky; top: 0; height: 100vh;
+          position: -webkit-sticky; position: sticky; top: 0;
+          height: 100vh; height: 100svh; /* svh: the visible height with the mobile toolbar showing */
           display: flex; align-items: center;
         }
         .ar--static .ar-sticky { position: static; height: auto; }
@@ -158,9 +167,11 @@ export default function ArchiveReveal({ issue }: { issue: ArchiveRevealIssue }) 
         .ar-panel {
           position: absolute; inset: 0; background: #1a1814;
           display: flex; align-items: center; gap: 6%; padding: 0 8%;
+          -webkit-clip-path: circle(12% at 50% 50%);
           clip-path: circle(12% at 50% 50%); /* start state before JS runs */
+          will-change: clip-path; transform: translateZ(0); /* Safari repaints clip-path changes reliably on its own layer */
         }
-        .ar--static .ar-panel { clip-path: none !important; }
+        .ar--static .ar-panel { -webkit-clip-path: none !important; clip-path: none !important; }
         .ar-cover { flex: 0 0 26%; display: block; }
         .ar-cover img {
           width: 100%; aspect-ratio: 4 / 5; object-fit: cover;
