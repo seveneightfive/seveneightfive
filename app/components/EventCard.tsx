@@ -13,7 +13,7 @@ export type EventCardEvent = {
   venue?: { name: string; neighborhood: string | null } | null
 }
 
-function formatDate(dateStr: string) {
+export function formatDate(dateStr: string) {
   const d = new Date(dateStr + 'T12:00:00')
   return {
     weekday: d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
@@ -22,7 +22,7 @@ function formatDate(dateStr: string) {
   }
 }
 
-function formatTime(t: string | null) {
+export function formatTime(t: string | null) {
   if (!t || t.trim() === ':' || t.trim() === '') return ''
 
   const cleaned = t.trim().toLowerCase()
