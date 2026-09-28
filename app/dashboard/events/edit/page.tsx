@@ -237,6 +237,7 @@ function EventEditInner() {
       const { data } = await supabase
         .from('venues')
         .select('id, name, neighborhood')
+        .eq('status', 'active')
         .ilike('name', `%${venueSearch}%`)
         .limit(8)
       setVenueOptions(data || [])
