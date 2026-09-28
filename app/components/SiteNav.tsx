@@ -18,9 +18,10 @@ const IMMERSIVE_PREFIXES = [
 ]
 
 // Routes with their own BrowseHeader (logo/back + title + Search & Filter),
-// so SiteNav's desktop topnav would be redundant here.
+// so SiteNav's desktop topnav would be redundant here. /events is NOT in
+// this list: it keeps the site nav (sticky, same as home) and puts its own
+// events bar directly underneath it.
 const HIDE_DESKTOP_TOPNAV_PATHS = [
-  '/events',
   '/artists',
   '/venues',
 ]
