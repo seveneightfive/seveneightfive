@@ -71,6 +71,7 @@ export default async function FollowingPage() {
           .from('venues')
           .select('id, name, slug, logo, image_url, venue_type')
           .in('id', venueIds)
+          .eq('status', 'active')
       : Promise.resolve({ data: [] as any[] }),
   ])
 
