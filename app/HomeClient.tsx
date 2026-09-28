@@ -9,6 +9,7 @@ import EventTabs, { type EventTab } from './components/EventTabs'
 import type { SpotlightEvent } from './components/SpotlightCard'
 import HomeHero from './components/HomeHero'
 import SignupForm from './components/SignupForm'
+import KeepMusicLiveBanner from './components/KeepMusicLiveBanner'
 
 
 type Event = {
@@ -166,7 +167,10 @@ export default function HomeClient({
             )}
           </div>
         </section>
-
+        
+ {/* ── Keep Music Live CTA → /live-music ── */}
+        <KeepMusicLiveBanner />
+        
         {/* ── Neighborhoods ── */}
         <section id="neighborhoods" className={styles.contentWrap}>
           <div className={styles.sectionHeader}>
