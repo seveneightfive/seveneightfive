@@ -54,6 +54,7 @@ export default function NewMenuProclamationPage() {
         .from('venues')
         .select('id, name, neighborhood')
         .overlaps('venue_type', ['Local Flavor', 'Bar/Tavern', 'Brewery / Winery', 'Coffee Shop', 'Catering'])
+        .eq('status', 'active')
         .ilike('name', `%${venueSearch}%`)
         .limit(8)
       setVenueOptions(data || [])
