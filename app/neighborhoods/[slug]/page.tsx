@@ -91,6 +91,7 @@ export default async function NeighborhoodDetailPage({ params }: Props) {
     .from('venues')
     .select('id, name, slug, description, image_url, logo, venue_type, address')
     .eq('neighborhood', neighborhood.name)
+    .eq('status', 'active')
     .order('name', { ascending: true })
 
   const venueIds = (venues as Venue[] | null)?.map((v) => v.id) || []
