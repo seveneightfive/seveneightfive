@@ -98,7 +98,8 @@ export default async function HomePage() {
     supabase
       .from('venues')
       .select('id')
-      .eq('neighborhood', 'NOTO'),
+      .eq('neighborhood', 'NOTO')
+      .eq('status', 'active'),
 
     // 5. Hero slides
     supabase

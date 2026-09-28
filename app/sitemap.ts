@@ -11,7 +11,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { data: seoPages },
   ] = await Promise.all([
     supabase.from('events').select('slug, updated_at'),
-    supabase.from('venues').select('slug, updated_at'),
+    supabase.from('venues').select('slug, updated_at').eq('status', 'active'),
     supabase.from('artists').select('slug, updated_at'),
     supabase.from('seo_pages').select('slug, updated_at').eq('published', true),
   ])
