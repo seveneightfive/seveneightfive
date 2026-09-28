@@ -59,6 +59,10 @@ type BrowseHeaderProps = {
   // sidebar + this header are still the nav. /artists, /venues don't pass
   // this, so they're unaffected.
   hideOnMobile?: boolean
+  // The reverse: show this header below 900px only. /artists uses it —
+  // at ≥900px that page has its own full-width bar + left nav under the
+  // site nav instead.
+  hideOnDesktop?: boolean
 }
 
 export default function BrowseHeader({
@@ -68,6 +72,7 @@ export default function BrowseHeader({
   browseLinks,
   browseLabel = 'Browse Events',
   hideOnMobile = false,
+  hideOnDesktop = false,
 }: BrowseHeaderProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -77,7 +82,7 @@ export default function BrowseHeader({
   const isActive = (href: string) => href === '/' ? pathname === '/' : pathname.startsWith(href)
 
   return (
-    <div className={`${styles.browseHeader}${hideOnMobile ? ` ${styles.hideOnMobile}` : ''}`}>
+    <div className={`${styles.browseHeader}${hideOnMobile ? ` ${styles.hideOnMobile}` : ''}${hideOnDesktop ? ` ${styles.hideOnDesktop}` : ''}`}>
       <div className={styles.row}>
         <div className={styles.left}>
           {/* Desktop-only home mark (hidden below 640px via CSS) — this

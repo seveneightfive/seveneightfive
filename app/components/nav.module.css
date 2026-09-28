@@ -151,3 +151,10 @@
     display: none;
   }
 }
+
+/* Site nav shown only at ≥900px on some routes (see SiteNav WIDE_ONLY_TOPNAV_PATHS) */
+@media (max-width: 899px) {
+  .topnavWideOnly {
+    display: none;
+  }
+}

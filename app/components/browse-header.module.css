@@ -320,3 +320,9 @@
     display: none;
   }
 }
+
+@media (min-width: 900px) {
+  .hideOnDesktop {
+    display: none;
+  }
+}

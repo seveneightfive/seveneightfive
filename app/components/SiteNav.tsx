@@ -22,8 +22,14 @@ const IMMERSIVE_PREFIXES = [
 // this list: it keeps the site nav (sticky, same as home) and puts its own
 // events bar directly underneath it.
 const HIDE_DESKTOP_TOPNAV_PATHS = [
-  '/artists',
   '/venues',
+]
+
+// Routes that show the site nav only at ≥900px. Below that they keep their
+// own BrowseHeader (which has its own logo + menu), so showing both would
+// stack two headers.
+const WIDE_ONLY_TOPNAV_PATHS = [
+  '/artists',
 ]
 
 function isImmersive(pathname: string) {
@@ -36,12 +42,13 @@ export default function SiteNav() {
   if (isImmersive(pathname)) return null
 
   const hideDesktopTopnav = HIDE_DESKTOP_TOPNAV_PATHS.includes(pathname)
+  const wideOnlyTopnav = WIDE_ONLY_TOPNAV_PATHS.includes(pathname)
   const isActive = (prefix: string) => pathname.startsWith(prefix)
 
   return (
     <>
       {!hideDesktopTopnav && (
-        <header className={styles.topnav}>
+        <header className={`${styles.topnav}${wideOnlyTopnav ? ` ${styles.topnavWideOnly}` : ''}`}>
           <Link href="/" className={styles.logoLink} aria-label="seveneightfive home">
             <img
               src="https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/785logo_web_Proxy.png"
