@@ -76,10 +76,12 @@ async function getVenue(slug: string): Promise<Venue | null> {
       social_instagram, social_facebook, est
     `)
     .eq('slug', slug)
-    .single()
+    // Closed venues 404 (only status = 'active' is public)
+    .eq('status', 'active')
+    .maybeSingle()
 
   if (error || !data) {
-    console.error('[getVenue] error:', error?.message, error?.details, 'slug:', slug)
+    if (error) console.error('[getVenue] error:', error.message, error.details, 'slug:', slug)
     return null
   }
   return data as Venue
