@@ -49,6 +49,7 @@ export default function ArtGalleriesClient() {
         .from('venues')
         .select('id, name, slug, address, neighborhood, city, state, image_url, logo, venue_type')
         .overlaps('venue_type', ['Studio / Classes', 'Gallery / Museum', 'Artist Studio', 'First Friday ArtWalk'])
+        .eq('status', 'active')
 
       const venues = venueData || []
       // Shuffle so order is random on each page load
