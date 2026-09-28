@@ -68,6 +68,7 @@ type Opportunity = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ADD_ARTIST_URL = 'https://seveneightfive.fillout.com/new-artist'
+const MANAGE_ARTIST_URL = 'https://seveneightfive.zite.so'
 
 // Desktop left-nav "Explore" links
 const EXPLORE_LINKS = [
@@ -956,38 +957,17 @@ export default function ArtistDirectory({ initialData }: { initialData: InitialD
         /* ════════ Desktop shell (bar + left nav + rail) ════════
            Everything below is hidden under 900px, where the page keeps its
            original mobile/tablet layout. */
-        .adir-bar, .adir-nav, .adir-rail, .adir-partner-line { display: none; }
+        .adir-nav, .adir-rail { display: none; }
 
         @media (min-width: 900px) {
-          :root { --side-w: 248px; --rail-w: clamp(300px, 22vw, 360px); --nav-h: 64px; --bar-h: 60px; }
+          :root { --side-w: 248px; --rail-w: clamp(300px, 22vw, 360px); --nav-h: 64px; }
 
           .adir-tagline { display: none; }
-          .adir-partner-line { display: block; font-size: 12px; color: var(--ink-soft); margin: -14px 0 28px; }
-          .adir-partner-line strong { color: var(--ink); font-weight: 600; }
+          /* Heading stays in the HTML for SEO/screen readers, hidden visually
+             on desktop — the left nav's "Artists" title does that job there. */
+          .adir-heading { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+          .adir-center .adir-wrap { padding-top: 32px; }
 
-          .adir-bar {
-            display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr);
-            position: sticky; top: var(--nav-h); z-index: 90; height: var(--bar-h);
-            background: #fff; border-bottom: 2px solid var(--ink);
-          }
-          .adir-bar-side { background: var(--ink); display: flex; align-items: center; padding: 0 24px; }
-          .adir-bar-title { font-family: var(--serif); font-size: 22px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); }
-          .adir-bar-main { min-width: 0; }
-          .adir-bar-inner {
-            height: 100%; max-width: 1280px; margin: 0 auto; padding: 0 32px;
-            display: flex; align-items: center; justify-content: space-between; gap: 16px;
-          }
-          .adir-bar-count { font-size: 13px; color: var(--ink-soft); white-space: nowrap; display: flex; align-items: center; gap: 14px; }
-          .adir-bar-clear { background: none; border: none; padding: 0; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
-          .adir-bar-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-          .adir-add-btn {
-            display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 100px;
-            background: var(--accent); color: #fff; text-decoration: none; white-space: nowrap;
-            font-family: var(--serif); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-            transition: background 0.15s;
-          }
-          .adir-add-btn:hover { background: #a00440; }
-          .adir-bar-rail { display: none; }
 
           .adir-shell { display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); align-items: stretch; }
           .adir-center { min-width: 0; }
@@ -996,10 +976,18 @@ export default function ArtistDirectory({ initialData }: { initialData: InitialD
           /* Solid black nav column; the inner panel sticks */
           .adir-nav { display: block; background: var(--ink); color: #fff; }
           .adir-nav-inner {
-            position: sticky; top: calc(var(--nav-h) + var(--bar-h));
-            max-height: calc(100vh - var(--nav-h) - var(--bar-h)); overflow-y: auto;
+            position: sticky; top: var(--nav-h);
+            max-height: calc(100vh - var(--nav-h)); overflow-y: auto;
             padding: 24px 16px 32px; scrollbar-width: thin; scrollbar-color: #444 transparent;
           }
+          .adir-nav-head { padding: 4px 12px 18px; }
+          .adir-nav-title { font-family: var(--serif); font-size: 26px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); line-height: 1; margin-bottom: 10px; }
+          .adir-nav-partner { font-size: 12px; line-height: 1.5; color: #a8a29a; }
+          .adir-nav-partner strong { color: #e9e5df; font-weight: 600; }
+          .adir-nav-sf { margin-bottom: 10px; }
+          .adir-nav-sf button { width: 100%; justify-content: center; }
+          .adir-nav-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; margin: -12px 0 20px; font-size: 12px; color: #8a8479; }
+          .adir-nav-clear { background: none; border: none; padding: 0; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
           .adir-nav-search {
             display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 40px; margin-bottom: 24px;
             background: #232120; border: 1px solid #34312e; border-radius: 6px; color: #a8a29a; cursor: text;
@@ -1030,8 +1018,11 @@ export default function ArtistDirectory({ initialData }: { initialData: InitialD
           }
           .adir-nav-pill:hover { border-color: #8a8479; color: #fff; }
           .adir-nav-pill.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+          .adir-nav-ctas { display: flex; flex-direction: column; gap: 8px; margin: 8px 12px 0; }
+          .adir-nav-cta--primary { background: var(--accent) !important; border-color: var(--accent) !important; color: #fff !important; }
+          .adir-nav-cta--primary:hover { background: #a00440 !important; border-color: #a00440 !important; }
           .adir-nav-cta {
-            display: block; margin: 8px 12px 0; padding: 11px 12px; text-align: center; border-radius: 4px;
+            display: block; padding: 11px 12px; text-align: center; border-radius: 4px;
             border: 1.5px solid var(--gold); color: var(--gold); text-decoration: none;
             font-family: var(--serif); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1.3;
           }
@@ -1045,8 +1036,7 @@ export default function ArtistDirectory({ initialData }: { initialData: InitialD
         }
 
         @media (min-width: 1100px) {
-          .adir-shell, .adir-bar { grid-template-columns: var(--side-w) minmax(0, 1fr) var(--rail-w); }
-          .adir-bar-rail { display: block; }
+          .adir-shell { grid-template-columns: var(--side-w) minmax(0, 1fr) var(--rail-w); }
           .adir-center .opp-section { display: none; }
           .adir-rail { display: flex; flex-direction: column; gap: 20px; padding: 36px 28px 60px 0; }
           .adir-rail .adir-sidebar { position: static; }
@@ -1097,7 +1087,7 @@ export default function ArtistDirectory({ initialData }: { initialData: InitialD
         }
       `}</style>
 
-      {/* Below 900px only — desktop gets the site nav + .adir-bar instead */}
+      {/* Below 900px only — desktop gets the site nav + left nav instead */}
       <BrowseHeader
         title="Artists"
         activeFilterCount={activeFilterCount}
@@ -1127,33 +1117,21 @@ export default function ArtistDirectory({ initialData }: { initialData: InitialD
         <strong>seveneightfive magazine</strong> and <strong>ArtsConnect</strong>
       </div>
 
-      {/* ── Desktop bar (≥900px): full width, sticky under the site nav ── */}
-      <div className="adir-bar">
-        <div className="adir-bar-side">
-          <span className="adir-bar-title">Artists</span>
-        </div>
-        <div className="adir-bar-main">
-          <div className="adir-bar-inner">
-            <span className="adir-bar-count">
-              {filtered.length} {filtered.length === 1 ? 'artist' : 'artists'}
-              {isFiltered && <button type="button" className="adir-bar-clear" onClick={clearAll}>Clear filters</button>}
-            </span>
-            <div className="adir-bar-actions">
-              <SearchFilterButton count={activeFilterCount} onClick={() => setFiltersOpen(true)} />
-              <a href={ADD_ARTIST_URL} target="_blank" rel="noopener noreferrer" className="adir-add-btn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                Add or create your artist page
-              </a>
-            </div>
-          </div>
-        </div>
-        <div className="adir-bar-rail" aria-hidden="true" />
-      </div>
-
       <div className="adir-shell">
         {/* ── Desktop left nav (≥900px) ── */}
         <aside className="adir-nav" aria-label="Filter artists">
           <div className="adir-nav-inner">
+            <div className="adir-nav-head">
+              <div className="adir-nav-title">Artists</div>
+              <p className="adir-nav-partner">
+                Presented in partnership between <strong>seveneightfive magazine</strong> and <strong>ArtsConnect</strong>
+              </p>
+            </div>
+
+            <div className="adir-nav-sf">
+              <SearchFilterButton count={activeFilterCount} onClick={() => setFiltersOpen(true)} variant="light" />
+            </div>
+
             <label className="adir-nav-search">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
               <input
@@ -1164,6 +1142,11 @@ export default function ArtistDirectory({ initialData }: { initialData: InitialD
                 aria-label="Search artists"
               />
             </label>
+
+            <div className="adir-nav-status">
+              <span>{filtered.length} {filtered.length === 1 ? 'artist' : 'artists'}</span>
+              {isFiltered && <button type="button" className="adir-nav-clear" onClick={clearAll}>Clear filters</button>}
+            </div>
 
             <nav className="adir-nav-group" aria-label="Artist type">
               <div className="adir-nav-label">Type</div>
@@ -1227,18 +1210,20 @@ export default function ArtistDirectory({ initialData }: { initialData: InitialD
               ))}
             </nav>
 
-            <a href={ADD_ARTIST_URL} target="_blank" rel="noopener noreferrer" className="adir-nav-cta">
-              Add or create your artist page
-            </a>
+            <div className="adir-nav-ctas">
+              <a href={ADD_ARTIST_URL} target="_blank" rel="noopener noreferrer" className="adir-nav-cta adir-nav-cta--primary">
+                + Add or create your artist page
+              </a>
+              <a href={MANAGE_ARTIST_URL} target="_blank" rel="noopener noreferrer" className="adir-nav-cta">
+                Manage your page
+              </a>
+            </div>
           </div>
         </aside>
 
         <div className="adir-center">
             <div className="adir-wrap">
               <h1 className="adir-heading">785 <em>Artists</em></h1>
-              <p className="adir-partner-line">
-                Presented in partnership between <strong>seveneightfive magazine</strong> and <strong>ArtsConnect</strong>
-              </p>
 
               <div className={`adir-layout${hasSidebar && !isFiltered ? ' has-sidebar' : ''}`}>
 
