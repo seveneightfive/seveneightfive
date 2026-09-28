@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import BrowseHeader from '../components/BrowseHeader'
+import SearchFilterButton from '../components/SearchFilterButton'
 import SearchFilterSheet from '../components/SearchFilterSheet'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -65,6 +66,16 @@ type Opportunity = {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+
+const ADD_ARTIST_URL = 'https://seveneightfive.fillout.com/new-artist'
+
+// Desktop left-nav "Explore" links
+const EXPLORE_LINKS = [
+  { href: '/topeka-art-galleries', label: 'Art Galleries + Studios' },
+  { href: '/live-music', label: 'Live Music' },
+  { href: '/opportunities', label: 'Opportunities' },
+  { href: '/events', label: 'Events' },
+]
 
 const ARTIST_TYPES = ['All', 'Musician', 'Visual', 'Performance', 'Literary']
 
@@ -246,13 +257,14 @@ function ExhibitionSidebar({
 
 // ─── Opportunity Board ────────────────────────────────────────────────────────
 
-function OpportunityBoard({ opportunities }: { opportunities: Opportunity[] }) {
+function OpportunityBoard({ opportunities, variant = 'main' }: { opportunities: Opportunity[]; variant?: 'main' | 'rail' }) {
   const [expanded, setExpanded] = useState(false)
   if (!opportunities.length) return null
-  const visible = expanded ? opportunities : opportunities.slice(0, 4)
+  const initialCount = variant === 'rail' ? 5 : 4
+  const visible = expanded ? opportunities : opportunities.slice(0, initialCount)
 
   return (
-    <section className="opp-section">
+    <section className={`opp-section${variant === 'rail' ? ' opp-section--rail' : ''}`}>
       <div className="opp-header">
         <div>
           <h2 className="opp-heading">OPPORTUNITIES</h2>
@@ -293,7 +305,7 @@ function OpportunityBoard({ opportunities }: { opportunities: Opportunity[] }) {
           )
         })}
       </div>
-      {opportunities.length > 4 && (
+      {opportunities.length > initialCount && (
         <button className="opp-more" onClick={() => setExpanded(e => !e)}>
           {expanded ? 'Show less' : `Show all ${opportunities.length} opportunities`}
         </button>
@@ -449,6 +461,13 @@ export default function ArtistDirectory({ initialData }: { initialData: InitialD
   ]
 
   const activeFilterCount = (activeType !== 'All' ? 1 : 0) + (activeGenre ? 1 : 0) + (showMine ? 1 : 0)
+
+  // Desktop left nav: artist count per type, shown next to each type link
+  const typeCounts: Record<string, number> = { All: artists.length }
+  artists.forEach(a => {
+    if (a.artist_type) typeCounts[a.artist_type] = (typeCounts[a.artist_type] || 0) + 1
+  })
+  const clearAll = () => { setActiveType('All'); setActiveGenre(''); setShowMine(false); setSearch('') }
 
   return (
     <>
@@ -934,6 +953,122 @@ export default function ArtistDirectory({ initialData }: { initialData: InitialD
         .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
         @keyframes ldot { 0%,80%,100% { opacity:0.3; transform:scale(0.85); } 40% { opacity:1; transform:scale(1); } }
 
+        /* ════════ Desktop shell (bar + left nav + rail) ════════
+           Everything below is hidden under 900px, where the page keeps its
+           original mobile/tablet layout. */
+        .adir-bar, .adir-nav, .adir-rail, .adir-partner-line { display: none; }
+
+        @media (min-width: 900px) {
+          :root { --side-w: 248px; --rail-w: clamp(300px, 22vw, 360px); --nav-h: 64px; --bar-h: 60px; }
+
+          .adir-tagline { display: none; }
+          .adir-partner-line { display: block; font-size: 12px; color: var(--ink-soft); margin: -14px 0 28px; }
+          .adir-partner-line strong { color: var(--ink); font-weight: 600; }
+
+          .adir-bar {
+            display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr);
+            position: sticky; top: var(--nav-h); z-index: 90; height: var(--bar-h);
+            background: #fff; border-bottom: 2px solid var(--ink);
+          }
+          .adir-bar-side { background: var(--ink); display: flex; align-items: center; padding: 0 24px; }
+          .adir-bar-title { font-family: var(--serif); font-size: 22px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); }
+          .adir-bar-main { min-width: 0; }
+          .adir-bar-inner {
+            height: 100%; max-width: 1280px; margin: 0 auto; padding: 0 32px;
+            display: flex; align-items: center; justify-content: space-between; gap: 16px;
+          }
+          .adir-bar-count { font-size: 13px; color: var(--ink-soft); white-space: nowrap; display: flex; align-items: center; gap: 14px; }
+          .adir-bar-clear { background: none; border: none; padding: 0; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+          .adir-bar-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+          .adir-add-btn {
+            display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 100px;
+            background: var(--accent); color: #fff; text-decoration: none; white-space: nowrap;
+            font-family: var(--serif); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+            transition: background 0.15s;
+          }
+          .adir-add-btn:hover { background: #a00440; }
+          .adir-bar-rail { display: none; }
+
+          .adir-shell { display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); align-items: stretch; }
+          .adir-center { min-width: 0; }
+          .adir-wrap { width: 100%; }
+
+          /* Solid black nav column; the inner panel sticks */
+          .adir-nav { display: block; background: var(--ink); color: #fff; }
+          .adir-nav-inner {
+            position: sticky; top: calc(var(--nav-h) + var(--bar-h));
+            max-height: calc(100vh - var(--nav-h) - var(--bar-h)); overflow-y: auto;
+            padding: 24px 16px 32px; scrollbar-width: thin; scrollbar-color: #444 transparent;
+          }
+          .adir-nav-search {
+            display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 40px; margin-bottom: 24px;
+            background: #232120; border: 1px solid #34312e; border-radius: 6px; color: #a8a29a; cursor: text;
+          }
+          .adir-nav-search:focus-within { border-color: var(--gold); color: var(--gold); }
+          .adir-nav-search input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: #fff; font-family: var(--sans); font-size: 14px; }
+          .adir-nav-search input::placeholder { color: #8a8479; }
+          .adir-nav-group { display: flex; flex-direction: column; margin-bottom: 22px; }
+          .adir-nav-label { font-family: var(--serif); font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #8a8479; padding: 0 12px 8px; }
+          .adir-nav-link {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+            padding: 8px 12px; border: none; border-radius: 4px; background: none; cursor: pointer; text-align: left;
+            font-family: var(--sans); font-size: 14px; font-weight: 500; color: #e9e5df; text-decoration: none;
+            transition: background 0.12s, color 0.12s;
+          }
+          .adir-nav-link:hover { background: #262422; color: #fff; }
+          .adir-nav-link:focus-visible, .adir-nav-pill:focus-visible, .adir-nav-cta:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+          .adir-nav-link.active { background: var(--gold); color: var(--ink); font-weight: 700; }
+          .adir-nav-link--mine.active { background: var(--accent); color: #fff; }
+          .adir-nav-count { font-size: 12px; color: #6f6a64; font-weight: 500; }
+          .adir-nav-link.active .adir-nav-count { color: inherit; opacity: 0.7; }
+          .adir-nav-link--page svg { color: #5d5853; flex-shrink: 0; transition: transform 0.12s, color 0.12s; }
+          .adir-nav-link--page:hover svg { color: var(--gold); transform: translateX(2px); }
+          .adir-nav-pills { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px; }
+          .adir-nav-pill {
+            padding: 5px 10px; border-radius: 100px; border: 1px solid #3a3632; background: none; cursor: pointer;
+            font-family: var(--sans); font-size: 12px; color: #d8d3cc;
+          }
+          .adir-nav-pill:hover { border-color: #8a8479; color: #fff; }
+          .adir-nav-pill.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+          .adir-nav-cta {
+            display: block; margin: 8px 12px 0; padding: 11px 12px; text-align: center; border-radius: 4px;
+            border: 1.5px solid var(--gold); color: var(--gold); text-decoration: none;
+            font-family: var(--serif); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1.3;
+          }
+          .adir-nav-cta:hover { background: var(--gold); color: var(--ink); }
+
+          /* Main column: the in-page sidebar moves to the rail (or drops
+             below 1100px), so the grid becomes a single column. */
+          .adir-layout.has-sidebar { display: block; }
+          .adir-center .adir-sidebar { display: none; }
+          .adir-featured-grid, .has-sidebar .adir-featured-grid { grid-template-columns: repeat(3, 1fr) !important; }
+        }
+
+        @media (min-width: 1100px) {
+          .adir-shell, .adir-bar { grid-template-columns: var(--side-w) minmax(0, 1fr) var(--rail-w); }
+          .adir-bar-rail { display: block; }
+          .adir-center .opp-section { display: none; }
+          .adir-rail { display: flex; flex-direction: column; gap: 20px; padding: 36px 28px 60px 0; }
+          .adir-rail .adir-sidebar { position: static; }
+
+          /* Compact opportunities list for the 300px rail */
+          .opp-section--rail { border-top: none; padding-top: 0; }
+          .opp-section--rail .opp-header { flex-direction: column; gap: 10px; margin-bottom: 12px; }
+          .opp-section--rail .opp-heading { font-size: 1.3rem; }
+          .opp-section--rail .opp-sub { font-size: 12px; }
+          .opp-section--rail .opp-post-btn { padding: 7px 12px; font-size: 10px; }
+          .opp-section--rail .opp-item { flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px 14px; }
+          .opp-section--rail .opp-item-left { width: 100%; }
+          .opp-section--rail .opp-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+          .opp-section--rail .opp-excerpt { display: none; }
+          .opp-section--rail .opp-item-right { flex-direction: row; align-items: center; gap: 10px; }
+          .opp-section--rail .opp-dl { flex-direction: row; align-items: baseline; gap: 6px; }
+          .opp-section--rail .opp-arrow { display: none; }
+        }
+        @media (min-width: 1700px) {
+          .adir-featured-grid, .has-sidebar .adir-featured-grid { grid-template-columns: repeat(6, 1fr) !important; }
+        }
+
         /* ── Responsive ── */
         @media (max-width: 1100px) {
           .adir-layout.has-sidebar { grid-template-columns: 1fr 240px; gap: 28px; }
@@ -962,10 +1097,12 @@ export default function ArtistDirectory({ initialData }: { initialData: InitialD
         }
       `}</style>
 
+      {/* Below 900px only — desktop gets the site nav + .adir-bar instead */}
       <BrowseHeader
         title="Artists"
         activeFilterCount={activeFilterCount}
         onOpenFilters={() => setFiltersOpen(true)}
+        hideOnDesktop
       />
 
       <SearchFilterSheet
@@ -981,7 +1118,7 @@ export default function ArtistDirectory({ initialData }: { initialData: InitialD
         showDateFilters={false}
         resultCount={filtered.length}
         resultLabel="Artists"
-        onClearAll={() => { setActiveType('All'); setActiveGenre(''); setShowMine(false); setSearch('') }}
+        onClearAll={clearAll}
       />
 
       {/* ── Partnership tagline ── */}
@@ -990,124 +1127,242 @@ export default function ArtistDirectory({ initialData }: { initialData: InitialD
         <strong>seveneightfive magazine</strong> and <strong>ArtsConnect</strong>
       </div>
 
-      <div className="adir-wrap">
-        <h1 className="adir-heading">785 <em>Artists</em></h1>
+      {/* ── Desktop bar (≥900px): full width, sticky under the site nav ── */}
+      <div className="adir-bar">
+        <div className="adir-bar-side">
+          <span className="adir-bar-title">Artists</span>
+        </div>
+        <div className="adir-bar-main">
+          <div className="adir-bar-inner">
+            <span className="adir-bar-count">
+              {filtered.length} {filtered.length === 1 ? 'artist' : 'artists'}
+              {isFiltered && <button type="button" className="adir-bar-clear" onClick={clearAll}>Clear filters</button>}
+            </span>
+            <div className="adir-bar-actions">
+              <SearchFilterButton count={activeFilterCount} onClick={() => setFiltersOpen(true)} />
+              <a href={ADD_ARTIST_URL} target="_blank" rel="noopener noreferrer" className="adir-add-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                Add or create your artist page
+              </a>
+            </div>
+          </div>
+        </div>
+        <div className="adir-bar-rail" aria-hidden="true" />
+      </div>
 
-        <div className={`adir-layout${hasSidebar && !isFiltered ? ' has-sidebar' : ''}`}>
+      <div className="adir-shell">
+        {/* ── Desktop left nav (≥900px) ── */}
+        <aside className="adir-nav" aria-label="Filter artists">
+          <div className="adir-nav-inner">
+            <label className="adir-nav-search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+              <input
+                type="search"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search artists"
+                aria-label="Search artists"
+              />
+            </label>
 
-            {/* ── Main column ── */}
-            <div className="adir-main">
+            <nav className="adir-nav-group" aria-label="Artist type">
+              <div className="adir-nav-label">Type</div>
+              {ARTIST_TYPES.map(t => {
+                const active = !showMine && activeType === t
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    className={`adir-nav-link${active ? ' active' : ''}`}
+                    aria-pressed={active}
+                    onClick={() => {
+                      if (t === 'All') { setActiveType('All'); setActiveGenre(''); setShowMine(false) }
+                      else handleToggleType(t)
+                    }}
+                  >
+                    <span>{TYPE_FILTER_LABELS[t]}</span>
+                    <span className="adir-nav-count">{typeCounts[t] || 0}</span>
+                  </button>
+                )
+              })}
+              {myArtistIds.length > 0 && (
+                <button
+                  type="button"
+                  className={`adir-nav-link adir-nav-link--mine${showMine ? ' active' : ''}`}
+                  aria-pressed={showMine}
+                  onClick={handleToggleMine}
+                >
+                  <span>My Artists</span>
+                  <span className="adir-nav-count">{myArtistIds.length}</span>
+                </button>
+              )}
+            </nav>
 
-              {/* Featured artists — verified, sorted by upcoming events */}
-              {!isFiltered && featured.length > 0 && (
-                <section className="adir-section">
-                  <div className="adir-section-head">
-                    <span className="adir-section-label">Featured Artists</span>
-                    <div className="adir-section-rule" />
-                  </div>
-                  <div className="adir-featured-grid">
-                    {featured.map(a => (
-                      <a key={a.id} href={`/artists/${a.slug}`} className="feat-card">
-                        {getImage(a)
-                          ? <img src={getImage(a)!} alt={a.name} className="feat-img" />
-                          : <div className="feat-no-img">{a.name[0]}</div>
-                        }
-                        <div className="feat-overlay">
-                          <div className="feat-name">
-                            {a.name}
-                            {a.verified && <span className="feat-verified" />}
-                          </div>
-                          <div className="feat-type">{TYPE_LABELS[a.artist_type || ''] || a.artist_type}</div>
-                          {(a.upcoming_event_count ?? 0) > 0 && (
-                            <div className="feat-events">
-                              {a.upcoming_event_count} upcoming event{a.upcoming_event_count !== 1 ? 's' : ''}
-                            </div>
+            {activeType !== 'All' && !showMine && (
+              <div className="adir-nav-group">
+                <div className="adir-nav-label">{getGenreLabel()}</div>
+                <div className="adir-nav-pills">
+                  {getGenreList().map(g => (
+                    <button
+                      key={g}
+                      type="button"
+                      className={`adir-nav-pill${activeGenre === g ? ' active' : ''}`}
+                      aria-pressed={activeGenre === g}
+                      onClick={() => handleToggleGenre(g)}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <nav className="adir-nav-group" aria-label="Explore">
+              <div className="adir-nav-label">Explore</div>
+              {EXPLORE_LINKS.map(l => (
+                <a key={l.href} href={l.href} className="adir-nav-link adir-nav-link--page">
+                  {l.label}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+                </a>
+              ))}
+            </nav>
+
+            <a href={ADD_ARTIST_URL} target="_blank" rel="noopener noreferrer" className="adir-nav-cta">
+              Add or create your artist page
+            </a>
+          </div>
+        </aside>
+
+        <div className="adir-center">
+            <div className="adir-wrap">
+              <h1 className="adir-heading">785 <em>Artists</em></h1>
+              <p className="adir-partner-line">
+                Presented in partnership between <strong>seveneightfive magazine</strong> and <strong>ArtsConnect</strong>
+              </p>
+
+              <div className={`adir-layout${hasSidebar && !isFiltered ? ' has-sidebar' : ''}`}>
+
+                  {/* ── Main column ── */}
+                  <div className="adir-main">
+
+                    {/* Featured artists — verified, sorted by upcoming events */}
+                    {!isFiltered && featured.length > 0 && (
+                      <section className="adir-section">
+                        <div className="adir-section-head">
+                          <span className="adir-section-label">Featured Artists</span>
+                          <div className="adir-section-rule" />
+                        </div>
+                        <div className="adir-featured-grid">
+                          {featured.map(a => (
+                            <a key={a.id} href={`/artists/${a.slug}`} className="feat-card">
+                              {getImage(a)
+                                ? <img src={getImage(a)!} alt={a.name} className="feat-img" />
+                                : <div className="feat-no-img">{a.name[0]}</div>
+                              }
+                              <div className="feat-overlay">
+                                <div className="feat-name">
+                                  {a.name}
+                                  {a.verified && <span className="feat-verified" />}
+                                </div>
+                                <div className="feat-type">{TYPE_LABELS[a.artist_type || ''] || a.artist_type}</div>
+                                {(a.upcoming_event_count ?? 0) > 0 && (
+                                  <div className="feat-events">
+                                    {a.upcoming_event_count} upcoming event{a.upcoming_event_count !== 1 ? 's' : ''}
+                                  </div>
+                                )}
+                              </div>
+                            </a>
+                          ))}
+                          {/* Create profile CTA */}
+                          <a href={ADD_ARTIST_URL} target="_blank" rel="noopener noreferrer" className="feat-cta">
+                            <div className="feat-cta-icon">+</div>
+                            <p className="feat-cta-title">Create Your Artist Profile</p>
+                            <p className="feat-cta-sub">Join the Topeka Artist Directory</p>
+                          </a>
+                        </div>
+                      </section>
+                    )}
+
+                    {/* All / filtered artists */}
+                    <section className="adir-section">
+                      <div className="adir-section-head">
+                        <span className="adir-section-label">
+                          {showMine ? 'My Artists'
+                            : activeType !== 'All' ? TYPE_FILTER_LABELS[activeType]
+                            : 'All Artists'}
+                        </span>
+                        <div className="adir-section-rule" />
+                        <span className="adir-section-count">{filtered.length}</span>
+                      </div>
+
+                      {filtered.length === 0 ? (
+                        <div className="adir-empty">
+                          <div className="adir-empty-title">No artists found</div>
+                          <p>{search ? `No results for "${search}"` : 'Try adjusting your filters.'}</p>
+                          {search && (
+                            <button className="adir-empty-clear" onClick={() => setSearch('')}>
+                              Clear search
+                            </button>
                           )}
                         </div>
-                      </a>
-                    ))}
-                    {/* Create profile CTA */}
-                    <a href="/dashboard/artist/new" className="feat-cta">
-                      <div className="feat-cta-icon">+</div>
-                      <p className="feat-cta-title">Create Your Artist Profile</p>
-                      <p className="feat-cta-sub">Join the Topeka Artist Directory</p>
-                    </a>
-                  </div>
-                </section>
-              )}
+                      ) : (
+                        <div className="artists-grid">
+                          {filtered.map(a => (
+                            <a key={a.id} href={`/artists/${a.slug}`} className="artist-card">
+                              <div className="artist-img-wrap">
+                                {getImage(a)
+                                  ? <img src={getImage(a)!} alt={a.name} className="artist-img-inner" loading="lazy" />
+                                  : <div className="artist-no-img">{a.name[0]}</div>
+                                }
+                              </div>
+                              <div className="artist-name">
+                                {a.name}
+                                {a.verified && <span className="verified-dot" />}
+                                {myArtistIds.includes(a.id) && <span className="mine-badge">Mine</span>}
+                              </div>
+                              <div className="artist-type">{TYPE_LABELS[a.artist_type || ''] || a.artist_type || 'Artist'}</div>
+                              {(a.upcoming_event_count ?? 0) > 0 && (
+                                <div className="artist-events">
+                                  {a.upcoming_event_count} upcoming event{a.upcoming_event_count !== 1 ? 's' : ''}
+                                </div>
+                              )}
+                              {getGenres(a).length > 0 && (
+                                <div className="artist-genres">
+                                  {getGenres(a).map(g => (
+                                    <span key={g} className="artist-genre-tag">{g}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </section>
 
-              {/* All / filtered artists */}
-              <section className="adir-section">
-                <div className="adir-section-head">
-                  <span className="adir-section-label">
-                    {showMine ? 'My Artists'
-                      : activeType !== 'All' ? TYPE_FILTER_LABELS[activeType]
-                      : 'All Artists'}
-                  </span>
-                  <div className="adir-section-rule" />
-                  <span className="adir-section-count">{filtered.length}</span>
+                    {/* Opportunities */}
+                    {!isFiltered && <OpportunityBoard opportunities={opportunities} />}
+                  </div>
+
+                  {/* ── Sidebar: exhibitions + productions + galleries link ── */}
+                  {hasSidebar && !isFiltered && (
+                    <ExhibitionSidebar exhibitions={exhibitions} productions={productions} />
+                  )}
                 </div>
 
-                {filtered.length === 0 ? (
-                  <div className="adir-empty">
-                    <div className="adir-empty-title">No artists found</div>
-                    <p>{search ? `No results for "${search}"` : 'Try adjusting your filters.'}</p>
-                    {search && (
-                      <button className="adir-empty-clear" onClick={() => setSearch('')}>
-                        Clear search
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="artists-grid">
-                    {filtered.map(a => (
-                      <a key={a.id} href={`/artists/${a.slug}`} className="artist-card">
-                        <div className="artist-img-wrap">
-                          {getImage(a)
-                            ? <img src={getImage(a)!} alt={a.name} className="artist-img-inner" loading="lazy" />
-                            : <div className="artist-no-img">{a.name[0]}</div>
-                          }
-                        </div>
-                        <div className="artist-name">
-                          {a.name}
-                          {a.verified && <span className="verified-dot" />}
-                          {myArtistIds.includes(a.id) && <span className="mine-badge">Mine</span>}
-                        </div>
-                        <div className="artist-type">{TYPE_LABELS[a.artist_type || ''] || a.artist_type || 'Artist'}</div>
-                        {(a.upcoming_event_count ?? 0) > 0 && (
-                          <div className="artist-events">
-                            {a.upcoming_event_count} upcoming event{a.upcoming_event_count !== 1 ? 's' : ''}
-                          </div>
-                        )}
-                        {getGenres(a).length > 0 && (
-                          <div className="artist-genres">
-                            {getGenres(a).map(g => (
-                              <span key={g} className="artist-genre-tag">{g}</span>
-                            ))}
-                          </div>
-                        )}
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              {/* Opportunities */}
-              {!isFiltered && <OpportunityBoard opportunities={opportunities} />}
+              {/* ── Partnership footer ── */}
+              <div className="adir-footer">
+                <strong>Topeka Artist Directory</strong> · A partnership between{' '}
+                <a href="https://seveneightfive.com">seveneightfive magazine</a> and <strong>ArtsConnect</strong>
+                {' '}· Celebrating creative voices in Topeka, Kansas
+              </div>
             </div>
-
-            {/* ── Sidebar: exhibitions + productions + galleries link ── */}
-            {hasSidebar && !isFiltered && (
-              <ExhibitionSidebar exhibitions={exhibitions} productions={productions} />
-            )}
-          </div>
-
-        {/* ── Partnership footer ── */}
-        <div className="adir-footer">
-          <strong>Topeka Artist Directory</strong> · A partnership between{' '}
-          <a href="https://seveneightfive.com">seveneightfive magazine</a> and <strong>ArtsConnect</strong>
-          {' '}· Celebrating creative voices in Topeka, Kansas
         </div>
+
+        {/* ── Desktop right rail (≥1100px): opportunities, then what's on ── */}
+        <aside className="adir-rail" aria-label="Opportunities and exhibitions">
+          <OpportunityBoard opportunities={opportunities} variant="rail" />
+          <ExhibitionSidebar exhibitions={exhibitions} productions={productions} />
+        </aside>
       </div>
     </>
   )
