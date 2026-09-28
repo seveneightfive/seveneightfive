@@ -31,6 +31,7 @@ export default async function NeighborhoodsPage() {
   const { data: venueCounts } = await supabase
     .from('venues')
     .select('neighborhood')
+    .eq('status', 'active')
 
   const countMap: Record<string, number> = {}
   ;(venueCounts as VenueRow[] | null)?.forEach((v) => {
