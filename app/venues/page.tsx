@@ -27,6 +27,7 @@ export default async function VenuesPage({ searchParams }: { searchParams: Promi
     supabase
       .from('venues')
       .select('id, name, slug, description, address, neighborhood, city, state, image_url, logo, website, venue_type, latitude, longitude')
+      .eq('status', 'active')
       .order('name'),
     supabase
       .from('events')
