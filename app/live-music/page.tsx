@@ -58,6 +58,7 @@ export default async function LiveMusicPage() {
       .from('venues')
       .select('id, name, slug, address, neighborhood, image_url, logo, venue_type')
       .overlaps('venue_type', ['Live Music', 'Music Venue', 'Bar / Nightclub', 'Concert Venue'])
+      .eq('status', 'active')
       .order('name'),
   ])
 
