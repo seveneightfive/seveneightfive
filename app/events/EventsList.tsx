@@ -2,9 +2,36 @@
 
 import { Fragment, useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
-import BrowseHeader, { type BrowseLinkGroup } from '../components/BrowseHeader'
+import { type BrowseLinkGroup } from '../components/BrowseHeader'
+import SearchFilterButton from '../components/SearchFilterButton'
 import SearchFilterSheet, { getActiveFilterCount } from '../components/SearchFilterSheet'
 import AdvertisementBanner from '../components/AdvertisementBanner'
+import EventsRail from './EventsRail'
+
+const ADD_EVENT_URL = 'https://seveneightfive.fillout.com/add-event'
+
+// Desktop sidebar "When" list. These filter the list in place (no page
+// load), but the ones that have an SEO landing page still render as real
+// <a href> links so crawlers keep following them — the click handler just
+// intercepts normal left-clicks.
+const WHEN_OPTIONS: { key: string | null; label: string; href: string }[] = [
+  { key: null, label: 'All upcoming', href: '/events/all-events' },
+  { key: 'today', label: 'Today', href: '/events/today' },
+  { key: 'tomorrow', label: 'Tomorrow', href: '/events' },
+  { key: 'weekend', label: 'This weekend', href: '/events/this-weekend' },
+  { key: 'week', label: 'This week', href: '/events/this-week' },
+  { key: 'month', label: 'This month', href: '/events/this-month' },
+]
+
+const SHEET_QUICK_DATES = [
+  { key: 'today', label: 'Today' },
+  { key: 'tomorrow', label: 'Tomorrow' },
+  { key: 'weekend', label: 'This Weekend' },
+  { key: 'week', label: 'This Week' },
+  { key: 'month', label: 'This Month' },
+]
+
+const DESKTOP_MQ = '(min-width: 900px)'
 
 type Venue = {
   id: string
@@ -149,9 +176,11 @@ type EventsListProps = {
   // this does. Omit entirely (as /artists, /venues do) to get the old
   // plain-title header with no dropdown.
   browseLinks?: BrowseLinkGroup[]
+  // Page H1 — rendered at the top of the list column (real text for SEO).
+  heading?: string
 }
 
-export default function EventsList({ initialEvents, browseLinks }: EventsListProps = {}) {
+export default function EventsList({ initialEvents, browseLinks, heading }: EventsListProps = {}) {
   const [events, setEvents] = useState<Event[]>(initialEvents ?? [])
   const [filtered, setFiltered] = useState<Event[]>(initialEvents ?? [])
   const [loading, setLoading] = useState(!initialEvents || initialEvents.length === 0)
@@ -235,6 +264,13 @@ export default function EventsList({ initialEvents, browseLinks }: EventsListPro
     if (quickDate === 'today') return { start: todayKey, end: todayKey }
     if (quickDate === 'tomorrow') return { start: tomorrowKey, end: tomorrowKey }
     if (quickDate === 'weekend') return getWeekendRange()
+    if (quickDate === 'week') {
+      // Today through the coming Sunday
+      const now = new Date()
+      const sun = new Date(now)
+      sun.setDate(now.getDate() + ((7 - now.getDay()) % 7))
+      return { start: todayKey, end: getDateKey(sun) }
+    }
     if (quickDate === 'month') {
       const now = new Date()
       const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
@@ -384,7 +420,8 @@ export default function EventsList({ initialEvents, browseLinks }: EventsListPro
           }
         })
       },
-      { rootMargin: '-116px 0px -70% 0px', threshold: 0 }
+      // Sticky chrome is taller on desktop (site nav + events bar = 128px)
+      { rootMargin: window.matchMedia(DESKTOP_MQ).matches ? '-140px 0px -70% 0px' : '-116px 0px -70% 0px', threshold: 0 }
     )
     monthMarkers.forEach(m => {
       const el = monthRefs.current[m.firstDateKey]
@@ -402,6 +439,24 @@ export default function EventsList({ initialEvents, browseLinks }: EventsListPro
   }
 
   const [categoriesOpen, setCategoriesOpen] = useState(false)
+
+  // Sidebar "When" links: filter in place on a plain left-click, but let
+  // cmd/ctrl/middle-click fall through to the real SEO page in a new tab.
+  const handleWhenClick = (e: React.MouseEvent<HTMLAnchorElement>, key: string | null) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return
+    e.preventDefault()
+    if (key === null) {
+      setQuickDate(null)
+      setSelectedDate(null)
+      setStartDate(null)
+      setEndDate(null)
+    } else {
+      handleQuickDate(quickDate === key ? null : key)
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  const noDateFilter = !quickDate && !selectedDate && !startDate && !endDate
+  const categoryGroups = (browseLinks || []).filter(g => g.group !== 'By Date')
 
   return (
     <>
@@ -495,6 +550,193 @@ export default function EventsList({ initialEvents, browseLinks }: EventsListPro
         .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
         .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
         @keyframes pulse { 0%,80%,100%{opacity:0.3;transform:scale(0.85)}40%{opacity:1;transform:scale(1)} }
+        /* ════════ Page layout: mobile defaults ════════ */
+        .ev-bar, .ev-side, .ev-rail { display: none; }
+        .ev-h1 {
+          font-family: var(--serif); font-weight: 700; text-transform: uppercase;
+          letter-spacing: 0.04em; font-size: 11px; color: #8a8479; padding-top: 14px;
+        }
+        /* Tablet (640–899): the site nav is visible here now, so the
+           mobile month toolbar has to stick below it rather than at 0. */
+        @media (min-width: 640px) and (max-width: 899px) {
+          .events-toolbar { top: 64px; }
+        }
+
+        /* ════════ Desktop (≥900px) ════════ */
+        @media (min-width: 900px) {
+          :root { --side-w: 248px; --rail-w: clamp(300px, 22vw, 380px); --list-max: 1200px; --nav-h: 64px; --bar-h: 60px; }
+
+          /* Same column template as .ev-shell below, so the bar's contents
+             line up exactly with the sidebar, the list, and the rail. */
+          .ev-bar {
+            display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); position: sticky; top: var(--nav-h); z-index: 90;
+            height: var(--bar-h); background: var(--white); border-bottom: 2px solid var(--ink);
+          }
+          .ev-bar-side {
+            background: var(--ink);
+            display: flex; align-items: center; padding: 0 24px;
+          }
+          .ev-bar-title {
+            font-family: var(--serif); font-size: 22px; font-weight: 700; letter-spacing: 0.06em;
+            text-transform: uppercase; color: var(--yellow);
+          }
+          .ev-bar-main { min-width: 0; }
+          .ev-bar-inner {
+            height: 100%; max-width: var(--list-max); margin: 0 auto; padding: 0 32px;
+            display: flex; align-items: center; justify-content: space-between; gap: 16px;
+          }
+          .ev-bar-rail { display: none; }
+          .ev-bar-month { display: flex; align-items: center; gap: 6px; min-width: 0; }
+          .ev-bar-arrow {
+            display: flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+            border-radius: 100px; border: 1.5px solid var(--border); background: none; color: var(--ink); cursor: pointer;
+          }
+          .ev-bar-arrow:hover:not(:disabled) { border-color: var(--ink); }
+          .ev-bar-arrow:disabled { color: var(--ink-faint); cursor: default; }
+          .ev-bar-month-label {
+            font-family: var(--serif); font-size: 18px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.04em; min-width: 180px; text-align: center; white-space: nowrap;
+          }
+          .ev-bar-count { margin-left: 10px; font-size: 13px; color: var(--ink-soft); white-space: nowrap; }
+          .ev-bar-actions { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+          .ev-bar-clear {
+            background: none; border: none; padding: 0; cursor: pointer; font-size: 13px; font-weight: 600;
+            color: var(--accent); text-decoration: underline; text-underline-offset: 3px;
+          }
+
+          .ev-shell { display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); align-items: stretch; }
+
+          /* Solid black nav column, flush to the left edge. The column
+             itself stretches the full list height (so the black runs all
+             the way down); the inner panel is what sticks. */
+          .ev-side { display: block; background: var(--ink); color: var(--white); }
+          .ev-side-inner {
+            position: sticky; top: calc(var(--nav-h) + var(--bar-h));
+            max-height: calc(100vh - var(--nav-h) - var(--bar-h)); overflow-y: auto;
+            padding: 24px 16px 32px; scrollbar-width: thin; scrollbar-color: #444 transparent;
+          }
+          .ev-search {
+            display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 40px; margin-bottom: 24px;
+            background: #232120; border: 1px solid #34312e; border-radius: 6px; color: #a8a29a; cursor: text;
+          }
+          .ev-search:focus-within { border-color: var(--yellow); color: var(--yellow); }
+          .ev-search input {
+            flex: 1; min-width: 0; background: none; border: none; outline: none;
+            color: var(--white); font-family: var(--sans); font-size: 14px;
+          }
+          .ev-search input::placeholder { color: #8a8479; }
+          .ev-side-group { display: flex; flex-direction: column; margin-bottom: 22px; }
+          .ev-side-label {
+            font-family: var(--serif); font-size: 12px; font-weight: 600; letter-spacing: 0.12em;
+            text-transform: uppercase; color: #8a8479; padding: 0 12px 8px;
+          }
+          .ev-side-link {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            padding: 8px 12px; border-radius: 4px; font-size: 14px; font-weight: 500;
+            color: #e9e5df; text-decoration: none; transition: background 0.12s, color 0.12s;
+          }
+          .ev-side-link:hover { background: #262422; color: var(--white); }
+          .ev-side-link:focus-visible, .ev-side-cta:focus-visible { outline: 2px solid var(--yellow); outline-offset: 1px; }
+          .ev-side-link.active { background: var(--yellow); color: var(--ink); font-weight: 700; }
+          .ev-side-link-page svg { color: #5d5853; flex-shrink: 0; transition: transform 0.12s, color 0.12s; }
+          .ev-side-link-page:hover svg { color: var(--yellow); transform: translateX(2px); }
+          .ev-side-cta {
+            display: block; margin: 8px 12px 0; padding: 11px 12px; text-align: center; border-radius: 4px;
+            border: 1.5px solid var(--yellow); color: var(--yellow); text-decoration: none;
+            font-family: var(--serif); font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+          }
+          .ev-side-cta:hover { background: var(--yellow); color: var(--ink); }
+
+          .ev-main { min-width: 0; }
+          .page { max-width: var(--list-max); padding: 0 32px; }
+          .ev-h1 {
+            font-size: 28px; font-weight: 700; letter-spacing: 0.02em; color: var(--ink);
+            padding-top: 28px; line-height: 1.15;
+          }
+          .calendar { padding-top: 20px; }
+          .day-group { scroll-margin-top: 140px; }
+          .event-img-thumb { height: 96px; max-width: 180px; }
+          .event-description { max-width: 72ch; }
+        }
+
+        /* ════════ Wide desktop (≥1200px): add the right rail ════════ */
+        @media (min-width: 1200px) {
+          .ev-shell, .ev-bar { grid-template-columns: var(--side-w) minmax(0, 1fr) var(--rail-w); }
+          .ev-bar-rail { display: block; }
+          .ev-inline-ad { display: none; }
+          .ev-rail { display: block; padding: 28px 28px 48px 0; }
+          .rail-inner { position: sticky; top: calc(var(--nav-h) + var(--bar-h) + 24px); display: flex; flex-direction: column; gap: 20px; }
+
+          .rail-tag {
+            display: inline-block; align-self: flex-start; padding: 3px 8px; border-radius: 100px;
+            background: var(--yellow); color: var(--ink);
+            font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+          }
+          .rail-tag-dark { background: var(--ink); color: var(--yellow); }
+          .rail-btn {
+            display: inline-block; align-self: flex-start; margin-top: 4px; padding: 9px 16px; border-radius: 4px;
+            background: var(--accent); color: var(--white);
+            font-family: var(--serif); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+          }
+          .rail-btn-dark { background: var(--ink); }
+
+          .rail-ad {
+            display: flex; flex-direction: column; width: 100%; padding: 0; text-align: left; cursor: pointer;
+            background: var(--ink); color: var(--white); border: none; border-radius: 8px; overflow: hidden; font: inherit;
+          }
+          .rail-ad-skeleton { height: 300px; background: var(--warm); }
+          .rail-ad-img { display: block; aspect-ratio: 16 / 9; background: #2a2622; }
+          .rail-ad-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+          .rail-ad-body { display: flex; flex-direction: column; gap: 8px; padding: 16px 18px 18px; }
+          .rail-ad-title { font-family: var(--serif); font-size: 20px; font-weight: 700; text-transform: uppercase; line-height: 1.1; }
+          .rail-ad-copy {
+            font-size: 13px; line-height: 1.5; color: rgba(255,255,255,0.72);
+            display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+          }
+
+          .rail-house-ad {
+            display: flex; flex-direction: column; gap: 8px; padding: 20px 18px; border-radius: 8px;
+            background: var(--yellow); color: var(--ink); text-decoration: none;
+          }
+          .rail-house-title { font-family: var(--serif); font-size: 26px; font-weight: 700; text-transform: uppercase; line-height: 1; }
+          .rail-house-copy { font-size: 13px; line-height: 1.5; }
+
+          .rail-announce { position: relative; border: 2px solid var(--ink); padding: 22px 18px 18px; }
+          .rail-announce-legend {
+            position: absolute; top: -9px; left: 12px; background: var(--white); padding: 0 6px;
+            font-family: var(--serif); font-size: 10px; font-weight: 500; letter-spacing: 3px; text-transform: uppercase; color: #aaa;
+          }
+          .rail-announce-title { font-family: var(--serif); font-size: 19px; font-weight: 700; text-transform: uppercase; line-height: 1.1; margin-bottom: 8px; }
+          .rail-announce-copy { font-size: 13px; line-height: 1.55; color: #555; margin-bottom: 12px; }
+          .rail-link {
+            font-family: var(--serif); font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+            color: var(--accent); text-decoration: none; border-bottom: 2px solid var(--accent); padding-bottom: 1px;
+          }
+
+          .rail-signup { background: var(--ink); color: var(--white); padding: 20px 18px; border-radius: 8px; }
+          .rail-signup-title { font-family: var(--serif); font-size: 20px; font-weight: 700; text-transform: uppercase; line-height: 1.1; color: var(--yellow); margin-bottom: 6px; }
+          .rail-signup-copy { font-size: 13px; line-height: 1.5; color: rgba(255,255,255,0.7); margin-bottom: 12px; }
+          .rail-signup-form { display: flex; gap: 6px; }
+          .rail-signup-form input[type="email"] {
+            flex: 1; min-width: 0; height: 38px; padding: 0 10px; border-radius: 4px; border: 1px solid #3a3632;
+            background: #232120; color: var(--white); font-family: var(--sans); font-size: 13px; outline: none;
+          }
+          .rail-signup-form input[type="email"]:focus { border-color: var(--yellow); }
+          .rail-signup-form button {
+            height: 38px; padding: 0 14px; border: none; border-radius: 4px; cursor: pointer;
+            background: var(--yellow); color: var(--ink); font-family: var(--serif); font-weight: 700; font-size: 13px; text-transform: uppercase;
+          }
+          .rail-hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+          .rail-signup-status { margin-top: 8px; font-size: 12px; }
+          .rail-signup-status.ok { color: #9be39b; }
+          .rail-signup-status.err { color: #ff9aa9; }
+        }
+        /* Short screens: let the rail scroll with the page instead of
+           sticking, so nothing gets cut off below the fold. */
+        @media (min-width: 1200px) and (max-height: 860px) {
+          .rail-inner { position: static; }
+        }
+
         @media (max-width: 640px) {
           .event-card-desktop { display: none; }
           .page { padding: 0 16px; }
@@ -531,14 +773,6 @@ export default function EventsList({ initialEvents, browseLinks }: EventsListPro
           .event-row-thumb { width: 112px; aspect-ratio: 16 / 9; height: auto; }
         }
       `}</style>
-
-      <BrowseHeader
-        title="Events"
-        activeFilterCount={activeFilterCount}
-        onOpenFilters={() => setFiltersOpen(true)}
-        browseLinks={browseLinks}
-        hideOnMobile
-      />
 
       {/* Mobile-only (≥900px hides via CSS — BrowseHeader + the sidebar
           cover that range instead). Sticky from the top of the page,
@@ -633,6 +867,7 @@ export default function EventsList({ initialEvents, browseLinks }: EventsListPro
         onToggleCategory={toggleCategory}
         quickDate={quickDate}
         onQuickDate={handleQuickDate}
+        quickDateOptions={SHEET_QUICK_DATES}
         startDate={startDate}
         endDate={endDate}
         onStartDate={handleStartDate}
@@ -645,151 +880,256 @@ export default function EventsList({ initialEvents, browseLinks }: EventsListPro
       />
 
       <div className="events-root">
-      <div className="page">
-        {loading ? (
-          <div className="loading">
-            <div className="loading-dots"><span/><span/><span/></div>
+        {/* ── Desktop events bar (≥900px) ──────────────────────────────
+            Full width, sticky directly under the site nav. The left cell
+            is the same width + color as the sidebar so the two read as one
+            solid column. */}
+        <div className="ev-bar">
+          <div className="ev-bar-side">
+            <span className="ev-bar-title">Events</span>
           </div>
-        ) : (
-          <section className="calendar">
-            {dayGroups.length === 0 ? (
-              <div className="empty">
-                <div className="empty-title">No events found</div>
-                <div className="empty-sub">Try adjusting your filters or check back soon.</div>
-              </div>
-            ) : (
-              dayGroups.map((group, groupIdx) => {
-                const isFirstOfMonth = groupIdx === 0 || dayGroups[groupIdx - 1].dateKey.slice(0, 7) !== group.dateKey.slice(0, 7)
-                return (
-                <div key={group.dateKey}>
-                {groupIdx === 1 && (
-                  <div style={{ marginBottom: 48 }}>
-                    <AdvertisementBanner />
-                  </div>
-                )}
-                <div
-                  className="day-group"
-                  ref={isFirstOfMonth ? (el => { monthRefs.current[group.dateKey] = el }) : undefined}
-                  data-month-marker={isFirstOfMonth ? group.dateKey : undefined}
-                >
-                  <div className="day-header">
-                    <div className="day-label-box">
-                      <span className="day-label">{group.label.toUpperCase()}</span>
-                    </div>
-                    <span className="day-sublabel">{group.sublabel}</span>
-                    <span className="day-count">{group.events.length} {group.events.length === 1 ? 'event' : 'events'}</span>
-                  </div>
-                  <div className="events-list">
-                    {group.events.map(event => {
-                      const href = event.slug ? `/events/${event.slug}` : event.ticket_url || event.learnmore_link || '#'
-                      const isExternal = !event.slug
-                      const artistNames = (event.artists || []).map(a => a.name).filter(Boolean).join(', ')
-                      return (
-                        <Fragment key={event.id}>
-                          {/* Desktop card — unchanged from before, just hidden ≤640px now */}
-                          <a
-                            href={href}
-                            target={isExternal ? '_blank' : '_self'}
-                            rel={isExternal ? 'noopener noreferrer' : undefined}
-                            className={`event-card event-card-desktop${event.star ? ' starred' : ''}`}
-                            onClick={() => handleEventClick(isExternal)}
-                          >
-                            <div className="event-time-col">
-                              {event.event_start_time ? (
-                                <>
-                                  <span className="event-time">{formatTime(event.event_start_time)}</span>
-                                  {event.event_end_time && (
-                                    <span className="event-time-end">→ {formatTimeShort(event.event_end_time)}</span>
-                                  )}
-                                </>
-                              ) : (
-                                <span className="event-time-tba">TBA</span>
-                              )}
-                            </div>
-                            <div className="event-body">
-                              {event.event_types && event.event_types.length > 0 && (
-                                <div className="event-types-row">
-                                  {event.event_types.slice(0, 2).map(t => (
-                                    <span key={t} className="event-type-tag">{t}</span>
-                                  ))}
-                                </div>
-                              )}
-                              <div className="event-title">{event.title}</div>
-                              {event.venue && (
-                                <div className="event-venue">
-                                  <span className="event-venue-name">{event.venue.name}</span>
-                                  {(event.venue.neighborhood || event.venue.city) && (
-                                    <span className="event-venue-neighborhood">
-                                      {' · '}{event.venue.neighborhood || event.venue.city}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                              {event.description && (
-                                <div className="event-description">{event.description}</div>
-                              )}
-                            </div>
-                            <div className="event-right">
-                              {event.image_url && (
-                                <img src={event.image_url} alt={event.title} className="event-img-thumb" />
-                              )}
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                                {event.ticket_price !== null && (
-                                  <span className={`event-price ${event.ticket_price === 0 ? 'free' : ''}`}>
-                                    {event.ticket_price === 0 ? 'Free' : `$${event.ticket_price}`}
-                                  </span>
-                                )}
-                                <span className="event-arrow">→</span>
-                              </div>
-                            </div>
-                          </a>
+          <div className="ev-bar-main">
+           <div className="ev-bar-inner">
+            <div className="ev-bar-month">
+              <button
+                type="button"
+                className="ev-bar-arrow"
+                onClick={() => navigateMonth(-1)}
+                disabled={activeMonthIdx === 0}
+                aria-label="Previous month"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><polyline points="15 18 9 12 15 6" /></svg>
+              </button>
+              <span className="ev-bar-month-label">{monthMarkers[activeMonthIdx]?.label || '\u00A0'}</span>
+              <button
+                type="button"
+                className="ev-bar-arrow"
+                onClick={() => navigateMonth(1)}
+                disabled={activeMonthIdx >= monthMarkers.length - 1}
+                aria-label="Next month"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><polyline points="9 18 15 12 9 6" /></svg>
+              </button>
+              <span className="ev-bar-count">{filtered.length} {filtered.length === 1 ? 'event' : 'events'}</span>
+            </div>
+            <div className="ev-bar-actions">
+              {(activeFilterCount > 0 || search) && (
+                <button type="button" className="ev-bar-clear" onClick={clearAllFilters}>
+                  Clear filters
+                </button>
+              )}
+              <SearchFilterButton count={activeFilterCount} onClick={() => setFiltersOpen(true)} />
+            </div>
+           </div>
+          </div>
+          <div className="ev-bar-rail" aria-hidden="true" />
+        </div>
 
-                          {/* Compact mobile row — hidden ≥641px (see .event-row CSS) */}
-                          <a
-                            href={href}
-                            target={isExternal ? '_blank' : '_self'}
-                            rel={isExternal ? 'noopener noreferrer' : undefined}
-                            className={`event-row${event.star ? ' starred' : ''}`}
-                            onClick={() => handleEventClick(isExternal)}
-                          >
-                            <div className="event-row-thumb">
-                              {event.image_url ? (
-                                <img src={event.image_url} alt="" />
-                              ) : (
-                                <span>785</span>
-                              )}
-                            </div>
-                            <div className="event-row-body">
-                              <div className="event-title event-row-title">{event.title}</div>
-                              <div className="event-row-sub">
-                                {event.event_start_time ? formatTime(event.event_start_time) : 'TBA'}
-                                {event.venue?.name && (
-                                  <>
-                                    <span className="event-row-dot">·</span>
-                                    {event.venue.name}
-                                  </>
-                                )}
-                              </div>
-                              {artistNames && (
-                                <div className="event-row-artist">{artistNames}</div>
-                              )}
-                            </div>
-                            <svg className="event-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <polyline points="9 18 15 12 9 6" />
-                            </svg>
-                          </a>
-                        </Fragment>
+        <div className="ev-shell">
+          {/* ── Desktop sidebar (≥900px) ─────────────────────────────── */}
+          <aside className="ev-side" aria-label="Filter and browse events">
+            <div className="ev-side-inner">
+              <label className="ev-search">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search events, venues"
+                  aria-label="Search events"
+                />
+              </label>
+
+              <nav className="ev-side-group" aria-label="Filter by date">
+                <div className="ev-side-label">When</div>
+                {WHEN_OPTIONS.map(opt => {
+                  const active = opt.key === null ? noDateFilter : quickDate === opt.key
+                  return (
+                    <a
+                      key={opt.label}
+                      href={opt.href}
+                      className={`ev-side-link${active ? ' active' : ''}`}
+                      aria-current={active ? 'true' : undefined}
+                      onClick={(e) => handleWhenClick(e, opt.key)}
+                    >
+                      {opt.label}
+                    </a>
+                  )
+                })}
+              </nav>
+
+              {categoryGroups.map(group => (
+                <nav key={group.group} className="ev-side-group" aria-label={group.group}>
+                  <div className="ev-side-label">{group.group === 'By Category' ? 'Categories' : group.group}</div>
+                  {group.links.map(link => (
+                    <a key={link.href} href={link.href} className="ev-side-link ev-side-link-page">
+                      {link.label}
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+                    </a>
+                  ))}
+                </nav>
+              ))}
+
+              <a href={ADD_EVENT_URL} target="_blank" rel="noopener noreferrer" className="ev-side-cta">
+                Add your event
+              </a>
+            </div>
+          </aside>
+
+          <div className="ev-main">
+            <div className="page">
+              {heading && <h1 className="ev-h1">{heading}</h1>}
+              {loading ? (
+                <div className="loading">
+                  <div className="loading-dots"><span/><span/><span/></div>
+                </div>
+              ) : (
+                <section className="calendar">
+                  {dayGroups.length === 0 ? (
+                    <div className="empty">
+                      <div className="empty-title">No events found</div>
+                      <div className="empty-sub">Try adjusting your filters or check back soon.</div>
+                    </div>
+                  ) : (
+                    dayGroups.map((group, groupIdx) => {
+                      const isFirstOfMonth = groupIdx === 0 || dayGroups[groupIdx - 1].dateKey.slice(0, 7) !== group.dateKey.slice(0, 7)
+                      return (
+                      <div key={group.dateKey}>
+                      {groupIdx === 1 && (
+                        <div className="ev-inline-ad" style={{ marginBottom: 48 }}>
+                          <AdvertisementBanner />
+                        </div>
+                      )}
+                      <div
+                        className="day-group"
+                        ref={isFirstOfMonth ? (el => { monthRefs.current[group.dateKey] = el }) : undefined}
+                        data-month-marker={isFirstOfMonth ? group.dateKey : undefined}
+                      >
+                        <div className="day-header">
+                          <div className="day-label-box">
+                            <span className="day-label">{group.label.toUpperCase()}</span>
+                          </div>
+                          <span className="day-sublabel">{group.sublabel}</span>
+                          <span className="day-count">{group.events.length} {group.events.length === 1 ? 'event' : 'events'}</span>
+                        </div>
+                        <div className="events-list">
+                          {group.events.map(event => {
+                            const href = event.slug ? `/events/${event.slug}` : event.ticket_url || event.learnmore_link || '#'
+                            const isExternal = !event.slug
+                            const artistNames = (event.artists || []).map(a => a.name).filter(Boolean).join(', ')
+                            return (
+                              <Fragment key={event.id}>
+                                {/* Desktop card — unchanged from before, just hidden ≤640px now */}
+                                <a
+                                  href={href}
+                                  target={isExternal ? '_blank' : '_self'}
+                                  rel={isExternal ? 'noopener noreferrer' : undefined}
+                                  className={`event-card event-card-desktop${event.star ? ' starred' : ''}`}
+                                  onClick={() => handleEventClick(isExternal)}
+                                >
+                                  <div className="event-time-col">
+                                    {event.event_start_time ? (
+                                      <>
+                                        <span className="event-time">{formatTime(event.event_start_time)}</span>
+                                        {event.event_end_time && (
+                                          <span className="event-time-end">→ {formatTimeShort(event.event_end_time)}</span>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <span className="event-time-tba">TBA</span>
+                                    )}
+                                  </div>
+                                  <div className="event-body">
+                                    {event.event_types && event.event_types.length > 0 && (
+                                      <div className="event-types-row">
+                                        {event.event_types.slice(0, 2).map(t => (
+                                          <span key={t} className="event-type-tag">{t}</span>
+                                        ))}
+                                      </div>
+                                    )}
+                                    <div className="event-title">{event.title}</div>
+                                    {event.venue && (
+                                      <div className="event-venue">
+                                        <span className="event-venue-name">{event.venue.name}</span>
+                                        {(event.venue.neighborhood || event.venue.city) && (
+                                          <span className="event-venue-neighborhood">
+                                            {' · '}{event.venue.neighborhood || event.venue.city}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                    {event.description && (
+                                      <div className="event-description">{event.description}</div>
+                                    )}
+                                  </div>
+                                  <div className="event-right">
+                                    {event.image_url && (
+                                      <img src={event.image_url} alt={event.title} className="event-img-thumb" />
+                                    )}
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                      {event.ticket_price !== null && (
+                                        <span className={`event-price ${event.ticket_price === 0 ? 'free' : ''}`}>
+                                          {event.ticket_price === 0 ? 'Free' : `$${event.ticket_price}`}
+                                        </span>
+                                      )}
+                                      <span className="event-arrow">→</span>
+                                    </div>
+                                  </div>
+                                </a>
+
+                                {/* Compact mobile row — hidden ≥641px (see .event-row CSS) */}
+                                <a
+                                  href={href}
+                                  target={isExternal ? '_blank' : '_self'}
+                                  rel={isExternal ? 'noopener noreferrer' : undefined}
+                                  className={`event-row${event.star ? ' starred' : ''}`}
+                                  onClick={() => handleEventClick(isExternal)}
+                                >
+                                  <div className="event-row-thumb">
+                                    {event.image_url ? (
+                                      <img src={event.image_url} alt="" />
+                                    ) : (
+                                      <span>785</span>
+                                    )}
+                                  </div>
+                                  <div className="event-row-body">
+                                    <div className="event-title event-row-title">{event.title}</div>
+                                    <div className="event-row-sub">
+                                      {event.event_start_time ? formatTime(event.event_start_time) : 'TBA'}
+                                      {event.venue?.name && (
+                                        <>
+                                          <span className="event-row-dot">·</span>
+                                          {event.venue.name}
+                                        </>
+                                      )}
+                                    </div>
+                                    {artistNames && (
+                                      <div className="event-row-artist">{artistNames}</div>
+                                    )}
+                                  </div>
+                                  <svg className="event-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <polyline points="9 18 15 12 9 6" />
+                                  </svg>
+                                </a>
+                              </Fragment>
+                            )
+                          })}
+                        </div>
+                      </div>
+                      </div>
                       )
-                    })}
-                  </div>
-                </div>
-                </div>
-                )
-              })
-            )}
-          </section>
-        )}
-      </div>
+                    })
+                  )}
+                </section>
+              )}
+            </div>
+          </div>
+
+          {/* ── Desktop right rail (≥1200px) ─────────────────────────── */}
+          <aside className="ev-rail" aria-label="Sponsored and announcements">
+            <EventsRail />
+          </aside>
+        </div>
       </div>
     </>
   )

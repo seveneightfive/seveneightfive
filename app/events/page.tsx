@@ -22,11 +22,9 @@ export const metadata: Metadata = {
   },
 }
 
-// Real, crawlable HTML links to every filter destination page. Rendered
-// twice below (once in the desktop sidebar, once in BrowseHeader's mobile
-// "Browse Events" dropdown) from this one array, so both stay in sync and
-// neither view is JS-gated — Google's mobile-first indexing sees the same
-// links a desktop crawl would, just laid out differently.
+// Real, crawlable HTML links to every filter destination page, rendered in
+// EventsList's desktop sidebar. The "By Date" group there becomes in-place
+// filters (still <a href>s to these pages); the rest link out.
 const BROWSE_LINKS: { group: string; links: { href: string; label: string }[] }[] = [
   {
     group: 'By Date',
@@ -89,28 +87,6 @@ function buildItemListJsonLd(events: Awaited<ReturnType<typeof getFilteredEvents
   }
 }
 
-// Used by the desktop sidebar only now — the mobile equivalent lives inside
-// BrowseHeader's dropdown (see EventsList's browseLinks prop), rendered from
-// this same BROWSE_LINKS array so both stay in sync.
-function BrowseLinksGroups() {
-  return (
-    <>
-      {BROWSE_LINKS.map((section) => (
-        <div key={section.group} className="browse-group">
-          <div className="browse-group-label">{section.group}</div>
-          <div className="browse-group-links">
-            {section.links.map((link) => (
-              <a key={link.href} href={link.href} className="browse-pill">
-                {link.label}
-              </a>
-            ))}
-          </div>
-        </div>
-      ))}
-    </>
-  )
-}
-
 export default async function EventsPage() {
   // Reuse the same "all-events" seo_pages row (filter_type: date-range,
   // filter_value: upcoming) that /events/all-events itself uses, so the
@@ -126,77 +102,15 @@ export default async function EventsPage() {
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }} />
       )}
 
-      <style>{`
-        .events-hub-intro { max-width: 1100px; margin: 0 auto; padding: 12px 24px 0; }
-        .events-hub-h1 {
-          font-family: 'Oswald', sans-serif; font-weight: 800; text-transform: uppercase;
-          letter-spacing: 0.02em; font-size: clamp(1.6rem, 4vw, 2.4rem); line-height: 1.15;
-          margin: 0; color: #1a1814;
-        }
-
-        /* Mobile: the new month-nav toolbar (rendered inside EventsList) is
-           the primary chrome now, so the H1 steps back to a small label
-           above it — still real text for SEO, just not competing visually
-           with the toolbar underneath it. Desktop keeps the larger H1 since
-           it still sits above the sidebar + BrowseHeader layout as before. */
-        @media (max-width: 899px) {
-          .events-hub-intro { padding: 10px 16px 0; }
-          .events-hub-h1 {
-            font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: #8a8479;
-          }
-        }
-
-        .browse-group { margin-bottom: 12px; }
-        .browse-group:last-child { margin-bottom: 0; }
-        .browse-group-label {
-          display: block; font-size: 11px; font-weight: 700; text-transform: uppercase;
-          letter-spacing: 0.08em; color: #9a948c; margin-bottom: 8px;
-        }
-        .browse-group-links { display: flex; flex-wrap: wrap; gap: 8px; }
-        .browse-pill {
-          display: inline-block; font-size: 13px; font-weight: 600; color: #1a1814;
-          background: #f2ede6; border: 1px solid #ece8e2; border-radius: 999px;
-          padding: 5px 12px; text-decoration: none;
-        }
-        .browse-pill:hover { background: #ece5db; }
-
-        /* Desktop: two-column layout — sticky sidebar + main content.
-           Below 900px this collapses to a single column (sidebar hidden;
-           BrowseHeader's "Browse Events" dropdown covers the same links
-           instead) — matches the breakpoint used elsewhere on the site
-           (e.g. the event detail page's image/details split) for
-           consistency. */
-        .events-hub-layout { max-width: 1100px; margin: 0 auto; padding: 20px 24px 0; display: block; }
-        .events-hub-sidebar { display: none; }
-
-        @media (max-width: 899px) {
-          .events-hub-layout { padding: 0; }
-        }
-
-        @media (min-width: 900px) {
-          .events-hub-layout { display: grid; grid-template-columns: 220px 1fr; gap: 32px; align-items: start; padding: 20px 0 0; }
-          .events-hub-sidebar { display: block; position: sticky; top: 84px; }
-        }
-      `}</style>
-
-      <div className="events-hub-intro">
-        <h1 className="events-hub-h1">Topeka Events &amp; Things to Do</h1>
-      </div>
-
-      <div className="events-hub-layout">
-        {/* Desktop only (hidden below 900px via CSS) */}
-        <aside className="events-hub-sidebar" aria-label="Browse events by date and category">
-          <BrowseLinksGroups />
-        </aside>
-
-        <div className="events-hub-main">
-          {/* Full interactive browse/filter experience, seeded with the
-              same server-fetched events above so there's real content in
-              the initial HTML — not an empty shell waiting on a client
-              fetch. browseLinks feeds BrowseHeader's mobile dropdown. */}
-          <EventsList initialEvents={initialEvents as any} browseLinks={BROWSE_LINKS} />
-        </div>
-      </div>
+      {/* Layout (desktop sidebar, events bar, right rail) and the H1 all
+          live in EventsList now — the sidebar filters in place, so it
+          needs EventsList's state. BROWSE_LINKS still feeds its category
+          links, which are plain <a href>s in the server-rendered HTML. */}
+      <EventsList
+        initialEvents={initialEvents as any}
+        browseLinks={BROWSE_LINKS}
+        heading="Topeka Events & Things to Do"
+      />
     </>
   )
 }
