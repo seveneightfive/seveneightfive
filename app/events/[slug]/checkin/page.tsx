@@ -54,7 +54,16 @@ function CheckInPageInner() {
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const rafRef = useRef<number | null>(null)
+  // Stops the same ticket being processed over and over while it's still
+  // in front of the camera, and pauses scanning while a check-in is saving.
+  const lastCodeRef = useRef<{ code: string; at: number } | null>(null)
+  const busyRef = useRef(false)
+  const [cameraStarting, setCameraStarting] = useState(false)
+
+  // Turn off the camera when leaving the page
+  useEffect(() => () => stopCamera(), []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function callApi(action: string, body: Record<string, any> = {}) {
     if (!token) throw new Error('Missing check-in token')
@@ -99,59 +108,113 @@ function CheckInPageInner() {
     setStaffNameSubmitted(true)
   }
 
-  const startCamera = async () => {
-    try {
-      setCameraError('')
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+  // Ticket QR codes come in two forms: the bare token (ticket page, My
+  // Tickets) and a full link like https://seveneightfive.com/tickets/<token>
+  // (confirmation + reminder emails). Pull the token out of either.
+  const extractToken = (raw: string) => {
+    const text = raw.trim()
+    const m = text.match(/\/tickets\/([^/?#\s]+)/)
+    if (m) {
+      try { return decodeURIComponent(m[1]) } catch { return m[1] }
+    }
+    return text
+  }
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        setScanning(true)
-
-        const intervalId = setInterval(() => {
-          if (canvasRef.current && videoRef.current) {
-            const context = canvasRef.current.getContext('2d')
-            if (context) {
-              canvasRef.current.width = videoRef.current.videoWidth
-              canvasRef.current.height = videoRef.current.videoHeight
-              context.drawImage(videoRef.current, 0, 0)
-              const imageData = context.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height)
-              const code = jsQR(imageData.data, imageData.width, imageData.height)
-              if (code) handleScannedQR(code.data)
-            }
-          }
-        }, 200)
-        scanIntervalRef.current = intervalId
+  const scanLoop = () => {
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    if (!video || !canvas || !streamRef.current) return
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    if (ctx && video.readyState === video.HAVE_ENOUGH_DATA && !busyRef.current) {
+      // Scale down big camera frames — faster to decode, same accuracy
+      const scale = Math.min(1, 720 / Math.max(video.videoWidth, video.videoHeight))
+      canvas.width = Math.round(video.videoWidth * scale)
+      canvas.height = Math.round(video.videoHeight * scale)
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' })
+      if (code?.data) {
+        const now = Date.now()
+        const last = lastCodeRef.current
+        if (!last || last.code !== code.data || now - last.at > 4000) {
+          lastCodeRef.current = { code: code.data, at: now }
+          handleScannedQR(code.data)
+        }
       }
+    }
+    rafRef.current = requestAnimationFrame(scanLoop)
+  }
+
+  const startCamera = async () => {
+    setCameraError('')
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError(
+        "This browser can't open the camera. If you opened this link inside another app (Facebook, Instagram, Messages preview), tap the ⋯ or share icon and choose \"Open in Safari\" or \"Open in Chrome\". You can also use Manual Lookup below."
+      )
+      return
+    }
+    setCameraStarting(true)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 1280 } },
+      })
+      streamRef.current = stream
+      const video = videoRef.current
+      if (!video) throw new Error('Camera view not ready — please try again.')
+      video.srcObject = stream
+      video.setAttribute('playsinline', 'true') // iOS: play inline, not fullscreen
+      video.muted = true
+      await video.play()
+      setScanning(true)
+      rafRef.current = requestAnimationFrame(scanLoop)
     } catch (err: any) {
-      setCameraError(err.message || 'Could not access camera')
-      setScanning(false)
+      stopCamera()
+      const name = err?.name
+      setCameraError(
+        name === 'NotAllowedError' || name === 'SecurityError'
+          ? 'Camera access was blocked. On iPhone: Settings → Safari → Camera → Allow (or tap "aA" in the address bar → Website Settings → Camera). On Android: tap the lock icon by the address bar → Permissions → Camera. Then tap Try Again.'
+          : name === 'NotFoundError' || name === 'OverconstrainedError'
+          ? "We couldn't find a camera on this device. Use Manual Lookup below."
+          : name === 'NotReadableError'
+          ? 'Another app is using the camera. Close it and tap Try Again.'
+          : err?.message || 'Could not start the camera.'
+      )
+    } finally {
+      setCameraStarting(false)
     }
   }
 
   const stopCamera = () => {
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream
-      stream.getTracks().forEach((track) => track.stop())
-    }
-    if (scanIntervalRef.current) clearInterval(scanIntervalRef.current)
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    rafRef.current = null
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    streamRef.current = null
+    if (videoRef.current) videoRef.current.srcObject = null
     setScanning(false)
   }
 
-  const handleScannedQR = async (qrToken: string) => {
-    stopCamera()
+  // Camera stays on between guests — scan, check in, next guest.
+  const handleScannedQR = async (raw: string) => {
+    busyRef.current = true
     setSearching(true)
     try {
-      const json = await callApi('search', { query: qrToken })
-      if (json.results?.length === 1) {
-        await performCheckIn(json.results[0])
+      const json = await callApi('search', { query: extractToken(raw) })
+      const hit = json.results?.length === 1 ? json.results[0] : null
+      if (!hit || hit.match_type !== 'qr') {
+        setFeedback({ type: 'error', message: "Ticket not found — this code isn't a ticket for this event." })
+      } else if (hit.checked_in) {
+        setFeedback({ type: 'warning', message: `Already checked in: ${hit.buyer_name || hit.buyer_email}` })
       } else {
-        setFeedback({ type: 'error', message: 'Ticket not found' })
+        await performCheckIn(hit)
       }
+      if (navigator.vibrate) navigator.vibrate(120)
     } catch (err: any) {
       setFeedback({ type: 'error', message: err.message || 'Scan failed' })
     } finally {
       setSearching(false)
+      // short pause so the result can be read before the next scan
+      setTimeout(() => { busyRef.current = false }, 1200)
     }
   }
 
@@ -292,25 +355,56 @@ function CheckInPageInner() {
         <div className="mb-6 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-800">
           <h2 className="mb-4 font-semibold text-gray-900 dark:text-white">Scan QR Code</h2>
 
-          {scanning ? (
-            <div className="space-y-4">
-              <video ref={videoRef} autoPlay playsInline className="w-full rounded-lg bg-black" style={{ maxHeight: '400px', objectFit: 'cover' }} />
-              <canvas ref={canvasRef} className="hidden" />
+          {/* The video element is always mounted (just hidden) so it exists
+              when the camera starts — previously it only rendered after
+              scanning began, so the stream had nowhere to go and the
+              button appeared to do nothing. */}
+          <div className={scanning ? 'space-y-4' : 'hidden'}>
+            <div className="relative overflow-hidden rounded-lg bg-black">
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                playsInline
+                className="w-full"
+                style={{ maxHeight: '420px', objectFit: 'cover' }}
+              />
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <div className="h-3/5 aspect-square rounded-2xl border-4 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+              </div>
+              {searching && (
+                <div className="absolute inset-x-0 bottom-0 bg-black/70 py-2 text-center text-sm font-semibold text-white">
+                  Checking ticket…
+                </div>
+              )}
+            </div>
+            <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+              Point the camera at the guest&rsquo;s ticket QR code. The camera stays on for the next guest.
+            </p>
+            <button
+              onClick={stopCamera}
+              className="w-full rounded-lg border border-red-500 bg-red-50 px-4 py-2 font-semibold text-red-700 transition hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
+            >
+              Stop Camera
+            </button>
+          </div>
+          <canvas ref={canvasRef} className="hidden" />
+
+          {!scanning && (
+            <div className="space-y-3">
+              {cameraError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+                  <strong>Camera problem:</strong> {cameraError}
+                </div>
+              )}
               <button
-                onClick={stopCamera}
-                className="w-full rounded-lg border border-red-500 bg-red-50 px-4 py-2 font-semibold text-red-700 transition hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
+                onClick={startCamera}
+                disabled={cameraStarting}
+                className="w-full rounded-lg bg-brand-600 px-4 py-3 font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
               >
-                Stop Camera
+                {cameraStarting ? 'Starting camera…' : cameraError ? 'Try Again' : 'Start Camera'}
               </button>
             </div>
-          ) : cameraError ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
-              <strong>Camera Error:</strong> {cameraError}
-            </div>
-          ) : (
-            <button onClick={startCamera} className="w-full rounded-lg bg-brand-600 px-4 py-3 font-semibold text-white transition hover:bg-brand-700">
-              Start Camera
-            </button>
           )}
         </div>
 
