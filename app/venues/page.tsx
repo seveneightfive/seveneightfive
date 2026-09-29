@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   },
 }
 
-export default async function VenuesPage({ searchParams }: { searchParams: Promise<{ neighborhood?: string }> }) {
+export default async function VenuesPage({ searchParams }: { searchParams: Promise<{ neighborhood?: string; type?: string }> }) {
   const params = await searchParams
   const supabase = createClient()
 
@@ -44,5 +44,5 @@ export default async function VenuesPage({ searchParams }: { searchParams: Promi
   }
   const venuesWithCounts = (venues || []).map(v => ({ ...v, upcoming_events_count: counts[v.id] || 0 }))
 
-  return <VenuesList initialNeighborhood={params.neighborhood} initialVenues={venuesWithCounts} />
+  return <VenuesList initialNeighborhood={params.neighborhood} initialType={params.type} initialVenues={venuesWithCounts} />
 }
