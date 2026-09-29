@@ -109,7 +109,7 @@ function VenueCardMedia({ venue }: { venue: Venue }) {
   return <img src={src} alt={venue.name} className="venue-card-img" />
 }
 
-export default function VenuesList({ initialNeighborhood, initialVenues = [] }: { initialNeighborhood?: string; initialVenues?: Venue[] }) {
+export default function VenuesList({ initialNeighborhood, initialType, initialVenues = [] }: { initialNeighborhood?: string; initialType?: string; initialVenues?: Venue[] }) {
   const [venues, setVenues] = useState<Venue[]>(initialVenues)
   const [filtered, setFiltered] = useState<Venue[]>(initialVenues)
   const [loading, setLoading] = useState(initialVenues.length === 0)
@@ -118,7 +118,9 @@ export default function VenuesList({ initialNeighborhood, initialVenues = [] }: 
   const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>(
     initialNeighborhood ? [initialNeighborhood] : []
   )
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([])
+  const [selectedTypes, setSelectedTypes] = useState<string[]>(
+    initialType ? [initialType] : []
+  )
   const scrollRestored = useRef(false)
 
   useEffect(() => {
