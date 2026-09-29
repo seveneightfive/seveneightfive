@@ -32,6 +32,7 @@ export default async function DashboardTicketsPage() {
   const { data: tickets } = await supabase
     .from('my_tickets')
     .select('*')
+    .eq('payment_status', 'paid')
     .order('event_date', { ascending: true })
 
   const now = new Date()
