@@ -8,6 +8,7 @@ import TicketTiersEditor from '@/app/components/TicketTiersEditor'
 import EventQuestionsEditor from '@/app/components/EventQuestionsEditor'
 import CheckInQrCard from '@/app/components/CheckInQrCard'
 import TicketSalesCutoffCard from '@/app/components/TicketSalesCutoffCard'
+import EventSalesTab from '@/app/components/EventSalesTab'
 import {
   Ticket,
   CheckCircle2,
@@ -27,6 +28,7 @@ import {
  * Per-event ticket management surface. Three tabs (stats sit above all of them):
  * - Ticketing: tiers, when sales stop, buyer questions, reminder email, tier performance
  * - Guests: door check-in QR, add-on totals, attendee list (?tab=guests)
+ * - Sales: order ledger — what each buyer paid and how it breaks down (?tab=sales)
  * - Marketing: seller page, event URL, QR code, embed, social shares, analytics
  */
 
@@ -46,13 +48,13 @@ export default function EventTicketsPage() {
   const [responsesByTicket, setResponsesByTicket] = useState<Record<string, { label: string; value: string }[]>>({})
   const [addonsByTicket, setAddonsByTicket] = useState<Record<string, { name: string; choice: string | null }[]>>({})
   const [addonSummary, setAddonSummary] = useState<Record<string, Record<string, number>>>({})
-  type TabKey = 'ticketing' | 'guests' | 'marketing'
+  type TabKey = 'ticketing' | 'guests' | 'sales' | 'marketing'
   const [activeTab, setActiveTabState] = useState<TabKey>('ticketing')
   // Open on ?tab=guests / ?tab=marketing (read after mount — avoids the
   // useSearchParams Suspense requirement)
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get('tab')
-    if (t === 'guests' || t === 'marketing') setActiveTabState(t)
+    if (t === 'guests' || t === 'sales' || t === 'marketing') setActiveTabState(t)
   }, [])
   // Keep the tab in the URL so a refresh or shared link lands on it
   const setActiveTab = (t: TabKey) => {
@@ -584,6 +586,16 @@ export default function EventTicketsPage() {
               {totalSold}
             </span>
           )}
+        </button>
+        <button
+          onClick={() => setActiveTab('sales')}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+            activeTab === 'sales'
+              ? 'bg-white text-brand-700 shadow-sm dark:bg-gray-900 dark:text-brand-400'
+              : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+          }`}
+        >
+          Sales
         </button>
         <button
           onClick={() => setActiveTab('marketing')}
@@ -1147,6 +1159,9 @@ export default function EventTicketsPage() {
           </Card>
         </>
       )}
+
+      {/* Sales Tab */}
+      {activeTab === 'sales' && <EventSalesTab eventId={eventId} eventSlug={event.slug} />}
 
       {/* Marketing Tab */}
       {activeTab === 'marketing' && (

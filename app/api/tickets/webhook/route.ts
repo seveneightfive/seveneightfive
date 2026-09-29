@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabaseServer'
 import { stripe } from '@/lib/stripe'
 import { syncStripeAccountToProfile } from '@/lib/stripeSync'
 import { sendTicketEmail, sendAttendeeTicketEmail } from '@/app/lib/email'
+import { syncTicketOrder } from '@/lib/ticketOrders'
 
 /**
  * POST /api/tickets/webhook
@@ -136,6 +137,7 @@ export async function POST(request: NextRequest) {
           totalPlatformFeeCents: platformFee ? Math.round(platformFee * 100) : null,
           orderRef: session.id,
         })
+        if (paymentIntentId) await recordOrder(admin, paymentIntentId)
         break
       }
 
@@ -175,6 +177,7 @@ export async function POST(request: NextRequest) {
           totalPlatformFeeCents: pi.application_fee_amount ?? null,
           orderRef: pi.id,
         })
+        await recordOrder(admin, pi.id)
         break
       }
 
@@ -183,6 +186,7 @@ export async function POST(request: NextRequest) {
         const piId = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id
         if (!piId) break
         await admin.from('tickets').update({ payment_status: 'refunded', status: 'refunded' }).eq('stripe_payment_intent_id', piId)
+        await recordOrder(admin, piId)
         break
       }
 
@@ -205,6 +209,21 @@ export async function POST(request: NextRequest) {
   } catch (err: any) {
     console.error('[webhook] handler error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// ── Order ledger ────────────────────────────────────────────────────
+
+/**
+ * Records the order's money side in ticket_orders (see lib/ticketOrders).
+ * Never fails the webhook — tickets are already minted by this point, and
+ * the Sales tab fills in any missing order the next time it loads.
+ */
+async function recordOrder(admin: ReturnType<typeof createClient>, paymentIntentId: string) {
+  try {
+    await syncTicketOrder(admin, paymentIntentId)
+  } catch (err) {
+    console.error('[webhook] ticket_orders sync failed (non-fatal):', err)
   }
 }
 
