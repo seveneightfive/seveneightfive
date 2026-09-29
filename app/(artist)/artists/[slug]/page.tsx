@@ -149,6 +149,48 @@ async function getArtistEvents(artistId: string): Promise<Event[]> {
   })) as Event[]
 }
 
+export type Track = {
+  key: string
+  title: string
+  url: string
+  album: string | null
+  buyLink: string | null
+}
+
+// Songs from the `songs` table, in addition to (not instead of) the single
+// track on the artist's musician profile. Featured songs first, then newest.
+async function getArtistSongs(artistId: string) {
+  const { data } = await supabase
+    .from('songs')
+    .select('id, title, audio_url, album_name, buy_link, is_featured, release_date, created_at')
+    .eq('artist_id', artistId)
+    .not('audio_url', 'is', null)
+    .order('is_featured', { ascending: false, nullsFirst: false })
+    .order('release_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
+  return data || []
+}
+
+// Profile track first (what's always been shown), then every song not
+// already represented — matched by audio URL so the same file never
+// appears twice.
+function buildTracks(artist: Artist, songs: any[]): Track[] {
+  const tracks: Track[] = []
+  const seen = new Set<string>()
+  const norm = (u: string) => u.split('?')[0]
+  const mp = artist.musician_profile
+  if (mp?.audio_file_url) {
+    tracks.push({ key: 'profile', title: mp.audio_title || 'Listen', url: mp.audio_file_url, album: null, buyLink: mp.purchase_link || null })
+    seen.add(norm(mp.audio_file_url))
+  }
+  for (const s of songs) {
+    if (!s.audio_url || seen.has(norm(s.audio_url))) continue
+    seen.add(norm(s.audio_url))
+    tracks.push({ key: `song-${s.id}`, title: s.title || 'Untitled', url: s.audio_url, album: s.album_name || null, buyLink: s.buy_link || null })
+  }
+  return tracks
+}
+
 async function getPortfolioImages(artistId: string): Promise<PortfolioImage[]> {
   const { data } = await supabase
     .from('artist_portfolio_images')
@@ -241,10 +283,12 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
   const artist = await getArtist(slug)
   if (!artist) notFound()
 
-  const [events, portfolioImages] = await Promise.all([
+  const [events, portfolioImages, songs] = await Promise.all([
     getArtistEvents(artist.id),
     getPortfolioImages(artist.id),
+    getArtistSongs(artist.id),
   ])
+  const tracks = buildTracks(artist, songs)
 
   const mp = artist.musician_profile
   const vp = artist.visual_profile
@@ -254,7 +298,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
   const videoId = mp?.video_url ? getYouTubeId(mp.video_url) : null
   const jsonLd = getJsonLd(artist)
   const breadcrumbJsonLd = getBreadcrumbJsonLd(artist)
-  const hasMusic = !!(mp?.audio_file_url || mp?.video_url)
+  const hasMusic = tracks.length > 0 || !!mp?.video_url
   const hasWork = !!(vp?.works) || portfolioImages.length > 0
 
   const TYPE_LABEL: Record<string, string> = {
@@ -278,6 +322,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
       navItems={navItems}
       genres={genres}
       videoId={videoId}
+      tracks={tracks}
       hasMusic={hasMusic}
       hasWork={hasWork}
       jsonLd={jsonLd}
