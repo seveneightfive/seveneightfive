@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabaseBrowser'
+import { effectiveTierSaleEnd, SALES_CUTOFF_COLUMNS } from '@/lib/ticketSalesCutoff'
 
 type Tier = {
   id: string
@@ -143,9 +144,11 @@ export default function TicketPurchaseButton({ eventId, eventSlug }: Props) {
       .order('sort_order')
       .then(async ({ data }) => {
         const now = new Date()
+        const { data: cutoffEvent } = await supabase.from('events').select(SALES_CUTOFF_COLUMNS).eq('id', eventId).maybeSingle()
         const available = (data || []).filter((t) => {
           if (t.sale_starts_at && new Date(t.sale_starts_at) > now) return false
-          if (t.sale_ends_at && new Date(t.sale_ends_at) < now) return false
+          const saleEnd = effectiveTierSaleEnd(t.sale_ends_at, cutoffEvent as any)
+          if (saleEnd && saleEnd < now) return false
           const seatsPerUnit = t.is_group ? t.seats_per_unit : 1
           if (t.quantity !== null) {
             const unitsSold = Math.floor(t.quantity_sold / seatsPerUnit)

@@ -9,6 +9,8 @@ type Props = {
   eventId: string
   eventSlug: string
   eventTitle: string
+  // Owner's public /sellers/[slug] page, if they have one
+  sellerSlug?: string | null
 }
 
 type Analytics = {
@@ -21,11 +23,12 @@ type Analytics = {
 const sectionHeadingCls =
   'mb-4 border-b border-gray-100 pb-3 font-display text-xl font-bold uppercase tracking-wide text-gray-900 dark:border-gray-800 dark:text-white'
 
-export default function EventMarketingTab({ eventId, eventSlug, eventTitle }: Props) {
+export default function EventMarketingTab({ eventId, eventSlug, eventTitle, sellerSlug }: Props) {
   const [loading, setLoading] = useState(true)
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [sellerCopied, setSellerCopied] = useState(false)
 
   const supabase = createClient()
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://seveneightfive.com'
@@ -93,6 +96,44 @@ export default function EventMarketingTab({ eventId, eventSlug, eventTitle }: Pr
 
   return (
     <div className="space-y-6">
+      {/* Seller page — every event this organizer is selling, one link */}
+      {sellerSlug && (
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+          <h3 className={sectionHeadingCls}>Your Seller Page</h3>
+          <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">
+            One page with all of your upcoming events and tickets — great for your website, link-in-bio, or emails.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              type="text"
+              value={`${siteUrl}/sellers/${sellerSlug}`}
+              readOnly
+              className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-300"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`${siteUrl}/sellers/${sellerSlug}`)
+                  setSellerCopied(true)
+                  setTimeout(() => setSellerCopied(false), 2000)
+                }}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-300"
+              >
+                {sellerCopied ? 'Copied' : 'Copy'}
+              </button>
+              <a
+                href={`/sellers/${sellerSlug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+              >
+                View seller page ↗
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Event URL Section */}
       <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
         <h3 className={sectionHeadingCls}>Event URL</h3>
