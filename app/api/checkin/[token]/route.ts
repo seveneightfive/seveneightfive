@@ -93,8 +93,14 @@ export async function POST(
   }
 
   if (action === 'search') {
-    const query = String(body?.query || '').trim()
+    let query = String(body?.query || '').trim()
     if (!query) return NextResponse.json({ results: [] })
+    // Emailed ticket QR codes hold a link (…/tickets/<qr_token>), not the
+    // bare token — accept either.
+    const linkMatch = query.match(/\/tickets\/([^/?#\s]+)/)
+    if (linkMatch) {
+      try { query = decodeURIComponent(linkMatch[1]) } catch { query = linkMatch[1] }
+    }
 
     // Try QR token exact match first, then ticket id, then attendee
     // email, then buyer name — first non-empty match wins, same
