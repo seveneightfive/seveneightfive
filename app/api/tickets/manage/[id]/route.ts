@@ -12,6 +12,8 @@ import { createClient as createAdminClient } from '@/lib/supabaseServer'
  * ticketing dashboard: event owner, venue owner, or linked artist).
  *
  * Body: { buyer_name?: string, attendee_email?: string | null }
+ *
+ * The first rename keeps the original name in tickets.purchaser_name.
  */
 export async function PATCH(
   request: NextRequest,
@@ -28,7 +30,7 @@ export async function PATCH(
 
     const { data: ticket } = await admin
       .from('tickets')
-      .select('id, event_id, events!inner ( auth_user_id, venue_id, venues(auth_user_id) )')
+      .select('id, event_id, buyer_name, purchaser_name, events!inner ( auth_user_id, venue_id, venues(auth_user_id) )')
       .eq('id', ticketId)
       .maybeSingle()
 
@@ -63,6 +65,15 @@ export async function PATCH(
       const name = body.buyer_name.trim()
       if (!name) return NextResponse.json({ error: 'Name cannot be empty' }, { status: 400 })
       updates.buyer_name = name
+      // Remember who originally bought it the first time it's handed to
+      // someone else, so the attendee list can say "Guest of <purchaser>".
+      // Renaming it back to the purchaser clears that.
+      const original = ticket.purchaser_name || ticket.buyer_name
+      if (original && name.toLowerCase() !== original.toLowerCase()) {
+        if (!ticket.purchaser_name) updates.purchaser_name = ticket.buyer_name
+      } else if (ticket.purchaser_name) {
+        updates.purchaser_name = null
+      }
     }
 
     if ('attendee_email' in body) {
@@ -83,7 +94,7 @@ export async function PATCH(
       .from('tickets')
       .update(updates)
       .eq('id', ticketId)
-      .select('id, buyer_name, attendee_email')
+      .select('id, buyer_name, purchaser_name, attendee_email')
       .single()
 
     if (updateErr) {

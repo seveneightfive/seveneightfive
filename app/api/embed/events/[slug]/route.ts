@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient as createAdminClient } from '@/lib/supabaseServer'
+import { effectiveTierSaleEnd, SALES_CUTOFF_COLUMNS } from '@/lib/ticketSalesCutoff'
 
 /**
  * GET /api/embed/events/[slug]
@@ -36,6 +37,7 @@ export async function GET(
     .from('events')
     .select(`
       id, title, slug, event_date, event_start_time, ticketing_enabled,
+      ticket_sales_end_mode, ticket_sales_end_offset_minutes, ticket_sales_end_at,
       venues ( name, address )
     `)
     .eq('slug', slug)
@@ -55,7 +57,8 @@ export async function GET(
 
   const tiers = (tierRows || []).filter((t) => {
     if (t.sale_starts_at && new Date(t.sale_starts_at) > now) return false
-    if (t.sale_ends_at && new Date(t.sale_ends_at) < now) return false
+    const saleEnd = effectiveTierSaleEnd(t.sale_ends_at, event as any)
+    if (saleEnd && saleEnd < now) return false
     if (t.quantity !== null && t.quantity - t.quantity_sold <= 0) return false
     return true
   })

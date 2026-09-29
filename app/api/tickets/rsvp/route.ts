@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabaseServerAuth'
 import { createClient as createAdmin } from '@/lib/supabaseServer'
 import { sendAttendeeTicketEmail } from '@/app/lib/email'
+import { effectiveTierSaleEnd, SALES_CUTOFF_COLUMNS } from '@/lib/ticketSalesCutoff'
 
 /**
  * POST /api/tickets/rsvp
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     const { data: tierRows, error: tierError } = await admin
       .from('ticket_tiers')
-      .select('id, name, price, quantity, quantity_sold, is_active, is_group, seats_per_unit')
+      .select('id, name, price, quantity, quantity_sold, is_active, is_group, seats_per_unit, sale_starts_at, sale_ends_at')
       .in('id', tierIds)
       .eq('event_id', eventId)
 
@@ -75,6 +76,8 @@ export async function POST(request: NextRequest) {
     }
 
     const tierById = new Map(tierRows.map((t) => [t.id, t]))
+    const { data: cutoffEvent } = await admin.from('events').select(SALES_CUTOFF_COLUMNS).eq('id', eventId).maybeSingle()
+    const now = new Date()
 
     for (const it of items) {
       const tier = tierById.get(it.tierId)!
@@ -94,6 +97,13 @@ export async function POST(request: NextRequest) {
         )
       }
       if (!tier.is_active) return NextResponse.json({ error: `"${tier.name}" is not currently available` }, { status: 400 })
+      if (tier.sale_starts_at && new Date(tier.sale_starts_at) > now) {
+        return NextResponse.json({ error: `"${tier.name}" isn't open yet` }, { status: 400 })
+      }
+      const saleEnd = effectiveTierSaleEnd(tier.sale_ends_at, cutoffEvent as any)
+      if (saleEnd && saleEnd < now) {
+        return NextResponse.json({ error: `"${tier.name}" is no longer available` }, { status: 400 })
+      }
       if (tier.quantity !== null) {
         const seatsPerUnit = tier.is_group ? tier.seats_per_unit : 1
         const unitsSold = Math.floor(tier.quantity_sold / seatsPerUnit)

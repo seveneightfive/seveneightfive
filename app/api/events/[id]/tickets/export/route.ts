@@ -63,7 +63,7 @@ export async function GET(
     const { data: tickets, error: ticketsErr } = await admin
       .from('tickets')
       .select(`
-        id, buyer_name, buyer_email, buyer_phone, attendee_email, amount_paid, status,
+        id, buyer_name, purchaser_name, buyer_email, buyer_phone, attendee_email, amount_paid, status,
         payment_status, created_at, source, notes, ticket_tiers(name)
       `)
       .eq('event_id', eventId)
@@ -124,7 +124,7 @@ export async function GET(
     }
 
     const headers = [
-      'Name', 'Email', 'Attendee Email', 'Phone', 'Tier', 'Amount Paid', 'Status', 'Source', 'Notes', 'Purchased At',
+      'Name', 'Purchased By', 'Email', 'Attendee Email', 'Phone', 'Tier', 'Amount Paid', 'Status', 'Source', 'Notes', 'Purchased At',
       ...questionLabels,
       ...addonNames,
     ]
@@ -135,6 +135,7 @@ export async function GET(
       const addons = addonsByTicket[t.id] || {}
       return [
         t.buyer_name || '',
+        t.purchaser_name || t.buyer_name || '',
         t.buyer_email || '',
         t.attendee_email || '',
         t.buyer_phone || '',

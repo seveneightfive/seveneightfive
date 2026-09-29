@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient as createAdminClient } from '@/lib/supabaseServer'
 import { stripe, serviceFeeAmount, applicationFeeAmount } from '@/lib/stripe'
+import { effectiveTierSaleEnd, SALES_CUTOFF_COLUMNS } from '@/lib/ticketSalesCutoff'
 
 /**
  * POST /api/embed/checkout
@@ -124,6 +125,7 @@ export async function POST(request: NextRequest) {
       .from('events')
       .select(`
         id, title, slug, auth_user_id, ticketing_enabled,
+        event_date, event_start_time, ticket_sales_end_mode, ticket_sales_end_offset_minutes, ticket_sales_end_at,
         profiles!events_auth_user_id_profile_fkey ( id, stripe_account_id, stripe_account_status )
       `)
       .eq('slug', eventSlug)
@@ -155,7 +157,8 @@ export async function POST(request: NextRequest) {
       }
       if (!tier.is_active) return jsonError(`"${tier.name}" is not currently available`, 400)
       if (tier.sale_starts_at && new Date(tier.sale_starts_at) > now) return jsonError(`"${tier.name}" sales have not started yet`, 400)
-      if (tier.sale_ends_at && new Date(tier.sale_ends_at) < now) return jsonError(`"${tier.name}" sales have ended`, 400)
+      const saleEnd = effectiveTierSaleEnd(tier.sale_ends_at, eventRow as any)
+      if (saleEnd && saleEnd < now) return jsonError(`"${tier.name}" sales have ended`, 400)
       if (tier.quantity !== null) {
         const remaining = tier.quantity - tier.quantity_sold
         if (remaining < it.quantity) return jsonError(`Only ${remaining} "${tier.name}" ticket(s) remaining`, 400)

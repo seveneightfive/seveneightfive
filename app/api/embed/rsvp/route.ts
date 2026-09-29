@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient as createAdminClient } from '@/lib/supabaseServer'
 import { sendAttendeeTicketEmail } from '@/app/lib/email'
+import { effectiveTierSaleEnd, SALES_CUTOFF_COLUMNS } from '@/lib/ticketSalesCutoff'
 
 /**
  * POST /api/embed/rsvp
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
 
     const { data: eventRow } = await admin
       .from('events')
-      .select('id, title, slug, image_url, event_date, event_start_time, event_end_time, ticketing_enabled, auth_user_id, venues(name,address), profiles!events_auth_user_id_profile_fkey(full_name,email)')
+      .select('id, title, slug, image_url, event_date, event_start_time, event_end_time, ticketing_enabled, auth_user_id, ticket_sales_end_mode, ticket_sales_end_offset_minutes, ticket_sales_end_at, venues(name,address), profiles!events_auth_user_id_profile_fkey(full_name,email)')
       .eq('slug', eventSlug)
       .maybeSingle()
 
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     const { data: tierRows, error: tierError } = await admin
       .from('ticket_tiers')
-      .select('id, name, price, quantity, quantity_sold, is_active')
+      .select('id, name, price, quantity, quantity_sold, is_active, sale_starts_at, sale_ends_at')
       .in('id', tierIds)
       .eq('event_id', eventId)
 
@@ -95,6 +96,9 @@ export async function POST(request: NextRequest) {
         return jsonError(`"${tier.name}" requires payment — free and paid tickets can't be combined.`, 400)
       }
       if (!tier.is_active) return jsonError(`"${tier.name}" is not currently available`, 400)
+      if (tier.sale_starts_at && new Date(tier.sale_starts_at) > new Date()) return jsonError(`"${tier.name}" isn't open yet`, 400)
+      const saleEnd = effectiveTierSaleEnd(tier.sale_ends_at, eventRow as any)
+      if (saleEnd && saleEnd < new Date()) return jsonError(`"${tier.name}" is no longer available`, 400)
       if (tier.quantity !== null) {
         const remaining = tier.quantity - tier.quantity_sold
         if (remaining < it.quantity) return jsonError(`Only ${remaining} spot(s) remaining for "${tier.name}"`, 400)

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabaseServerAuth'
 import { createClient as createAdminClient } from '@/lib/supabaseServer'
 import { stripe, serviceFeeAmount, applicationFeeAmount } from '@/lib/stripe'
+import { effectiveTierSaleEnd, SALES_CUTOFF_COLUMNS } from '@/lib/ticketSalesCutoff'
 
 /**
  * POST /api/tickets/checkout
@@ -122,6 +123,7 @@ export async function POST(request: NextRequest) {
 
         events!inner (
           id, title, slug, auth_user_id,
+          event_date, event_start_time, ticket_sales_end_mode, ticket_sales_end_offset_minutes, ticket_sales_end_at,
           profiles!events_auth_user_id_profile_fkey ( id, stripe_account_id, stripe_account_status )
         )
       `)
@@ -164,7 +166,8 @@ export async function POST(request: NextRequest) {
       if (tier.sale_starts_at && new Date(tier.sale_starts_at) > now) {
         return NextResponse.json({ error: `"${tier.name}" sales have not started yet` }, { status: 400 })
       }
-      if (tier.sale_ends_at && new Date(tier.sale_ends_at) < now) {
+      const saleEnd = effectiveTierSaleEnd(tier.sale_ends_at, event as any)
+      if (saleEnd && saleEnd < now) {
         return NextResponse.json({ error: `"${tier.name}" sales have ended` }, { status: 400 })
       }
       if (tier.quantity !== null) {
