@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabaseBrowser'
 import EventMarketingTab from '@/app/components/EventMarketingTab'
 import TicketTiersEditor from '@/app/components/TicketTiersEditor'
 import EventQuestionsEditor from '@/app/components/EventQuestionsEditor'
+import CheckInQrCard from '@/app/components/CheckInQrCard'
+import TicketSalesCutoffCard from '@/app/components/TicketSalesCutoffCard'
 import {
   Ticket,
   CheckCircle2,
@@ -16,14 +18,16 @@ import {
   ArrowUpRight,
   Download,
   Mail,
+  Users,
 } from 'lucide-react'
 
 /**
  * /dashboard/events/[id]/tickets
  *
- * Per-event ticket management surface. Two tabs:
- * - Ticketing: Tier editor, buyer questions, tier performance, attendee list, door check-in
- * - Marketing: Event URL, QR code, social shares, traffic analytics
+ * Per-event ticket management surface. Three tabs (stats sit above all of them):
+ * - Ticketing: tiers, when sales stop, buyer questions, reminder email, tier performance
+ * - Guests: door check-in QR, add-on totals, attendee list (?tab=guests)
+ * - Marketing: seller page, event URL, QR code, embed, social shares, analytics
  */
 
 const sectionHeadingCls =
@@ -42,8 +46,22 @@ export default function EventTicketsPage() {
   const [responsesByTicket, setResponsesByTicket] = useState<Record<string, { label: string; value: string }[]>>({})
   const [addonsByTicket, setAddonsByTicket] = useState<Record<string, { name: string; choice: string | null }[]>>({})
   const [addonSummary, setAddonSummary] = useState<Record<string, Record<string, number>>>({})
-  const [activeTab, setActiveTab] = useState<'ticketing' | 'marketing'>('ticketing')
-  const [checkInCopied, setCheckInCopied] = useState(false)
+  type TabKey = 'ticketing' | 'guests' | 'marketing'
+  const [activeTab, setActiveTabState] = useState<TabKey>('ticketing')
+  // Open on ?tab=guests / ?tab=marketing (read after mount — avoids the
+  // useSearchParams Suspense requirement)
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    if (t === 'guests' || t === 'marketing') setActiveTabState(t)
+  }, [])
+  // Keep the tab in the URL so a refresh or shared link lands on it
+  const setActiveTab = (t: TabKey) => {
+    setActiveTabState(t)
+    const url = new URL(window.location.href)
+    if (t === 'ticketing') url.searchParams.delete('tab'); else url.searchParams.set('tab', t)
+    window.history.replaceState(null, '', url.toString())
+  }
+  const [sellerSlug, setSellerSlug] = useState<string | null>(null)
   const [checkInUrl, setCheckInUrl] = useState('')
   const [checkInUrlLoading, setCheckInUrlLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
@@ -97,8 +115,9 @@ export default function EventTicketsPage() {
         const { data: eventData } = await supabase
           .from('events')
           .select(`
-            id, title, slug, event_date, ticketing_enabled, reminder_note,
+            id, title, slug, event_date, event_start_time, ticketing_enabled, reminder_note,
             auth_user_id, venue_id,
+            ticket_sales_end_mode, ticket_sales_end_offset_minutes, ticket_sales_end_at,
             venues(id, name, auth_user_id)
           `)
           .eq('id', eventId)
@@ -141,6 +160,16 @@ export default function EventTicketsPage() {
         setEvent(eventData)
         setReminderNote(eventData.reminder_note || '')
 
+        // Public seller page (/sellers/[slug]) belongs to the event's owner
+        if (eventData.auth_user_id) {
+          const { data: ownerProfile } = await supabase
+            .from('profiles')
+            .select('seller_slug, is_seller')
+            .eq('id', eventData.auth_user_id)
+            .maybeSingle()
+          if (ownerProfile?.is_seller && ownerProfile?.seller_slug) setSellerSlug(ownerProfile.seller_slug)
+        }
+
         const { data: profileData } = await supabase
           .from('profiles')
           .select('stripe_account_status')
@@ -157,7 +186,7 @@ export default function EventTicketsPage() {
           supabase
             .from('tickets')
             .select(`
-              id, buyer_name, buyer_email, attendee_email, amount_paid, status, payment_status,
+              id, buyer_name, purchaser_name, buyer_email, attendee_email, amount_paid, status, payment_status,
               created_at, ticket_tier_id, source, notes,
               ticket_tiers(name)
             `)
@@ -255,12 +284,6 @@ export default function EventTicketsPage() {
 
 
 
-  const copyCheckInUrl = () => {
-    if (!checkInUrl) return
-    navigator.clipboard.writeText(checkInUrl)
-    setCheckInCopied(true)
-    setTimeout(() => setCheckInCopied(false), 2000)
-  }
 
   async function saveReminderNote() {
     setReminderNoteSaving(true)
@@ -294,7 +317,7 @@ export default function EventTicketsPage() {
       supabase
         .from('tickets')
         .select(`
-          id, buyer_name, buyer_email, attendee_email, amount_paid, status, payment_status,
+          id, buyer_name, purchaser_name, buyer_email, attendee_email, amount_paid, status, payment_status,
           created_at, ticket_tier_id, source, notes,
           ticket_tiers(name)
         `)
@@ -500,6 +523,40 @@ export default function EventTicketsPage() {
         </div>
       )}
 
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <StatCard
+          icon={<Ticket className="h-4 w-4" />}
+          label="Tickets Sold"
+          value={String(totalSold)}
+          tone="brand"
+        />
+        <StatCard
+          icon={<CheckCircle2 className="h-4 w-4" />}
+          label="Checked In"
+          value={String(checkedIn)}
+          tone="neutral"
+        />
+        <StatCard
+          icon={<Percent className="h-4 w-4" />}
+          label="Check-In Rate"
+          value={`${checkInRate.toFixed(1)}%`}
+          tone="neutral"
+        />
+        <StatCard
+          icon={<DollarSign className="h-4 w-4" />}
+          label="Gross Revenue"
+          value={`$${totalRevenue.toFixed(2)}`}
+          tone="success"
+        />
+        <StatCard
+          icon={<Wallet className="h-4 w-4" />}
+          label="Est. Payout"
+          value={`$${Math.max(0, totalPayout).toFixed(2)}`}
+          tone="neutral"
+        />
+      </div>
+
       {/* Tab switcher — pill buttons instead of underlined text so the
           active tab reads clearly at a glance */}
       <div className="inline-flex gap-1 rounded-xl bg-gray-100 p-1 dark:bg-white/[0.05]">
@@ -512,6 +569,21 @@ export default function EventTicketsPage() {
           }`}
         >
           Ticketing
+        </button>
+        <button
+          onClick={() => setActiveTab('guests')}
+          className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+            activeTab === 'guests'
+              ? 'bg-white text-brand-700 shadow-sm dark:bg-gray-900 dark:text-brand-400'
+              : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+          }`}
+        >
+          Guests
+          {totalSold > 0 && (
+            <span className="rounded-full bg-brand-100 px-1.5 py-0.5 text-[10px] font-bold leading-none text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
+              {totalSold}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setActiveTab('marketing')}
@@ -528,40 +600,6 @@ export default function EventTicketsPage() {
       {/* Ticketing Tab */}
       {activeTab === 'ticketing' && (
         <>
-          {/* Stat cards */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            <StatCard
-              icon={<Ticket className="h-4 w-4" />}
-              label="Tickets Sold"
-              value={String(totalSold)}
-              tone="brand"
-            />
-            <StatCard
-              icon={<CheckCircle2 className="h-4 w-4" />}
-              label="Checked In"
-              value={String(checkedIn)}
-              tone="neutral"
-            />
-            <StatCard
-              icon={<Percent className="h-4 w-4" />}
-              label="Check-In Rate"
-              value={`${checkInRate.toFixed(1)}%`}
-              tone="neutral"
-            />
-            <StatCard
-              icon={<DollarSign className="h-4 w-4" />}
-              label="Gross Revenue"
-              value={`$${totalRevenue.toFixed(2)}`}
-              tone="success"
-            />
-            <StatCard
-              icon={<Wallet className="h-4 w-4" />}
-              label="Est. Payout"
-              value={`$${Math.max(0, totalPayout).toFixed(2)}`}
-              tone="neutral"
-            />
-          </div>
-
           {/* Tier editor */}
           <Card>
             <h2 className={sectionHeadingCls}>Ticket Tiers</h2>
@@ -572,6 +610,19 @@ export default function EventTicketsPage() {
             <TicketTiersEditor
               eventId={eventId}
               stripeAccountStatus={profile?.stripe_account_status || null}
+            />
+          </Card>
+
+          {/* When sales stop — event-wide */}
+          <Card>
+            <h2 className={sectionHeadingCls}>When Ticket Sales Stop</h2>
+            <p className="mb-4 -mt-2 text-xs text-gray-500 dark:text-gray-400">
+              Choose when online sales close for this event.
+            </p>
+            <TicketSalesCutoffCard
+              eventId={eventId}
+              event={event}
+              onSaved={(next) => setEvent((prev: any) => ({ ...prev, ...next }))}
             />
           </Card>
 
@@ -720,6 +771,38 @@ export default function EventTicketsPage() {
             </Card>
           )}
 
+          <Card>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <Users className="h-4 w-4" />
+                Door check-in QR code and your attendee list are on the <strong className="text-gray-900 dark:text-white">Guests</strong> tab.
+              </div>
+              <button
+                onClick={() => { setActiveTab('guests'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white transition hover:bg-gray-700 dark:bg-white dark:text-gray-900"
+              >
+                Go to Guests →
+              </button>
+            </div>
+          </Card>
+        </>
+      )}
+
+      {/* Guests Tab — check-in, add-on totals, attendee list */}
+      {activeTab === 'guests' && (
+        <>
+          {/* Door Check-In — QR for volunteers */}
+          <Card>
+            <h2 className={sectionHeadingCls}>Door Check-In</h2>
+            <CheckInQrCard
+              checkInUrl={checkInUrl}
+              loading={checkInUrlLoading}
+              eventTitle={event.title}
+              eventDateLabel={formatDate(event.event_date)}
+              eventSlug={event.slug}
+            />
+          </Card>
+
           {/* Add-on summary — total add-ons sold across all tickets,
               broken down by choice (e.g. meal type). */}
           {Object.keys(addonSummary).length > 0 && (
@@ -751,35 +834,6 @@ export default function EventTicketsPage() {
               </div>
             </Card>
           )}
-
-          {/* Door Check-In — moved here from Marketing since it's a
-              ticketing/ops concern, not a promotion channel */}
-          <Card>
-            <h2 className={sectionHeadingCls}>Door Check-In</h2>
-            <p className="mb-2 -mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Share this link with staff to check in attendees at the door — no account needed,
-              the link itself is what grants access:
-            </p>
-            {checkInUrlLoading ? (
-              <div className="text-sm text-gray-500 dark:text-gray-400">Setting up your check-in link…</div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={checkInUrl}
-                  readOnly
-                  className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-300"
-                />
-                <button
-                  onClick={copyCheckInUrl}
-                  disabled={!checkInUrl}
-                  className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {checkInCopied ? 'Copied' : 'Copy'}
-                </button>
-              </div>
-            )}
-          </Card>
 
           {/* Attendees */}
           <Card>
@@ -1027,6 +1081,11 @@ export default function EventTicketsPage() {
                               Edit
                             </button>
                           </div>
+                          {t.purchaser_name && (
+                            <div className="mt-0.5 truncate text-xs font-medium text-brand-700 dark:text-brand-400">
+                              Part of {t.purchaser_name}&rsquo;s {tierName || 'ticket'} purchase
+                            </div>
+                          )}
                           <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
                             {t.attendee_email || t.buyer_email || '—'}
                           </div>
@@ -1043,7 +1102,7 @@ export default function EventTicketsPage() {
                               : 'Free'}
                           </div>
                           <div className="mt-0.5 text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                            {tierName}
+                            {t.purchaser_name ? 'Guest ticket' : tierName}
                           </div>
                           <div className="text-[10px] text-gray-400 dark:text-gray-500">
                             {formatTime(t.created_at)}
@@ -1095,6 +1154,7 @@ export default function EventTicketsPage() {
           eventId={eventId}
           eventSlug={event.slug}
           eventTitle={event.title}
+          sellerSlug={sellerSlug}
         />
       )}
     </div>
