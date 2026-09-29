@@ -1,8 +1,10 @@
 import { supabase } from '@/lib/supabase'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import FollowFavoriteButtons from '@/app/components/FollowFavoriteButtons'
 import VenueShareButton from './VenueShareButton'
+import VenueHours, { type Hours } from './VenueHours'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,6 +26,11 @@ type Venue = {
   social_instagram: string | null
   social_facebook: string | null
   est: string | null
+  hours: Hours
+  amenities: string[] | null
+  blkowned: boolean | null
+  womenowned: boolean | null
+  lgbtq: boolean | null
 }
 
 type Event = {
@@ -44,6 +51,47 @@ const SITE_URL = 'https://seveneightfive.com'
 // OG image, and JSON-LD image — anywhere we need "the" picture of a venue.
 function getHeroImage(venue: Pick<Venue, 'image_url' | 'logo'>): string | null {
   return venue.image_url || venue.logo || null
+}
+
+// Some addresses already include "Topeka, KS 66604" and some are just the
+// street line. Only append city/state when the street line doesn't have it.
+function formatAddress(venue: Pick<Venue, 'address' | 'city' | 'state'>): string | null {
+  if (!venue.address) return null
+  const a = venue.address.trim()
+  if (venue.city && a.toLowerCase().includes(venue.city.toLowerCase())) return a
+  return [a, venue.city, venue.state].filter(Boolean).join(', ')
+}
+
+// Categories that have their own landing page. Anything not listed here
+// links to the venue directory pre-filtered to that type.
+const CATEGORY_ROUTES: Record<string, string> = {
+  'Local Flavor': '/local-flavor',
+}
+function categoryHref(type: string) {
+  return CATEGORY_ROUTES[type] ?? `/venues?type=${encodeURIComponent(type)}`
+}
+
+// Amenity slugs stored in venues.amenities (text[]) -> display labels.
+// Unknown values still render, just title-cased.
+const AMENITY_LABELS: Record<string, string> = {
+  'wifi': 'Free Wi-Fi',
+  'parking-lot': 'Parking Lot',
+  'street-parking': 'Street Parking',
+  'wheelchair-accessible': 'Wheelchair Accessible',
+  'outdoor-seating': 'Outdoor Seating',
+  'pet-friendly': 'Pet Friendly',
+  'family-friendly': 'Family Friendly',
+  'full-bar': 'Full Bar',
+  'beer-wine': 'Beer & Wine',
+  'live-music': 'Live Music',
+  'reservations': 'Takes Reservations',
+  'takeout': 'Takeout',
+  'delivery': 'Delivery',
+  'private-events': 'Private Events',
+  'all-ages': 'All Ages',
+}
+function amenityLabel(slug: string) {
+  return AMENITY_LABELS[slug] ?? slug.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
 // ─── SEO ─────────────────────────────────────────────────────────────────────
@@ -73,7 +121,8 @@ async function getVenue(slug: string): Promise<Venue | null> {
     .select(`
       id, name, slug, description, address, neighborhood, city, state,
       image_url, logo, website, venue_type, phone, email,
-      social_instagram, social_facebook, est
+      social_instagram, social_facebook, est,
+      hours, amenities, blkowned, womenowned, lgbtq
     `)
     .eq('slug', slug)
     // Closed venues 404 (only status = 'active' is public)
@@ -98,6 +147,19 @@ async function getVenueEvents(venueId: string): Promise<Event[]> {
     .limit(10)
 
   return (data || []) as Event[]
+}
+
+// Link the neighborhood eyebrow to its page when one is published;
+// otherwise fall back to the directory filtered by that neighborhood.
+async function getNeighborhoodHref(name: string | null): Promise<string | null> {
+  if (!name) return null
+  const { data } = await supabase
+    .from('neighborhoods')
+    .select('slug')
+    .eq('name', name)
+    .eq('published', true)
+    .maybeSingle()
+  return data?.slug ? `/neighborhoods/${data.slug}` : `/venues?neighborhood=${encodeURIComponent(name)}`
 }
 
 // ─── JSON-LD ──────────────────────────────────────────────────────────────────
@@ -163,10 +225,24 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
   const venue = await getVenue(slug)
   if (!venue) notFound()
 
-  const events = await getVenueEvents(venue.id)
+  const [events, neighborhoodHref] = await Promise.all([
+    getVenueEvents(venue.id),
+    getNeighborhoodHref(venue.neighborhood),
+  ])
   const jsonLd = getJsonLd(venue)
   const breadcrumbJsonLd = getBreadcrumbJsonLd(venue)
   const heroImage = getHeroImage(venue)
+  // If there's no photo, the logo becomes the hero — so don't show it twice.
+  const heroIsLogo = !venue.image_url && !!venue.logo
+  const showLogoBadge = !!venue.image_url && !!venue.logo
+  const fullAddress = formatAddress(venue)
+  const mapsUrl = fullAddress ? `https://maps.google.com/?q=${encodeURIComponent(fullAddress)}` : null
+
+  const ownership = [
+    venue.blkowned && 'Black Owned',
+    venue.womenowned && 'Women Owned',
+    venue.lgbtq && 'LGBTQ+ Friendly',
+  ].filter(Boolean) as string[]
 
   // Contact / social icons — order intentional: primary action first, then reach-out, then socials
   const contactLinks: { label: string; url: string; icon: React.ReactNode; color: string }[] = []
@@ -231,10 +307,10 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
       ),
     })
   }
-  if (venue.address) {
+  if (mapsUrl) {
     contactLinks.push({
       label: 'Directions',
-      url: `https://maps.google.com/?q=${encodeURIComponent(`${venue.address} ${venue.city || ''} ${venue.state || ''}`)}`,
+      url: mapsUrl,
       color: '#1a1814',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -260,24 +336,34 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
         body { background: var(--white); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
 
         /* ── HERO ── */
+        .hero-wrap { position: relative; }
         .hero { position: relative; width: 100%; height: 100svh; max-height: 680px; min-height: 460px; overflow: hidden; background: var(--ink); display: flex; flex-direction: column; justify-content: flex-end; }
         .hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 30%; }
         .hero-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0.15) 40%, rgba(0,0,0,0.72) 75%, rgba(0,0,0,0.92) 100%); }
+        .hero--logo { background: var(--off); }
+        .hero--logo .hero-img { object-fit: contain; padding: 72px 48px 150px; }
         .hero-monogram { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: clamp(8rem, 30vw, 20rem); font-weight: 700; color: rgba(255,255,255,0.04); text-transform: uppercase; letter-spacing: -0.04em; user-select: none; }
         .hero-back { position: absolute; top: 20px; left: 20px; z-index: 3; display: inline-flex; align-items: center; gap: 6px; font-size: 0.7rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: #fff; text-decoration: none; background: rgba(0,0,0,0.32); backdrop-filter: blur(6px); padding: 8px 14px; border-radius: 100px; border: 1px solid rgba(255,255,255,0.16); transition: background 0.15s; }
         .hero-back:hover { background: rgba(0,0,0,0.5); }
         .hero-actions { position: absolute; top: 20px; right: 20px; z-index: 3; display: flex; align-items: center; gap: 8px; }
         .hero-body { position: relative; z-index: 2; padding: 24px 32px 40px var(--page-pad); }
         .hero-eyebrow { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-        .hero-type-label { font-size: 0.65rem; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); }
-        .hero-name { font-family: var(--serif); font-size: clamp(2.4rem, 8vw, 5rem); font-weight: 700; color: #fff; line-height: 0.95; letter-spacing: -0.01em; text-transform: uppercase; margin-bottom: 12px; animation: fadeUp 0.6s cubic-bezier(0.22,1,0.36,1) both; }
+        .hero-type-label { font-size: 0.65rem; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: opacity 0.15s; }
+        a.hero-type-label:hover { opacity: 0.8; }
+        a.hero-type-label::after { content: '→'; letter-spacing: 0; transition: transform 0.15s; }
+        a.hero-type-label:hover::after { transform: translateX(3px); }
+        .has-logo .hero-body { padding-right: 200px; }
+
+        /* Logo badge — overlaps the bottom-right edge of the hero */
+        .venue-logo { position: absolute; bottom: 0; right: max(var(--page-pad), calc((100vw - 1440px) / 2 + var(--page-pad))); transform: translateY(50%); z-index: 5; width: 128px; height: 128px; border-radius: 20px; background: var(--white); border: 4px solid var(--white); box-shadow: 0 8px 28px rgba(0,0,0,0.18); overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        .venue-logo img { width: 100%; height: 100%; object-fit: contain; padding: 8px; }
+        .hero-name { font-family: var(--serif); font-size: clamp(2.4rem, 8vw, 5rem); font-weight: 700; color: #fff; line-height: 0.95; letter-spacing: -0.01em; text-transform: uppercase; margin-bottom: 0; animation: fadeUp 0.6s cubic-bezier(0.22,1,0.36,1) both; }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        .hero-pills { display: flex; flex-wrap: wrap; gap: 6px; animation: fadeUp 0.6s 0.12s cubic-bezier(0.22,1,0.36,1) both; }
-        .hero-pill { font-size: 0.67rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.18); padding: 4px 10px; border-radius: 100px; backdrop-filter: blur(4px); display: flex; align-items: center; gap: 4px; }
 
         /* ── LAYOUT ── */
         :root { --page-pad: 64px; }
-        .venue-main { max-width: 1440px; margin: 0 auto; padding: 48px var(--page-pad) 0; position: relative; background: var(--white); }
+        .venue-main { max-width: 1440px; margin: 0 auto; padding: 48px var(--page-pad) 0; position: relative; z-index: 1; background: var(--white); }
+        .venue-main.has-logo { padding-top: 96px; }
         .venue-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 40px; align-items: start; }
 
         .panel-header { padding: 0; }
@@ -297,13 +383,40 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
         .address-link { color: var(--accent); text-decoration: none; font-size: 0.8rem; font-weight: 600; }
         .address-link:hover { text-decoration: underline; }
         .type-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
-        .type-tag { font-size: 0.65rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); background: var(--off); border-radius: 100px; padding: 5px 11px; }
+        .type-tag { font-size: 0.65rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); background: var(--off); border: 1px solid transparent; border-radius: 100px; padding: 5px 11px; text-decoration: none; transition: border-color 0.15s, background 0.15s; }
+        a.type-tag:hover { border-color: var(--ink); background: var(--white); }
+        .est-line { font-size: 0.65rem; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 10px; }
+        .est-line span { color: var(--accent); }
+
+        /* ── OWNERSHIP ── */
+        .owner-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
+        .owner-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em; color: var(--accent); background: var(--accent-light); border-radius: 100px; padding: 6px 12px; }
+
+        /* ── HOURS ── */
+        .hours { margin-top: 22px; border: 1px solid var(--border); border-radius: 12px; }
+        .hours-summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 12px 14px; font-size: 0.86rem; }
+        .hours-summary::-webkit-details-marker { display: none; }
+        .hours-status { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; padding: 4px 10px; border-radius: 100px; flex-shrink: 0; }
+        .hours-status--open { background: #e3f6e3; color: #1f7a2e; }
+        .hours-status--closed { background: var(--off); color: var(--ink-soft); }
+        .hours-today { flex: 1; min-width: 0; color: var(--ink); }
+        .hours-toggle { width: 24px; height: 24px; border-radius: 50%; background: var(--off); display: flex; align-items: center; justify-content: center; font-size: 1rem; transition: transform 0.2s; flex-shrink: 0; }
+        .hours[open] .hours-toggle { transform: rotate(45deg); }
+        .hours-list { list-style: none; padding: 4px 14px 12px; border-top: 1px solid var(--border); }
+        .hours-row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 0.82rem; color: var(--ink-soft); }
+        .hours-row--today { color: var(--ink); font-weight: 600; }
+
+        /* ── AMENITIES ── */
+        .amenities { margin-top: 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+        .amenity { display: flex; align-items: center; gap: 8px; font-size: 0.84rem; font-weight: 500; color: var(--ink); }
+        .amenity svg { color: var(--accent); flex-shrink: 0; }
 
         /* ── EVENTS ── */
         .events-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 0; text-align: center; }
-        .events-empty-icon { font-size: 2rem; }
         .events-empty-title { font-family: var(--serif); font-size: 1rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); }
         .events-empty-sub { font-size: 0.85rem; color: var(--ink-faint); }
+        .add-event-btn { margin-top: 14px; display: inline-flex; align-items: center; gap: 8px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); text-decoration: none; border: 1.5px solid var(--ink); border-radius: 100px; padding: 10px 18px; transition: background 0.15s, color 0.15s; }
+        .add-event-btn:hover { background: var(--ink); color: var(--white); }
         .events-list { display: flex; flex-direction: column; gap: 10px; }
 
         /* Compact date-block-on-the-left row — date bleeds flush to the
@@ -342,8 +455,14 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
         }
         @media (max-width: 640px) {
           :root { --page-pad: 20px; }
-          .hero { height: 100svh; max-height: 100svh; min-height: 0; }
-          .hero-body { padding: 20px 20px 28px var(--page-pad); }
+          /* Shorter hero on mobile — no longer full screen */
+          .hero { height: clamp(280px, 78vw, 400px); max-height: none; min-height: 0; }
+          .hero--logo .hero-img { padding: 64px 32px 110px; }
+          .hero-body { padding: 20px 20px 24px var(--page-pad); }
+          .hero-name { font-size: clamp(2rem, 9vw, 2.6rem); }
+          .has-logo .hero-body { padding-right: 112px; }
+          .venue-logo { width: 84px; height: 84px; border-radius: 16px; border-width: 3px; }
+          .venue-main.has-logo { padding-top: 60px; }
 
           /* Curved panel: pull the content up over the hero's bottom edge,
              mobile only — desktop keeps the flat two-column layout. */
@@ -354,7 +473,8 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
       `}</style>
 
       {/* ── HERO ── */}
-      <section className="hero">
+      <div className={`hero-wrap${showLogoBadge ? ' has-logo' : ''}`}>
+      <section className={`hero${heroIsLogo ? ' hero--logo' : ''}`}>
         <a href="/venues" className="hero-back">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M19 12H5M12 5l-7 7 7 7"/>
@@ -374,65 +494,77 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
           <div className="hero-monogram">{venue.name[0]}</div>
         )}
         <div className="hero-body">
-          <div className="hero-eyebrow">
-            {venue.neighborhood && <span className="hero-type-label">{venue.neighborhood}</span>}
-          </div>
+          {venue.neighborhood && neighborhoodHref && (
+            <div className="hero-eyebrow">
+              <Link href={neighborhoodHref} className="hero-type-label">{venue.neighborhood}</Link>
+            </div>
+          )}
           <h1 className="hero-name">{venue.name}</h1>
-          <div className="hero-pills">
-            {(venue.city || venue.neighborhood) && (
-              <span className="hero-pill">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-                </svg>
-                {venue.city || venue.neighborhood}
-              </span>
-            )}
-          </div>
         </div>
       </section>
+      {showLogoBadge && (
+        <div className="venue-logo">
+          <img src={venue.logo!} alt={`${venue.name} logo`} />
+        </div>
+      )}
+      </div>
 
       {/* ── CONTENT ── */}
-      <main className="venue-main">
+      <main className={`venue-main${showLogoBadge ? ' has-logo' : ''}`}>
         <div className="venue-grid">
 
           {/* ── ABOUT (33%) ── */}
           <section className="panel about-panel">
-            <div className="panel-header">
-              <div className="eyebrow">
-                {venue.est ? <><span className="eyebrow-accent">Est.</span>&nbsp;{venue.est}</> : 'About'}
+            {venue.est && <div className="est-line"><span>Est.</span> {venue.est}</div>}
+
+            {venue.description &&
+              venue.description.split('\n').filter(Boolean).map((p, i) => <p key={i} className="desc-text">{p}</p>)}
+
+            {ownership.length > 0 && (
+              <div className="owner-tags">
+                {ownership.map(label => (
+                  <span key={label} className="owner-tag">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7.5-4.6-9.5-9.3C1.2 8.6 3.3 5 6.8 5c2 0 3.4 1.1 4.2 2.4h2C13.8 6.1 15.2 5 17.2 5c3.5 0 5.6 3.6 4.3 6.7C19.5 16.4 12 21 12 21z"/></svg>
+                    {label}
+                  </span>
+                ))}
               </div>
-            </div>
-            <div className="panel-body">
-              {venue.description
-                ? venue.description.split('\n').filter(Boolean).map((p, i) => <p key={i} className="desc-text">{p}</p>)
-                : <p className="desc-empty">No description available.</p>
-              }
+            )}
 
-              {venue.venue_type && venue.venue_type.length > 0 && (
-                <div className="type-tags">
-                  {venue.venue_type.map(t => <span key={t} className="type-tag">{t}</span>)}
-                </div>
-              )}
+            {venue.venue_type && venue.venue_type.length > 0 && (
+              <div className="type-tags">
+                {venue.venue_type.map(t => (
+                  <Link key={t} href={categoryHref(t)} className="type-tag">{t}</Link>
+                ))}
+              </div>
+            )}
 
-              {venue.address && (
-                <div className="address-block">
-                  <svg className="address-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-                  </svg>
-                  <div>
-                    <div className="address-text">{venue.address}{venue.city && `, ${venue.city}`}{venue.state && `, ${venue.state}`}</div>
-                    <a
-                      href={`https://maps.google.com/?q=${encodeURIComponent(`${venue.address} ${venue.city || ''} ${venue.state || ''}`)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="address-link"
-                    >
-                      Open in Maps →
-                    </a>
-                  </div>
+            <VenueHours hours={venue.hours} />
+
+            {venue.amenities && venue.amenities.length > 0 && (
+              <div className="amenities">
+                {venue.amenities.map(a => (
+                  <span key={a} className="amenity">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+                    {amenityLabel(a)}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {fullAddress && mapsUrl && (
+              <div className="address-block">
+                <svg className="address-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                </svg>
+                <div>
+                  <div className="address-text">{fullAddress}</div>
+                  <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="address-link">
+                    Open in Maps →
+                  </a>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </section>
 
           {/* ── EVENTS (66%) ── */}
@@ -443,9 +575,12 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
             <div className="panel-body">
               {events.length === 0 ? (
                 <div className="events-empty">
-                  <div className="events-empty-icon">📅</div>
                   <div className="events-empty-title">No upcoming events</div>
                   <div className="events-empty-sub">Check back soon or follow on social media</div>
+                  <Link href={`/dashboard/events/edit?venue=${venue.id}`} className="add-event-btn">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                    Add an event here
+                  </Link>
                 </div>
               ) : (
                 <div className="events-list">
