@@ -28,10 +28,16 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({}))
-  const { qr_token } = body
+  let { qr_token } = body
 
   if (!qr_token || typeof qr_token !== 'string') {
     return NextResponse.json({ error: 'qr_token is required' }, { status: 400 })
+  }
+  // Emailed ticket QR codes hold a link (…/tickets/<qr_token>) — accept either.
+  qr_token = qr_token.trim()
+  const linkMatch = qr_token.match(/\/tickets\/([^/?#\s]+)/)
+  if (linkMatch) {
+    try { qr_token = decodeURIComponent(linkMatch[1]) } catch { qr_token = linkMatch[1] }
   }
 
   const admin = createAdmin()
