@@ -68,6 +68,7 @@ type PortfolioImage = {
 
 type SocialLink = { label: string; url: string; icon: string; color: string }
 type NavItem = { id: string; label: string; icon: string }
+type Track = { key: string; title: string; url: string; album: string | null; buyLink: string | null }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ type Props = {
   navItems: NavItem[]
   genres: string[]
   videoId: string | null
+  tracks?: Track[]
   hasMusic: boolean
   hasWork: boolean
   jsonLd: object
@@ -169,6 +171,7 @@ export default function ArtistPageClient({
   navItems,
   genres,
   videoId,
+  tracks = [],
   hasMusic,
   hasWork,
   jsonLd,
@@ -187,7 +190,25 @@ export default function ArtistPageClient({
   const heroRef = useRef<HTMLDivElement>(null)
 
   const mp = artist.musician_profile
-  const hasAudio = !!mp?.audio_file_url
+  const hasAudio = tracks.length > 0
+  // One shared player; the track list below it switches what's loaded.
+  const [trackIdx, setTrackIdx] = useState(0)
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const currentTrack = tracks[trackIdx] || null
+  const playTrack = (i: number) => {
+    if (i === trackIdx) {
+      const a = audioRef.current
+      if (a) { if (a.paused) a.play().catch(() => {}); else a.pause() }
+      return
+    }
+    setTrackIdx(i)
+  }
+  // Auto-play when the listener picks a different track (not on first load)
+  const firstTrackLoad = useRef(true)
+  useEffect(() => {
+    if (firstTrackLoad.current) { firstTrackLoad.current = false; return }
+    audioRef.current?.play().catch(() => {})
+  }, [trackIdx])
   const hasVideo = !!videoId
 
   const TYPE_LABEL: Record<string, string> = {
@@ -698,6 +719,22 @@ export default function ArtistPageClient({
           margin-bottom: 14px;
         }
         audio { width: 100%; height: 32px; }
+        .audio-album { color: rgba(255,255,255,0.5); text-transform: none; letter-spacing: 0; }
+        .track-list { list-style: none; margin: 16px 0 0; padding: 12px 0 0; border-top: 1px solid rgba(255,255,255,0.12); }
+        .track-row {
+          display: flex; align-items: center; gap: 12px; width: 100%;
+          padding: 9px 8px; border: none; border-radius: 6px; background: none; cursor: pointer; text-align: left;
+          color: rgba(255,255,255,0.8); font-family: var(--sans); font-size: 0.88rem;
+        }
+        .track-row:hover { background: rgba(255,255,255,0.06); color: #fff; }
+        .track-row:focus-visible { outline: 2px solid #FFCE03; outline-offset: 1px; }
+        .track-row.active { color: #FFCE03; }
+        .track-num { width: 18px; flex-shrink: 0; text-align: center; font-size: 0.78rem; color: rgba(255,255,255,0.4); }
+        .track-row.active .track-num { color: #FFCE03; }
+        .track-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .track-album { flex-shrink: 0; font-size: 0.75rem; color: rgba(255,255,255,0.4); }
+        .track-buy { display: inline-block; margin-top: 12px; font-size: 0.78rem; color: #FFCE03; text-decoration: none; }
+        .track-buy:hover { text-decoration: underline; }
 
         .video-grid {
           display: grid;
@@ -1169,13 +1206,39 @@ export default function ArtistPageClient({
               </section>
             )}
 
-            {/* ── AUDIO ── */}
-            {hasAudio && (
+            {/* ── AUDIO ── (profile track + any songs from the songs table) */}
+            {hasAudio && currentTrack && (
               <section id="music" className="section">
                 <div className="eyebrow">Listen</div>
                 <div className="audio-block">
-                  <div className="audio-track-name">{mp?.audio_title || 'Listen'}</div>
-                  <audio controls src={mp!.audio_file_url!} />
+                  <div className="audio-track-name">
+                    {currentTrack.title}
+                    {currentTrack.album && <span className="audio-album"> · {currentTrack.album}</span>}
+                  </div>
+                  <audio ref={audioRef} controls preload="metadata" src={currentTrack.url} />
+                  {tracks.length > 1 && (
+                    <ol className="track-list">
+                      {tracks.map((t, i) => (
+                        <li key={t.key}>
+                          <button
+                            type="button"
+                            className={`track-row${i === trackIdx ? ' active' : ''}`}
+                            onClick={() => playTrack(i)}
+                            aria-current={i === trackIdx ? 'true' : undefined}
+                          >
+                            <span className="track-num">{i === trackIdx ? '♪' : i + 1}</span>
+                            <span className="track-title">{t.title}</span>
+                            {t.album && <span className="track-album">{t.album}</span>}
+                          </button>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  {currentTrack.buyLink && (
+                    <a href={currentTrack.buyLink} target="_blank" rel="noopener noreferrer" className="track-buy">
+                      Buy / stream this track ↗
+                    </a>
+                  )}
                 </div>
               </section>
             )}
