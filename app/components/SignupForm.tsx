@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { handleSignup } from '../actions/signup';
 import styles from './SignupForm.module.css';
 
-export default function SignupForm() {
+export default function SignupForm({ className }: { className?: string } = {}) {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<{ success?: boolean; message?: string } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -35,7 +35,7 @@ export default function SignupForm() {
   }
 
   return (
-    <div className={styles.wrap}>
+    <div className={className ? `${styles.wrap} ${className}` : styles.wrap}>
       <div className={styles.inner}>
         <h2 className={styles.headline}>
           Most Emails Suck. <em>Ours Don&rsquo;t.</em>

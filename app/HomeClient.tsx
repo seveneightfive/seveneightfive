@@ -211,6 +211,8 @@ export default function HomeClient({
           </div>
         </section>
 
+        {/* ── CTAs: stacked on mobile, three boxes in a row on desktop ── */}
+        <section className={styles.ctaRow}>
         {/* ── Announcement ── */}
         <div className={styles.announcement}>
           <h3>Sell<br />Event <span>Tickets</span><br />Now on 785</h3>
@@ -237,9 +239,9 @@ export default function HomeClient({
         </div>
 
         {/* ── Newsletter Signup (full-width) ── */}
-        <SignupForm />
+        <SignupForm className={styles.ctaNewsletter} />
+        </section>
 
-        <div className={styles.footerRule} />
         <p className={styles.footerText}>© seveneightfive magazine — Events & times subject to change</p>
 
       </main>

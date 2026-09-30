@@ -509,15 +509,78 @@
   pointer-events: none;
 }
 
-/* ── Footer ── */
-.footerRule {
-  height: 3px;
-  background: #0A0A0A;
-  margin: 40px 20px 20px;
+/* ── CTA row ──
+   Mobile/tablet: no layout of its own, so the announcement, ad and
+   newsletter stack exactly as before (newsletter stays full-bleed).
+   Desktop: three equal boxes side by side, with each box's button
+   pinned to the bottom so all three line up. */
+@media (min-width: 1024px) {
+  .ctaRow {
+    width: min(100% - 48px, 1280px);
+    margin: 72px auto 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    align-items: stretch;
+  }
+
+  .ctaRow > .announcement,
+  .ctaRow > .adBlock {
+    margin: 0;
+    padding: 32px 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ctaRow > .announcement p,
+  .ctaRow > .adBlock p {
+    flex: 1;
+  }
+
+  /* Newsletter as a box instead of a full-width band */
+  .ctaRow > .ctaNewsletter {
+    width: auto;
+    margin: 0;
+    padding: 32px 28px;
+    text-align: left;
+    display: flex;
+  }
+
+  .ctaRow > .ctaNewsletter > div {
+    max-width: none;
+    margin: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ctaRow > .ctaNewsletter h2 {
+    font-size: 30px;
+    line-height: 1.05;
+  }
+
+  .ctaRow > .ctaNewsletter p {
+    flex: 1;
+    max-width: none;
+    margin: 0 0 20px;
+  }
+
+  .ctaRow > .ctaNewsletter form {
+    max-width: none;
+    margin: 0;
+    width: 100%;
+  }
+
+  .ctaRow > .ctaNewsletter button {
+    padding: 0 22px;
+  }
 }
 
+
+/* ── Footer ── */
 .footerText {
-  padding: 0 20px 20px;
+  padding: 28px 20px 20px;
   font-family: 'Oswald', sans-serif;
   font-size: 11px;
   font-weight: 400;
@@ -577,11 +640,8 @@
     margin: 40px 40px;
   }
 
-  .footerRule {
-    margin: 60px 40px 24px;
-  }
 
   .footerText {
-    padding: 0 40px 40px;
+    padding: 48px 40px 40px;
   }
 }

@@ -7,9 +7,12 @@
 // apart and fade, and the circle grows until it uncovers the archive panel
 // (cover, story callout, CTA).
 //
-// How it works: the section is taller than the screen and the stage is
-// `position: sticky`, so it stays put while you scroll through it. Scroll
-// position inside the section becomes a 0→1 progress value, and every
+// How it works: the stage is `position: sticky`, pinned vertically centred
+// on screen, and is followed by an invisible "runway" div. While the runway
+// scrolls past, the stage stays put, and how far through the runway you are
+// becomes a 0→1 progress value. Because the sticky wrapper is only as tall
+// as the card, nothing but the card is left behind when it scrolls away.
+// Every
 // moving part is a function of that value, so scrolling back up plays it
 // in reverse. Styles are written straight to DOM refs inside a single
 // requestAnimationFrame, so React doesn't re-render on scroll.
@@ -54,6 +57,8 @@ export default function ArchiveReveal({ issue }: { issue: ArchiveRevealIssue }) 
   const [reduced, setReduced] = useState(false)
 
   const sectionRef = useRef<HTMLDivElement>(null)
+  const stickyRef = useRef<HTMLDivElement>(null)
+  const runwayRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const badgeRef = useRef<HTMLDivElement>(null)
@@ -61,6 +66,20 @@ export default function ArchiveReveal({ issue }: { issue: ArchiveRevealIssue }) 
   const rightRef = useRef<SVGGElement>(null)
   const coverRef = useRef<HTMLAnchorElement>(null)
   const copyRef = useRef<HTMLDivElement>(null)
+  // Diagnostic readout: add ?revealdebug to the URL to see what the
+  // animation is measuring while you scroll. Invisible otherwise.
+  const debugRef = useRef<HTMLPreElement>(null)
+  const [debug, setDebug] = useState(false)
+
+  useEffect(() => {
+    setDebug(new URLSearchParams(window.location.search).has('revealdebug'))
+  }, [])
+
+  useEffect(() => {
+    if (!debug || !reduced || !debugRef.current) return
+    debugRef.current.textContent =
+      'REDUCE MOTION IS ON\nAnimation skipped on purpose.\n(iPhone: Settings > Accessibility > Motion)'
+  }, [debug, reduced])
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -78,17 +97,23 @@ export default function ArchiveReveal({ issue }: { issue: ArchiveRevealIssue }) 
     const render = () => {
       frame = 0
       const section = sectionRef.current
+      const sticky = stickyRef.current
       const stage = stageRef.current
-      if (!section || !stage) return
-
-      // 0 when the section's top reaches the top of the screen,
-      // 1 when its bottom reaches the bottom of the screen.
-      const rect = section.getBoundingClientRect()
-      const travel = rect.height - window.innerHeight
-      const p = travel > 0 ? clamp(-rect.top / travel) : 1
+      const runway = runwayRef.current
+      if (!section || !sticky || !stage || !runway) return
 
       const w = stage.clientWidth
       const h = stage.clientHeight
+
+      // Pin the card vertically centred in the viewport.
+      const pinTop = Math.max(0, (window.innerHeight - h) / 2)
+      sticky.style.top = `${pinTop}px`
+
+      // 0 when the card first pins, 1 once the whole runway has scrolled by.
+      const rect = section.getBoundingClientRect()
+      const travel = runway.offsetHeight
+      const p = travel > 0 ? clamp((pinTop - rect.top) / travel) : 1
+
       const r0 = Math.min(w, h) * 0.16
       const r1 = Math.hypot(w / 2, h / 2) + 2
 
@@ -128,6 +153,17 @@ export default function ArchiveReveal({ issue }: { issue: ArchiveRevealIssue }) 
         copyRef.current.style.opacity = String(t)
         copyRef.current.style.transform = `translateY(${(1 - t) * 14}px)`
       }
+
+      if (debugRef.current) {
+        debugRef.current.textContent = [
+          `progress  ${p.toFixed(3)}`,
+          `sectionTop ${Math.round(rect.top)}  pinTop ${Math.round(pinTop)}`,
+          `runway ${travel}  viewport ${window.innerHeight}`,
+          `stage ${Math.round(w)}x${Math.round(h)}  stageTop ${Math.round(stage.getBoundingClientRect().top)}`,
+          `circle r ${Math.round(radius)}  badge ${badgeRef.current?.style.opacity}`,
+          `scrollY ${Math.round(window.scrollY)}`,
+        ].join('\n')
+      }
     }
 
     const schedule = () => {
@@ -142,7 +178,7 @@ export default function ArchiveReveal({ issue }: { issue: ArchiveRevealIssue }) 
       window.removeEventListener('resize', schedule)
       if (frame) cancelAnimationFrame(frame)
     }
-  }, [reduced])
+  }, [reduced, debug])
 
   const href = issue.issue_number ? `/magazine?issue=${issue.issue_number}` : '/magazine'
   const headline = issue.callout?.headline ?? issue.title
@@ -151,14 +187,17 @@ export default function ArchiveReveal({ issue }: { issue: ArchiveRevealIssue }) 
   return (
     <div ref={sectionRef} className={`ar ${reduced ? 'ar--static' : ''}`}>
       <style>{`
-        .ar { position: relative; height: 200vh; }
-        .ar--static { height: auto; }
+        .ar { position: relative; }
         .ar-sticky {
-          position: -webkit-sticky; position: sticky; top: 0;
-          height: 100vh; height: 100svh; /* svh: the visible height with the mobile toolbar showing */
-          display: flex; align-items: center;
+          position: -webkit-sticky; position: sticky;
+          top: 10vh; top: 10svh; /* JS refines this to exactly centre the card */
+          z-index: 1;
         }
-        .ar--static .ar-sticky { position: static; height: auto; }
+        /* Scroll distance for the animation. svh = visible height with the
+           mobile toolbar showing. */
+        .ar-runway { height: 100vh; height: 100svh; }
+        .ar--static .ar-sticky { position: static; }
+        .ar--static .ar-runway { display: none; }
         .ar-stage {
           position: relative; width: 100%;
           aspect-ratio: 16 / 9; max-height: 80vh;
@@ -207,7 +246,7 @@ export default function ArchiveReveal({ issue }: { issue: ArchiveRevealIssue }) 
         .ar-arcs { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 
         @media (max-width: 767px) {
-          .ar { height: 170vh; }
+          .ar-runway { height: 70vh; height: 70svh; }
           .ar-stage { aspect-ratio: 4 / 5; max-height: 82vh; }
           .ar-badge { width: 32%; }
           .ar-panel { flex-direction: column; justify-content: center; text-align: center; gap: 18px; padding: 8% 8%; }
@@ -216,7 +255,7 @@ export default function ArchiveReveal({ issue }: { issue: ArchiveRevealIssue }) 
         }
       `}</style>
 
-      <div className="ar-sticky">
+      <div ref={stickyRef} className="ar-sticky">
         <div ref={stageRef} className="ar-stage">
           <div ref={panelRef} className="ar-panel">
             <Link ref={coverRef} href={href} className="ar-cover" aria-label={`Read ${issue.title}`}>
@@ -249,6 +288,20 @@ export default function ArchiveReveal({ issue }: { issue: ArchiveRevealIssue }) 
           </svg>
         </div>
       </div>
+      <div ref={runwayRef} className="ar-runway" aria-hidden="true" />
+      {debug && (
+        <pre
+          ref={debugRef}
+          style={{
+            position: 'fixed', left: 8, bottom: 8, zIndex: 9999, margin: 0,
+            padding: '8px 10px', background: 'rgba(0,0,0,.85)', color: '#0f0',
+            font: '11px/1.4 ui-monospace, Menlo, monospace', borderRadius: 6,
+            pointerEvents: 'none', whiteSpace: 'pre',
+          }}
+        >
+          waiting for first scroll…
+        </pre>
+      )}
     </div>
   )
 }
