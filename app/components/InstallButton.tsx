@@ -26,7 +26,7 @@ const BENEFITS = [
       </svg>
     ),
     label: "Instant launch",
-    desc: "Opens straight from your home screen — no browser, no waiting.",
+    desc: "Opens straight from your home screen. No browser, no waiting.",
   },
   {
     icon: (
@@ -167,7 +167,7 @@ export default function InstallButton() {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Add to Home Screen"
+        aria-label="Get the 785 App"
         style={{
           position: "fixed",
           top: "50%",
@@ -202,7 +202,7 @@ export default function InstallButton() {
 
         <h2 style={styles.heading}>Add to your home screen</h2>
         <p style={styles.subheading}>
-          Get the full experience instantly — no download, no App Store.
+          Get the app experience. No download, no App Store.
         </p>
 
         <div style={styles.divider} />
