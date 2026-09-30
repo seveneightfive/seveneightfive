@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
+import { Fragment } from 'react'
 import EventCard from '@/app/components/EventCard'
 import EventListRow from '@/app/components/EventListRow'
 import ImageLightbox from './ImageLightbox'
@@ -434,14 +435,48 @@ function renderInline(text: string): React.ReactNode[] {
   return nodes
 }
 
-function renderDescription(text: string): React.ReactNode {
-  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-  const paragraphs = normalized.split(/\n{2,}/)
+// Most descriptions are pasted from Facebook, where a single line break
+// means "new paragraph" (only ~5% use a blank line). So every line break
+// starts a new paragraph, EXCEPT runs of short lines (date / time / price /
+// address lists), which stay together in one block with plain line breaks
+// so they don't get spread out.
+const SHORT_LINE = 70
 
-  return paragraphs
-    .map((p) => p.trim())
-    .filter(Boolean)
-    .map((p, i) => <p key={i}>{renderInline(p)}</p>)
+function renderDescription(text: string): React.ReactNode {
+  const lines = text
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((l) => l.trim())
+
+  const blocks: string[][] = []
+  let current: string[] = []
+  const flush = () => {
+    if (current.length) blocks.push(current)
+    current = []
+  }
+
+  for (const line of lines) {
+    if (!line) {
+      flush() // blank line = paragraph break
+      continue
+    }
+    const prev = current[current.length - 1]
+    const bothShort = prev !== undefined && prev.length <= SHORT_LINE && line.length <= SHORT_LINE
+    if (!bothShort) flush()
+    current.push(line)
+  }
+  flush()
+
+  return blocks.map((block, i) => (
+    <p key={i}>
+      {block.map((line, j) => (
+        <Fragment key={j}>
+          {j > 0 && <br />}
+          {renderInline(line)}
+        </Fragment>
+      ))}
+    </p>
+  ))
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -632,8 +667,8 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         /* DESCRIPTION */
         .section { padding: 48px 0; border-top: 1px solid var(--border); }
         .section-heading { font-family: var(--serif); font-size: 1.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; margin-bottom: 20px; }
-        .description-text { font-size: 1.1rem; font-weight: 300; line-height: 1.85; color: var(--ink); max-width: 760px; }
-        .description-text p + p { margin-top: 16px; }
+        .description-text { font-size: 1.1rem; font-weight: 300; line-height: 1.6; color: var(--ink); max-width: 760px; }
+        .description-text p + p { margin-top: 1em; }
         .description-text .desc-link { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; word-break: break-word; transition: opacity 0.15s; }
         .description-text .desc-link:hover { opacity: 0.7; }
 
