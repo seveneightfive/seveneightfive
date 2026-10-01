@@ -62,6 +62,10 @@
     var node = document.createElement(tag);
     if (attrs) {
       for (var k in attrs) {
+        // Skip null/undefined/false: setAttribute('disabled', null) would
+        // still ADD the attribute (as "null"), and any disabled attribute
+        // disables the element regardless of its value.
+        if (attrs[k] === null || attrs[k] === undefined || attrs[k] === false) continue;
         if (k === 'text') node.textContent = attrs[k];
         else if (k === 'html') node.innerHTML = attrs[k];
         else if (k.indexOf('on') === 0 && typeof attrs[k] === 'function') node.addEventListener(k.slice(2), attrs[k]);
