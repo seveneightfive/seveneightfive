@@ -4,7 +4,7 @@
  * Usage on a seller's own website:
  *
  *   <div data-785-event="my-event-slug"></div>
- *   <script src="https://seveneightfive.com/embed/tickets.js" async></script>
+ *   <script src="https://www.seveneightfive.com/embed/tickets.js" async></script>
  *
  * Renders entirely inside a Shadow DOM root attached to the div, so
  * the host site's CSS/JS can't collide with the widget and vice versa
@@ -26,7 +26,26 @@
   'use strict';
 
   var scriptEl = document.currentScript;
-  var API_BASE = (scriptEl && scriptEl.getAttribute('data-api-base')) || 'https://seveneightfive.com';
+
+  // Where the widget sends its API calls. Must be the canonical host
+  // (www): the bare domain redirects to www, and a redirect without CORS
+  // headers makes the browser block the request on the seller's site
+  // ("Could not load tickets"). Older embed snippets load this script from
+  // the bare domain, so upgrade that to www rather than trusting the
+  // script's own URL as-is. data-api-base still overrides everything.
+  var CANONICAL_BASE = 'https://www.seveneightfive.com';
+  function resolveApiBase() {
+    var override = scriptEl && scriptEl.getAttribute('data-api-base');
+    if (override) return override.replace(/\/+$/, '');
+    try {
+      var origin = new URL(scriptEl.src).origin;
+      if (origin === 'https://seveneightfive.com' || origin === 'http://seveneightfive.com') return CANONICAL_BASE;
+      return origin; // www, or a preview/staging deployment serving its own API
+    } catch (e) {
+      return CANONICAL_BASE;
+    }
+  }
+  var API_BASE = resolveApiBase();
 
   var STRIPE_FEE_PERCENT = 0.029;
   var STRIPE_FIXED_FEE_CENTS = 30;
