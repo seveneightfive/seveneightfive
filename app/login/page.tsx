@@ -1,10 +1,17 @@
 'use client'
 
-import { Suspense, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabaseBrowser'
 
 const supabase = createClient()
+
+// Only allow same-site relative paths as a post-login destination.
+// Blocks "https://evil.com" and protocol-relative "//evil.com".
+function safeNext(raw: string | null) {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/dashboard'
+  return raw
+}
 
 export default function LoginPage() {
   return (
@@ -15,14 +22,11 @@ export default function LoginPage() {
 }
 
 function LoginPageInner() {
-  const router = useRouter()
   const searchParams = useSearchParams()
 
   // Where to send the user after a successful login. Every page that
-  // redirects here for auth (tickets, advertise, following, events/edit,
-  // event tickets tab) appends ?next=<path>. Falls back to /dashboard if
-  // someone lands on /login directly with no ?next.
-  const nextPath = searchParams.get('next') || '/dashboard'
+  // redirects here for auth appends ?next=<path>. Falls back to /dashboard.
+  const nextPath = safeNext(searchParams.get('next'))
 
   const [mode, setMode] = useState<'email' | 'phone'>('email')
 
@@ -41,27 +45,54 @@ function LoginPageInner() {
     return `+1${digits}`
   }
 
+  // Decide where a signed-in user goes (onboarding vs. destination) and
+  // navigate with a FULL page load. router.push() can replay a cached
+  // pre-login redirect back to /login, which made Verify look like it
+  // did nothing (and the second click then hit an already-used code).
+  const goToDestination = async (userId: string) => {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username, email, phone_number, onboarding_completed')
+      .eq('id', userId)
+      .single()
+
+    const needsOnboarding =
+      !profile?.username ||
+      !profile?.email ||
+      !profile?.phone_number ||
+      !profile?.onboarding_completed
+
+    window.location.assign(
+      needsOnboarding
+        ? `/onboarding?next=${encodeURIComponent(nextPath)}`
+        : nextPath
+    )
+  }
+
+  // Already signed in (e.g. back button after login)? Skip the form.
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) goToDestination(user.id)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // ── EMAIL: send 6-digit code (no magic link) ───────────────────────
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        // shouldCreateUser left at default true so signup uses the same flow
-        // No emailRedirectTo: forces Supabase to send a 6-digit code instead
-        // of a clickable magic link that email pre-fetchers can burn.
-      },
-    })
+    // No emailRedirectTo: forces Supabase to send a 6-digit code instead
+    // of a clickable magic link that email pre-fetchers can burn.
+    const { error } = await supabase.auth.signInWithOtp({ email })
 
     setLoading(false)
     if (error) { setError(error.message); return }
     setStep('otp')
   }
 
-  // ── PHONE: send 6-digit code (unchanged) ───────────────────────────
+  // ── PHONE: send 6-digit code ───────────────────────────────────────
   const handlePhoneLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -80,39 +111,37 @@ function LoginPageInner() {
   // ── VERIFY: works for both email and phone ─────────────────────────
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (loading) return // guard against double-submit
     setLoading(true)
     setError('')
 
-    const { error } = mode === 'email'
+    const { data, error } = mode === 'email'
       ? await supabase.auth.verifyOtp({ email, token: otp, type: 'email' })
       : await supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' })
 
-    setLoading(false)
-    if (error) { setError(error.message); return }
+    let userId = data?.user?.id
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setError('Could not load user.'); return }
+    if (error) {
+      // A used code errors as "expired or invalid" — but if we're already
+      // signed in (e.g. an earlier click succeeded), just carry on.
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setLoading(false)
+        setError(error.message)
+        return
+      }
+      userId = user.id
+    }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-
-    if (
-      !profile?.username ||
-      !profile?.email ||
-      !profile?.phone_number ||
-      !profile?.onboarding_completed
-    ) {
-      // Preserve the intended destination through onboarding too, so a
-      // brand-new user still lands back where they started once they've
-      // finished setting up their profile.
-      router.push(`/onboarding?next=${encodeURIComponent(nextPath)}`)
+    if (!userId) {
+      setLoading(false)
+      setError('Could not load user.')
       return
     }
 
-    router.push(nextPath)
+    // Leave loading=true: the page is about to navigate away, and keeping
+    // the button disabled prevents re-submitting the now-used code.
+    await goToDestination(userId)
   }
 
   // ── Resend / change destination ────────────────────────────────────
@@ -139,12 +168,14 @@ function LoginPageInner() {
         {step === 'input' && (
           <div className="flex gap-2 mb-6">
             <button
+              type="button"
               onClick={() => { setMode('email'); setError('') }}
               className={`flex-1 p-3 rounded ${mode === 'email' ? 'bg-pink-600' : 'bg-zinc-900'}`}
             >
               Email
             </button>
             <button
+              type="button"
               onClick={() => { setMode('phone'); setError('') }}
               className={`flex-1 p-3 rounded ${mode === 'phone' ? 'bg-pink-600' : 'bg-zinc-900'}`}
             >
