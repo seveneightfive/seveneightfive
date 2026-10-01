@@ -1,5 +1,24 @@
 import { NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabaseServerAuth'
+
+// The public seller page (/sellers/[slug]) is cached for 5 minutes, so a
+// newly created or edited event wouldn't show there until the cache expired.
+// Rebuild it immediately whenever one of the seller's events changes.
+async function revalidateSellerPage(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  ownerId: string | null,
+) {
+  if (!ownerId) return
+  const { data: owner } = await supabase
+    .from('profiles')
+    .select('seller_slug, is_seller')
+    .eq('id', ownerId)
+    .maybeSingle()
+  if (owner?.is_seller && owner.seller_slug) {
+    revalidatePath(`/sellers/${owner.seller_slug}`)
+  }
+}
 
 function slugify(title: string, date: string): string {
   const base = title
@@ -84,6 +103,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  await revalidateSellerPage(supabase, user.id)
+
   return NextResponse.json({ ok: true, id: data.id, slug: data.slug })
 }
 
@@ -162,6 +183,10 @@ export async function PATCH(request: Request) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  // Rebuild the event owner's seller page (the owner, not necessarily the
+  // editor — a venue owner or featured artist can edit someone else's event).
+  await revalidateSellerPage(supabase, existing.auth_user_id)
 
   return NextResponse.json({ ok: true })
 }
