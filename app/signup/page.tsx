@@ -1,11 +1,17 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense } from 'react'
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabaseBrowser'
 
 const supabase = createClient()
+
+// Only allow same-site relative paths as a post-login destination.
+// Blocks "https://evil.com" and protocol-relative "//evil.com".
+function safeNext(raw: string | null) {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return '/dashboard'
+  return raw
+}
 
 export default function SignupPage() {
   return (
@@ -16,9 +22,8 @@ export default function SignupPage() {
 }
 
 function SignupInner() {
-  const router = useRouter()
   const searchParams = useSearchParams()
-  const nextPath = searchParams.get('next') || '/dashboard'
+  const nextPath = safeNext(searchParams.get('next'))
 
   const [mode, setMode] = useState<'email' | 'phone'>('email')
   const [email, setEmail] = useState('')
@@ -56,40 +61,71 @@ function SignupInner() {
     setStep('otp')
   }
 
-  const handleVerify = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
-    const { error } = mode === 'email'
-      ? await supabase.auth.verifyOtp({ email, token: otp, type: 'email' })
-      : await supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' })
-
-    setLoading(false)
-    if (error) { setError(error.message); return }
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setError('Could not load user.'); return }
-
+  // Decide where a signed-in user goes (onboarding vs. destination) and
+  // navigate with a FULL page load. router.push() can replay a cached
+  // pre-login redirect back to this page, which made Verify look like it
+  // did nothing (and the second click then hit an already-used code).
+  const goToDestination = async (userId: string) => {
     const { data: profile } = await supabase
       .from('profiles')
       .select('username, email, phone_number, onboarding_completed')
-      .eq('id', user.id)
+      .eq('id', userId)
       .maybeSingle()
 
-    // New users (or anyone with incomplete profile) → onboarding
-    if (
+    const needsOnboarding =
       !profile?.username ||
       !profile?.email ||
       !profile?.phone_number ||
       !profile?.onboarding_completed
-    ) {
-      router.push('/onboarding')
+
+    window.location.assign(
+      needsOnboarding
+        ? `/onboarding?next=${encodeURIComponent(nextPath)}`
+        : nextPath
+    )
+  }
+
+  // Already signed in? Skip the form.
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) goToDestination(user.id)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (loading) return // guard against double-submit
+    setLoading(true)
+    setError('')
+
+    const { data, error } = mode === 'email'
+      ? await supabase.auth.verifyOtp({ email, token: otp, type: 'email' })
+      : await supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' })
+
+    let userId = data?.user?.id
+
+    if (error) {
+      // A used code errors as "expired or invalid" — but if we're already
+      // signed in (e.g. an earlier click succeeded), just carry on.
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setLoading(false)
+        setError(error.message)
+        return
+      }
+      userId = user.id
+    }
+
+    if (!userId) {
+      setLoading(false)
+      setError('Could not load user.')
       return
     }
 
-    // Already-complete returning users → wherever they were headed
-    router.push(nextPath)
+    // Leave loading=true: the page is about to navigate away, and keeping
+    // the button disabled prevents re-submitting the now-used code.
+    await goToDestination(userId)
   }
 
   const resetToInput = () => {
@@ -339,7 +375,7 @@ function SignupInner() {
                   </button>
                 </form>
 
-                <button type="button" onClick={resetToInput} className="reset-btn">
+                <button type="button" onClick={resetToInput} disabled={loading} className="reset-btn">
                   Use a different {mode === 'email' ? 'email' : 'phone number'}
                 </button>
               </>
