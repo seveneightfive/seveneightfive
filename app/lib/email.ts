@@ -2,6 +2,7 @@ import { Resend } from 'resend'
 import QRCode from 'qrcode'
 import { ticketConfirmationEmail } from './emails/ticketConfirmation'
 import { ticketReminderEmail } from './emails/ticketReminder'
+import { parseStartTime } from '@/lib/ticketSalesCutoff'
 
 export const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -386,11 +387,10 @@ export function formatDate(iso: string): string {
 }
 
 export function formatTime(raw: string): string {
-  // accepts HH:MM or HH:MM:SS
-  const [hStr, mStr] = raw.split(':')
-  const h = parseInt(hStr, 10)
-  const m = mStr ? parseInt(mStr, 10) : 0
-  if (Number.isNaN(h)) return raw
+  // Accepts "6:00 PM", "6 pm", "18:00", "18:00:00"
+  const parsed = parseStartTime(raw)
+  if (!parsed) return raw
+  const [h, m] = parsed
   const period = h >= 12 ? 'PM' : 'AM'
   const h12 = h % 12 === 0 ? 12 : h % 12
   return `${h12}:${m.toString().padStart(2, '0')} ${period}`
