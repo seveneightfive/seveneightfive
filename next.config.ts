@@ -126,9 +126,10 @@ const nextConfig: NextConfig = {
     }))
 
     // --- One-off event slug corrections (flier had a typo in the slug) ---
-    const eventSlugRedirects: Array<[string, string]> = [
-      ["/events/the-soul-fire-art-music-festival-2026-08-28", "/events/the-soul-fire-art-music-festival-26-08-28"],
-    ]
+       const eventSlugRedirects: Array<[string, string]> = [
+     ["/events/the-soul-fire-art-music-festival-2026-08-28", "/events/the-soul-fire-art-music-festival-26-08-28"],
+     ["/events/2026-arty-awards-2026-10-16", "/events/2026-arty-awards-2026-10-16-1"],
+   ]
 
     const eventSlugRedirectRules = eventSlugRedirects.map(([source, destination]) => ({
       source,
