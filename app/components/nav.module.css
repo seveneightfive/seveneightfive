@@ -47,6 +47,7 @@
 
 .topnav nav {
   display: flex;
+  align-items: center;
   gap: 4px;
 }
 
@@ -98,43 +99,303 @@
   text-transform: uppercase;
 }
 
-/* ── Bottom Nav (mobile) ── */
+/* ── Bottom Nav (mobile) — floating bar ── */
 .bottomnav {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: #0A0A0A;
-  display: flex;
-  border-top: 3px solid #FFCE03;
+  left: 12px;
+  right: 12px;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  max-width: 480px;
+  margin: 0 auto;
   z-index: 200;
-  padding-bottom: env(safe-area-inset-bottom);
+  height: 66px;
+  box-sizing: border-box;
+  padding: 6px;
+  display: flex;
+  gap: 4px;
+  background: rgba(10, 10, 10, 0.92);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: transform 250ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 200ms ease;
+}
+
+/* Slid out of view while scrolling down */
+.bottomnavHidden {
+  transform: translateY(calc(100% + 24px + env(safe-area-inset-bottom, 0px)));
+  opacity: 0;
+  pointer-events: none;
 }
 
 .bnLink {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 10px 4px 12px;
+  gap: 3px;
+  border-radius: 18px;
   text-decoration: none;
-  color: #AAAAAA;
-  gap: 4px;
-  transition: color 0.15s;
+  color: rgba(255, 255, 255, 0.72);
   font-family: 'Oswald', sans-serif;
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 1.5px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-}
-
-.bnLink.active {
-  color: #FFCE03;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 200ms ease, color 200ms ease;
 }
 
 .bnLink:hover {
   color: #ffffff;
+}
+
+.bnLink.active,
+.bnLink.active:hover {
+  background: #FFCE03;
+  color: #0A0A0A;
+}
+
+.bnLink:focus-visible {
+  outline: 2px solid #FFCE03;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bottomnav,
+  .bnLink {
+    transition: none;
+  }
+}
+
+/* Room at the bottom of every page so the floating bar never covers the
+   last bit of content (class is set by MobileBottomNav while mounted). */
+@media (max-width: 639px) {
+  :global(body.has-bottomnav) {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ── Desktop Discover menu ── */
+.navGroup {
+  display: flex;
+  align-items: center;
+  border-radius: 2px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.navGroup:hover {
+  background: #FFCE03;
+}
+
+.navGroup .navLink {
+  padding-right: 4px;
+}
+
+.navGroup .navLink:hover {
+  background: transparent;
+}
+
+.navGroupActive,
+.navGroupActive:hover {
+  background: #0A0A0A;
+}
+
+.navGroupActive .navLink {
+  color: #ffffff;
+}
+
+.ddBtn {
+  width: 32px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: #0A0A0A;
+  cursor: pointer;
+}
+
+.navGroupActive .ddBtn {
+  color: #ffffff;
+}
+
+.ddBtn svg {
+  transition: transform 200ms ease;
+}
+
+.ddBtn[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.navLink:focus-visible,
+.ddBtn:focus-visible,
+.menuItem:focus-visible,
+.menuFeature:focus-visible,
+.menuAll:focus-visible {
+  outline: 2px solid #C80650;
+  outline-offset: 2px;
+}
+
+.menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 2px; /* sit under the header's 2px border */
+  background: #ffffff;
+  border-bottom: 2px solid #0A0A0A;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
+}
+
+.menuInner {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 28px 40px 32px;
+  display: flex;
+  gap: 40px;
+}
+
+.menuCol {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.menuHeading {
+  font-family: 'Oswald', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #5B6170;
+  margin-bottom: 10px;
+}
+
+.menuGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px 16px;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: #0A0A0A;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.menuItem:hover {
+  background: #F4F2ED;
+}
+
+.menuSwatch {
+  flex: 0 0 10px;
+  height: 36px;
+  border-radius: 3px;
+}
+
+.menuName {
+  display: block;
+  font-family: 'Oswald', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.menuItem:hover .menuName {
+  text-decoration: underline;
+}
+
+.menuMeta {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  color: #5B6170;
+}
+
+.menuAll {
+  display: inline-block;
+  margin: 16px 0 0 12px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #C80650;
+  text-decoration: none;
+}
+
+.menuAll:hover {
+  text-decoration: underline;
+}
+
+.menuFeature {
+  flex: 0 0 320px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 22px;
+  border-radius: 14px;
+  background: #FFCE03;
+  color: #0A0A0A;
+  text-decoration: none;
+}
+
+.menuFeatureBadge {
+  align-self: flex-start;
+  background: #C80650;
+  color: #ffffff;
+  box-shadow: 3px 3px 0 #0A0A0A;
+  padding: 5px 9px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: auto;
+}
+
+.menuFeatureTitle {
+  font-family: 'Oswald', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  margin-top: 40px;
+}
+
+.menuFeatureCopy {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.menuFeatureCta {
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.menuFeature:hover .menuFeatureCta {
+  text-decoration: underline;
+}
+
+@media (max-width: 1023px) {
+  .menuFeature {
+    display: none;
+  }
 }
 
 /* ── Desktop Overrides ── */
