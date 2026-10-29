@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import HomeClient from './HomeClient'
 import type { HeroSlide } from './HeroSlider'
-import SignupForm from './components/SignupForm';
+import { pickFeaturedSlots, addDays, type FeaturedSlotEvent } from '@/lib/featuredSlots'
 
 export const revalidate = 3600
 
@@ -37,25 +37,27 @@ type EventRow = {
 export default async function HomePage() {
   const now = new Date()
 
-  const todayStart = new Date(now)
-  todayStart.setHours(0, 0, 0, 0)
-  const today = todayStart.toISOString().split('T')[0]
-
-  const tomorrowEnd = new Date(now)
-  tomorrowEnd.setDate(tomorrowEnd.getDate() + 1)
-  const tomorrow = tomorrowEnd.toISOString().split('T')[0]
+  // "Today" in Topeka, not in the server's timezone (UTC on Vercel), so
+  // evening visitors don't see tomorrow's events as today's.
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(now)
+  // Look-ahead window for the Featured Events slots (Tonight, This Weekend,
+  // Live Music · Arts, Free · Family)
+  const featuredHorizon = addDays(today, 14)
 
   // Run all queries in parallel
   const [
-    { data: events },
+    { data: events, count: todayCount },
     { data: upcomingEventIds },
     { data: featuredRaw },
     { data: notoVenues },
     { data: heroSlidesRaw },
     { data: spotlightRows },
+    { data: featuredPoolRaw },
   ] = await Promise.all([
 
-    // 1. Events for today + tomorrow for the home page list
+    // 1. Today's events for "Today in Topeka" (+ total count for the header)
     supabase
       .from('events')
       .select(`
@@ -72,11 +74,10 @@ export default async function HomePage() {
         image_url,
         ticket_url,
         venue:venues ( name, neighborhood )
-      `)
-      .in('event_date', [today, tomorrow])
-      .order('event_date', { ascending: true })
+      `, { count: 'exact' })
+      .eq('event_date', today)
       .order('event_start_time', { ascending: true })
-      .limit(10),
+      .limit(6),
 
     // 2. Get all upcoming event IDs (from today onwards) for artist ranking
     supabase
@@ -87,12 +88,13 @@ export default async function HomePage() {
     // 3. Featured (starred) upcoming events for the hero slider
     supabase
       .from('events')
-      .select('id, title, event_date, end_date, event_start_time, event_types, slug, image_url, ticket_url, venues ( name, neighborhood )')
+      .select('id, title, event_date, end_date, event_start_time, event_end_time, ticket_price, event_types, tags, star, slug, image_url, ticket_url, venues ( name, neighborhood )')
       .eq('star', true)
       .gte('event_date', today)
       .order('event_date', { ascending: true })
-      // 1 for the hero + up to 6 for the Editor's Pick tab
-      .limit(7),
+      // Editor's Pick slot + up to 6 for the Editor's Pick tab (+ spares
+      // in case some are used by other carousel slots)
+      .limit(12),
 
     // 4. NOTO neighborhood venues
     supabase
@@ -119,6 +121,18 @@ export default async function HomePage() {
         )
       `)
       .eq('active', true),
+
+    // 7. Candidate pool for the Featured Events carousel slots: everything
+    //    happening from today through the next two weeks, including runs
+    //    (exhibitions etc.) that started earlier and are still on.
+    supabase
+      .from('events')
+      .select('id, title, event_date, end_date, event_start_time, event_end_time, ticket_price, event_types, tags, star, slug, image_url, venues ( name, neighborhood )')
+      .lte('event_date', featuredHorizon)
+      .or(`event_date.gte.${today},end_date.gte.${today}`)
+      .order('event_date', { ascending: true })
+      .order('event_start_time', { ascending: true })
+      .limit(200),
   ])
 
   // "Explore our Archives" — a different issue each day, picked pseudo-
@@ -255,6 +269,28 @@ export default async function HomePage() {
     venue: Array.isArray(e.venues) ? e.venues[0] ?? null : e.venues ?? null,
   }))
 
+  const toSlotEvent = (e: any): FeaturedSlotEvent => ({
+    id: e.id,
+    title: e.title,
+    slug: e.slug ?? null,
+    event_date: e.event_date,
+    end_date: e.end_date ?? null,
+    event_start_time: e.event_start_time ?? null,
+    event_end_time: e.event_end_time ?? null,
+    ticket_price: e.ticket_price ?? null,
+    event_types: e.event_types ?? null,
+    tags: e.tags ?? null,
+    star: e.star ?? null,
+    image_url: e.image_url ?? null,
+    venue: Array.isArray(e.venues) ? e.venues[0] ?? null : e.venues ?? null,
+  })
+
+  const featuredSlots = pickFeaturedSlots({
+    today,
+    starred: (featuredRaw ?? []).map(toSlotEvent),
+    pool: (featuredPoolRaw ?? []).map(toSlotEvent),
+  })
+
   const heroSlides: HeroSlide[] = (heroSlidesRaw ?? []) as HeroSlide[]
 
   // Pick the spotlight whose date window includes today. If several
@@ -285,6 +321,8 @@ export default async function HomePage() {
       events={normalizedEvents}
       artists={sortedArtists}
       featuredEvents={featuredEvents}
+      featuredSlots={featuredSlots}
+      todayCount={todayCount ?? normalizedEvents.length}
       notoVenueCount={notoVenueIds.length}
       notoEventCount={notoEventCount ?? 0}
       heroSlides={heroSlides}

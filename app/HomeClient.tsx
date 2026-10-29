@@ -8,6 +8,8 @@ import ArchiveReveal from './components/ArchiveReveal'
 import EventTabs, { type EventTab } from './components/EventTabs'
 import type { SpotlightEvent } from './components/SpotlightCard'
 import HomeHero from './components/HomeHero'
+import TodayInTopeka from './components/TodayInTopeka'
+import type { FeaturedSlot } from '@/lib/featuredSlots'
 import SignupForm from './components/SignupForm'
 import KeepMusicLiveBanner from './components/KeepMusicLiveBanner'
 
@@ -65,6 +67,8 @@ export default function HomeClient({
   events,
   artists,
   featuredEvents,
+  featuredSlots,
+  todayCount,
   notoVenueCount,
   notoEventCount,
   heroSlides,
@@ -74,30 +78,45 @@ export default function HomeClient({
   events: Event[]
   artists: Artist[]
   featuredEvents: FeaturedEvent[]
+  featuredSlots: FeaturedSlot[]
+  todayCount: number
   notoVenueCount: number
   notoEventCount: number
   heroSlides: HeroSlide[]
   archiveIssue: ArchiveIssue | null
   spotlight: Spotlight | null
 }) {
+  // Events already shown in the Featured Events carousel aren't repeated
+  // in the Editor's Pick tab further down.
+  const inCarousel = new Set(featuredSlots.map(s => s.event.id))
+
   // Tabs with no events are hidden automatically by EventTabs.
+  // ("Today in Topeka" now has its own list right under the hero.)
   const eventTabs: EventTab[] = [
     ...(spotlight
       ? [{ key: 'spotlight', label: spotlight.title, href: spotlight.href, events: spotlight.events }]
       : []),
-    { key: 'today', label: 'Today in Topeka', href: '/events', events: events.slice(0, 6) },
-    // featuredEvents[0] is already the hero's Editor's Pick
-    { key: 'editors-pick', label: "Editor's Pick", href: '/events', events: featuredEvents.slice(1, 7) },
+    {
+      key: 'editors-pick',
+      label: "Editor's Pick",
+      href: '/events',
+      events: featuredEvents.filter(e => !inCarousel.has(e.id)).slice(0, 6),
+    },
   ]
 
   return (
     <>
       <main className={styles.main}>
 
-        {/* ── Hero ── */}
-<HomeHero editorPick={featuredEvents[0] ?? null} />
+                {/* ── Hero + Featured Events carousel ── */}
+        <HomeHero slots={featuredSlots} />
 
-{/* ── Event tabs (desktop) / stacked rails (mobile) ── */}
+        {/* ── Today in Topeka ── */}
+        <div id="today" className={styles.contentWrap}>
+          <TodayInTopeka events={events} total={todayCount} />
+        </div>
+
+        {/* ── Spotlight / Editor's Pick tabs (desktop) / stacked rails (mobile) ── */}
         <section id="events" className={styles.contentWrap}>
           <EventTabs tabs={eventTabs} />
         </section>
