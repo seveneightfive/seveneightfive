@@ -49,25 +49,26 @@ function LoginPageInner() {
   // navigate with a FULL page load. router.push() can replay a cached
   // pre-login redirect back to /login, which made Verify look like it
   // did nothing (and the second click then hit an already-used code).
-  const goToDestination = async (userId: string) => {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('username, email, phone_number, onboarding_completed')
-      .eq('id', userId)
-      .single()
+     const goToDestination = async (userId: string) => {
+     const { data: { user } } = await supabase.auth.getUser()
+     const { data: profile } = await supabase
+       .from('profiles')
+       .select('username, onboarding_completed')
+       .eq('id', userId)
+       .single()
 
-    const needsOnboarding =
-      !profile?.username ||
-      !profile?.email ||
-      !profile?.phone_number ||
-      !profile?.onboarding_completed
+     const needsOnboarding =
+       !profile?.username ||
+       !user?.email ||
+       !user?.phone ||
+       !profile?.onboarding_completed
 
-    window.location.assign(
-      needsOnboarding
-        ? `/onboarding?next=${encodeURIComponent(nextPath)}`
-        : nextPath
-    )
-  }
+     window.location.assign(
+       needsOnboarding
+         ? `/onboarding?next=${encodeURIComponent(nextPath)}`
+         : nextPath
+     )
+   }
 
   // Already signed in (e.g. back button after login)? Skip the form.
   useEffect(() => {
