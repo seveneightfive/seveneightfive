@@ -46,7 +46,7 @@ const nextConfig: NextConfig = {
     // Search Console's Change of Address "301-redirect from homepage"
     // pre-flight check specifically wants a literal 301. `statusCode` is
     // the documented escape hatch to force the exact code.
-    const OLD_HOSTS = ["785events.com", "www.785events.com"]
+    const OLD_HOSTS = ["785events.com", "www.785events.com", "785mag.com", "www.785mag.com"]
     const NEW_ORIGIN = "https://www.seveneightfive.com"
 
     const pageMap: Array<[string, string]> = [

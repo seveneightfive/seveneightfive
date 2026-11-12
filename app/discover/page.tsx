@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   title: 'Discover Topeka | Artists, Local Flavor, Galleries & Venues | seveneightfive',
   description:
     'Explore seveneightfive — Topeka artists, locally owned restaurants and bars, art galleries, First Friday ArtWalk, live music, venues and neighborhoods.',
-  alternates: { canonical: 'https://seveneightfive.com/discover' },
+  alternates: { canonical: 'https://www.seveneightfive.com/discover' },
 }
 
 type VenueRow = {

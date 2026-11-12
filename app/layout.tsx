@@ -7,6 +7,7 @@ import NavWrapper from './components/NavWrapper'
 import { NavProvider } from './components/NavContext'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Analytics } from '@vercel/analytics/next'
+import GoogleAnalytics from './components/GoogleAnalytics'
 
 // Display font — used for h1–h6 and anything tagged `font-display`.
 // Loaded via next/font, which self-hosts and inlines the font in CSS instead
@@ -28,6 +29,13 @@ const dmSans = DM_Sans({
 })
 
 export const metadata: Metadata = {
+  // Resolves relative canonical/OG URLs and keeps every page on one host.
+  metadataBase: new URL('https://www.seveneightfive.com'),
+  // Paste the content value from Search Console's "HTML tag" method here,
+  // or set NEXT_PUBLIC_GSC_VERIFICATION. Not needed if you verify via DNS.
+  ...(process.env.NEXT_PUBLIC_GSC_VERIFICATION && {
+    verification: { google: process.env.NEXT_PUBLIC_GSC_VERIFICATION },
+  }),
   title: 'seveneightfive',
   description: 'Topeka Arts and Entertainment Magazine featuring Calendar of Events and Artists Directory',
   manifest: '/manifest.json',
@@ -79,6 +87,7 @@ export default function RootLayout({
           <PushNotificationButton />
           <SpeedInsights />
           <Analytics />
+          <GoogleAnalytics />
         </NavProvider>
       </body>
     </html>
