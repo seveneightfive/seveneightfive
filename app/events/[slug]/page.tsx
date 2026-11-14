@@ -204,7 +204,7 @@ export async function generateMetadata(
   return {
     title: `${event.title} | The 785`,
     description,
-    alternates: { canonical: `https://seveneightfive.com/events/${event.slug}` },
+    alternates: { canonical: `https://www.seveneightfive.com/events/${event.slug}` },
     openGraph: {
       title: event.title,
       description,
@@ -275,7 +275,7 @@ function getJsonLd(event: Event) {
     '@type': schemaType,
     name: event.title,
     description: event.description,
-    url: `https://seveneightfive.com/events/${event.slug}`,
+    url: `https://www.seveneightfive.com/events/${event.slug}`,
     startDate,
     ...(endDate && { endDate }),
     image: event.image_url,
@@ -325,13 +325,13 @@ function getJsonLd(event: Event) {
       performer: event.artists.map(a => ({
         '@type': 'Person',
         name: a.name,
-        ...(a.slug && { url: `https://seveneightfive.com/artists/${a.slug}` }),
+        ...(a.slug && { url: `https://www.seveneightfive.com/artists/${a.slug}` }),
       })),
     }),
     organizer: {
       '@type': 'Organization',
       name: 'seveneightfive',
-      url: 'https://seveneightfive.com',
+      url: 'https://www.seveneightfive.com',
     },
   }
 }
@@ -341,8 +341,8 @@ function getBreadcrumbJsonLd(event: Event) {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Events', item: 'https://seveneightfive.com/events' },
-      { '@type': 'ListItem', position: 2, name: event.title, item: `https://seveneightfive.com/events/${event.slug}` },
+      { '@type': 'ListItem', position: 1, name: 'Events', item: 'https://www.seveneightfive.com/events' },
+      { '@type': 'ListItem', position: 2, name: event.title, item: `https://www.seveneightfive.com/events/${event.slug}` },
     ],
   }
 }

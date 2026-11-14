@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     images: ['https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/hero-images/local-flavor-hero.jpg'],
   },
   alternates: {
-    canonical: 'https://seveneightfive.com/local-flavor',
+    canonical: 'https://www.seveneightfive.com/local-flavor',
   },
 }
 

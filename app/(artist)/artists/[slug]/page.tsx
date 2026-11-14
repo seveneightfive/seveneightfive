@@ -69,7 +69,7 @@ type PortfolioImage = {
   display_order: number
 }
 
-const SITE_URL = 'https://seveneightfive.com'
+const SITE_URL = 'https://www.seveneightfive.com'
 
 // ─── SEO ─────────────────────────────────────────────────────────────────────
 

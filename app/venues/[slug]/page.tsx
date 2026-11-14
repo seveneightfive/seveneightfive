@@ -44,7 +44,7 @@ type Event = {
   ticket_url: string | null
 }
 
-const SITE_URL = 'https://seveneightfive.com'
+const SITE_URL = 'https://www.seveneightfive.com'
 
 // Image_url is the venue's photo; logo is a fallback for venues that only
 // have a business logo on file (no on-site photo yet). Used for the hero,

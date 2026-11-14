@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: 'Articles | seveneightfive Magazine',
   description: 'Read stories about Topeka — local flavor, live music, art, and community from seveneightfive magazine.',
   alternates: {
-    canonical: 'https://seveneightfive.com/articles',
+    canonical: 'https://www.seveneightfive.com/articles',
   },
 }
 

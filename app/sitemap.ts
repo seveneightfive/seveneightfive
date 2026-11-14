@@ -56,10 +56,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Programmatic SEO landing pages (all-events, free-events, karaoke, etc.)
   // — one route per published row in the seo_pages table.
+  // Only list slugs that have a real route folder under app/events/, so the
+  // sitemap never points Google at a 404 or a redirect.
+  const SEO_EVENT_FOLDERS = new Set([
+    'all-events', 'art', 'comedy', 'family', 'first-friday-artwalk', 'free',
+    'karaoke', 'live-music', 'theater', 'this-month', 'this-week',
+    'this-weekend', 'today',
+  ])
   const seoPageRoutes: MetadataRoute.Sitemap = (seoPages ?? [])
-    .filter((p) => p.slug)
+    .filter((p) => p.slug && SEO_EVENT_FOLDERS.has(p.slug))
     .map((p) => ({
-      url: `${BASE_URL}/topeka-events/${p.slug}`,
+      url: `${BASE_URL}/events/${p.slug}`,
       lastModified: p.updated_at ? new Date(p.updated_at) : new Date(),
       changeFrequency: 'daily' as const,
       priority: 0.7,

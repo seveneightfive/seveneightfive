@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     images: ['https://pjuyzybsyguuqaesiiyu.supabase.co/storage/v1/object/public/site-images/hero-images/ILove90s-TylerStruck-Web.jpg'],
   },
   alternates: {
-    canonical: 'https://seveneightfive.com/live-music',
+    canonical: 'https://www.seveneightfive.com/live-music',
   },
 }
 
